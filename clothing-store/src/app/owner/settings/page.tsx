@@ -1,0 +1,468 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Sidebar } from '@/components/ui/Sidebar';
+import { TopNavBar } from '@/components/ui/TopNavBar';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Toggle } from '@/components/ui/Toggle';
+import { ImageUpload } from '@/components/ui/ImageUpload';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { Building2, Receipt, User, DollarSign } from 'lucide-react';
+
+interface BusinessSettings {
+  businessName: string;
+  shortName: string;
+  defaultCurrency: string;
+  taxRate: number;
+  registeredBy: string;
+  registeredAt: string;
+  businessLogo: string;
+  showBusinessLogoOnInvoice: boolean;
+  autoPrintReceiptAfterCheckout: boolean;
+  invoiceFooterMessage: string;
+  enableDarkMode: boolean;
+  enableSoundEffects: boolean;
+  currencyRate: number;
+}
+
+function OwnerSettingsContent() {
+  const { refreshCurrencySettings } = useCurrency();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [error, setError] = useState<string>('');
+  
+  // Main state for all settings
+  const [settings, setSettings] = useState<BusinessSettings>({
+    businessName: '',
+    shortName: '',
+    defaultCurrency: 'THB',
+    taxRate: 0,
+    registeredBy: '',
+    registeredAt: '',
+    businessLogo: '',
+    showBusinessLogoOnInvoice: true,
+    autoPrintReceiptAfterCheckout: true,
+    invoiceFooterMessage: '',
+    enableDarkMode: false,
+    enableSoundEffects: false,
+    currencyRate: 0
+  });
+
+  // Fetch existing settings on component mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setIsLoadingData(true);
+        setError('');
+        
+        const response = await fetch('/api/settings');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          setSettings(result.data);
+        } else {
+          setError(result.error || 'Failed to load settings');
+        }
+      } catch (err) {
+        console.error('Error fetching settings:', err);
+        setError('Failed to load settings');
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
+  const currencies = [
+    { code: 'THB', name: 'Thai Baht', symbol: '฿' },
+    { code: 'MMK', name: 'Myanmar Kyat', symbol: 'Ks' }
+  ];
+
+  // Helper function to get currency rate display
+  const getCurrencyRateDisplay = () => {
+    if (settings.defaultCurrency === 'MMK') {
+      return {
+        from: 'MMK',
+        to: 'THB',
+        fromName: 'Myanmar Kyat',
+        toName: 'Thai Baht',
+        fromSymbol: 'Ks',
+        toSymbol: '฿',
+        description: '1 Myanmar Kyat = ? Thai Baht'
+      };
+    } else {
+      return {
+        from: settings.defaultCurrency,
+        to: 'MMK',
+        fromName: currencies.find(c => c.code === settings.defaultCurrency)?.name || settings.defaultCurrency,
+        toName: 'Myanmar Kyat',
+        fromSymbol: currencies.find(c => c.code === settings.defaultCurrency)?.symbol || settings.defaultCurrency,
+        toSymbol: 'Ks',
+        description: `1 ${currencies.find(c => c.code === settings.defaultCurrency)?.name || settings.defaultCurrency} = ? Myanmar Kyat`
+      };
+    }
+  };
+
+  const handleInputChange = (field: keyof BusinessSettings, value: string | number | boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSaveSettings = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSettings(result.data);
+        // Refresh currency context to reflect the new settings
+        await refreshCurrencySettings();
+        alert('Settings saved successfully!');
+      } else {
+        setError(result.error || 'Failed to save settings');
+        alert('Failed to save settings: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Error saving settings:', err);
+      setError('Failed to save settings');
+      alert('Failed to save settings. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (confirm('Are you sure you want to reset all settings to default values?')) {
+      setIsLoading(true);
+      setError('');
+      
+      try {
+        const response = await fetch('/api/settings?action=reset', {
+          method: 'PUT',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setSettings(result.data);
+          alert('Settings reset successfully!');
+        } else {
+          setError(result.error || 'Failed to reset settings');
+          alert('Failed to reset settings: ' + (result.error || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Error resetting settings:', err);
+        setError('Failed to reset settings');
+        alert('Failed to reset settings. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar 
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isCartModalOpen={isCartModalOpen}
+      />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+        
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+              <p className="text-gray-600 mt-1">Manage your business settings and preferences</p>
+            </div>
+
+            {/* Loading State */}
+            {isLoadingData && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-gray-600">Loading settings...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Settings Content */}
+            {!isLoadingData && (
+            <div className="space-y-8">
+              {/* Business Information Section */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center mb-6">
+                  <Building2 className="h-5 w-5 text-blue-600 mr-2" />
+                  <h2 className="text-lg font-semibold text-gray-900">Business Information</h2>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Logo Upload */}
+                  <div className="text-center">
+                    <div className="w-24 h-24 mx-auto mb-4 bg-blue-100 rounded-lg flex items-center justify-center">
+                      {settings.businessLogo ? (
+                        <img 
+                          src={settings.businessLogo} 
+                          alt="Business Logo" 
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-blue-500 rounded transform rotate-12"></div>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">Click to select logo</p>
+                    <p className="text-xs text-gray-500 mb-4">PNG, JPG, JPEG, GIF up to 10MB</p>
+                    <Button variant="outline" size="sm">
+                      Upload Logo
+                    </Button>
+                  </div>
+
+                  {/* Business Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Input
+                      label="Business Name"
+                      value={settings.businessName}
+                      onChange={(e) => handleInputChange('businessName', e.target.value)}
+                    />
+                    <Input
+                      label="Short Name (Optional)"
+                      value={settings.shortName}
+                      onChange={(e) => handleInputChange('shortName', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-normal text-gray-900 mb-2">
+                        Default Currency
+                      </label>
+                      <div className="relative">
+                        <select
+                          title='DefaultCurrentcy'
+                          value={settings.defaultCurrency}
+                          onChange={(e) => handleInputChange('defaultCurrency', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-gray-500 appearance-none bg-white text-gray-900"
+                        >
+                          {currencies.map((currency) => (
+                            <option key={currency.code} value={currency.code}>
+                              {currency.symbol} {currency.code} — {currency.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                          <svg className="w-4 h-4 text-dark-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <Input
+                      label="Tax Rate (%) (e.g., 5 for 5%)"
+                      type="number"
+                      value={settings.taxRate}
+                      onChange={(e) => handleInputChange('taxRate', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Input
+                      label="Registered By"
+                      value={settings.registeredBy}
+                      onChange={(e) => handleInputChange('registeredBy', e.target.value)}
+                    />
+                    <Input
+                      label="Registered At"
+                      type="date"
+                      value={settings.registeredAt}
+                      onChange={(e) => handleInputChange('registeredAt', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Invoice & Receipt Settings */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center mb-6">
+                  <Receipt className="h-5 w-5 text-blue-600 mr-2" />
+                  <h2 className="text-lg font-semibold text-gray-900">Invoice & Receipt Settings</h2>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">Show Business Logo on Invoice</h3>
+                    </div>
+                    <Toggle
+                      checked={settings.showBusinessLogoOnInvoice}
+                      onChange={(checked) => handleInputChange('showBusinessLogoOnInvoice', checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">Auto Print Receipt After Checkout</h3>
+                    </div>
+                    <Toggle
+                      checked={settings.autoPrintReceiptAfterCheckout}
+                      onChange={(checked) => handleInputChange('autoPrintReceiptAfterCheckout', checked)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Invoice Footer Message
+                    </label>
+                    <textarea
+                      value={settings.invoiceFooterMessage}
+                      onChange={(e) => handleInputChange('invoiceFooterMessage', e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-gray-500 text-gray-900"
+                      placeholder="Enter footer message for invoices"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">This message will appear at the bottom of customer invoices.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Interface Preferences */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center mb-6">
+                  <User className="h-5 w-5 text-blue-600 mr-2" />
+                  <h2 className="text-lg font-semibold text-gray-900">User Interface Preferences</h2>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">Enable Dark Mode (Coming Soon)</h3>
+                    </div>
+                    <Toggle
+                      checked={settings.enableDarkMode}
+                      onChange={(checked) => handleInputChange('enableDarkMode', checked)}
+                      disabled={true}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">Enable Sound Effects (Coming Soon)</h3>
+                    </div>
+                    <Toggle
+                      checked={settings.enableSoundEffects}
+                      onChange={(checked) => handleInputChange('enableSoundEffects', checked)}
+                      disabled={true}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Currency Rate */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center mb-6">
+                  <DollarSign className="h-5 w-5 text-blue-600 mr-2" />
+                  <h2 className="text-lg font-semibold text-gray-900">Currency Rate</h2>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">
+                        {getCurrencyRateDisplay().from} → {getCurrencyRateDisplay().to}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {getCurrencyRateDisplay().description}
+                      </p>
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={settings.currencyRate}
+                        onChange={(e) => handleInputChange('currencyRate', parseFloat(e.target.value) || 0)}
+                        className="text-right"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  
+                  {settings.currencyRate > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        <span className="font-medium">Exchange Rate:</span> 1 {getCurrencyRateDisplay().fromSymbol} = {settings.currencyRate} {getCurrencyRateDisplay().toSymbol}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-4 pt-6">
+                <Button
+                  variant="outline"
+                  onClick={handleReset}
+                  disabled={isLoading || isLoadingData}
+                >
+                  Reset
+                </Button>
+                <Button
+                  onClick={handleSaveSettings}
+                  loading={isLoading}
+                  disabled={isLoading || isLoadingData}
+                >
+                  Save Settings
+                </Button>
+              </div>
+            </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function OwnerSettingsPage() {
+  return (
+    <ProtectedRoute requiredRole="owner">
+      <OwnerSettingsContent />
+    </ProtectedRoute>
+  );
+}

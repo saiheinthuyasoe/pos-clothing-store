@@ -1,0 +1,23 @@
+🔍 Supabase Free Tier
+
+Storage: Free = 1 GB → your 1.5 GB/month already exceeds the free limit.
+
+Bandwidth: Free = 2 GB/month → if customers/staff view the images, bandwidth will exceed quickly (just a few hundred views).
+
+✅ Good only for very small stores (<300–400 products).
+
+❌ Not suitable for 1,000 products/month.
+
+🔍 Cloudinary Free Tier
+
+Credits: 25/month (each credit = 1 GB storage OR 1 GB bandwidth OR 1,000 transformations).
+
+Storage needed: 1.5 GB = ≈ 2 credits.
+
+Bandwidth: Let’s assume 10,000 customer views/month, each loading 5 images (≈15 MB per product page × 10,000 views = 150 GB bandwidth).
+
+Free bandwidth = 25 GB → you’ll exceed if you have lots of online views.
+
+But for POS only (staff-facing), traffic is much smaller, so 25 GB is plenty.
+
+Transformations: Cloudinary can auto-generate thumbnails, compressions, etc. Even with 5,000 images, you’ll likely stay under 25,000 transformations (≈25 credits)
