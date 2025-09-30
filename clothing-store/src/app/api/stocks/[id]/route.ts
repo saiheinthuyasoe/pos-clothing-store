@@ -5,10 +5,10 @@ import { StockResponse } from '@/types/stock';
 // GET /api/stocks/[id] - Get a specific stock item
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     
     // For now, we'll get all stocks and find the specific one
     // In a real implementation, you'd have a getStockById method
@@ -30,7 +30,7 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error(`Error in GET /api/stocks/${params.id}:`, error);
+    console.error(`Error in GET /api/stocks/${(await params).id}:`, error);
     const response: StockResponse = {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch stock item',
@@ -42,10 +42,10 @@ export async function GET(
 // PUT /api/stocks/[id] - Update a specific stock item
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     
     // Basic validation
@@ -79,7 +79,7 @@ export async function PUT(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error(`Error in PUT /api/stocks/${params.id}:`, error);
+    console.error(`Error in PUT /api/stocks/${(await params).id}:`, error);
     const response: StockResponse = {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update stock item',
@@ -91,10 +91,10 @@ export async function PUT(
 // DELETE /api/stocks/[id] - Delete a specific stock item
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     
     await StockService.deleteStock(id);
 
@@ -105,7 +105,7 @@ export async function DELETE(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error(`Error in DELETE /api/stocks/${params.id}:`, error);
+    console.error(`Error in DELETE /api/stocks/${(await params).id}:`, error);
     const response: StockResponse = {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete stock item',

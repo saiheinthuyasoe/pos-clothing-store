@@ -5,10 +5,10 @@ import { UpdateShopRequest, ShopResponse } from '@/types/shop';
 // GET /api/shops/[id] - Get a specific shop by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       const response: ShopResponse = {
@@ -47,10 +47,10 @@ export async function GET(
 // PUT /api/shops/[id] - Update a specific shop
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     if (!id) {
@@ -126,10 +126,10 @@ export async function PUT(
 // DELETE /api/shops/[id] - Delete a specific shop
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       const response: ShopResponse = {
