@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -26,11 +27,13 @@ export default function RootLayout({
         className={`${inter.variable} font-sans antialiased`}
       >
         <AuthProvider>
-          <CurrencyProvider>
-            <CartProvider>
-              {children}
-            </CartProvider>
-          </CurrencyProvider>
+          <SettingsProvider>
+            <CurrencyProvider>
+              <CartProvider>
+                {children}
+              </CartProvider>
+            </CurrencyProvider>
+          </SettingsProvider>
         </AuthProvider>
       </body>
     </html>

@@ -27,6 +27,7 @@ import {
   Building2,
 } from "lucide-react";
 import { MenuItem, NavigationProps } from "@/types/schemas";
+import { useSettings } from "@/contexts/SettingsContext";
 
 const menuItems: MenuItem[] = [
   {
@@ -224,33 +225,12 @@ export function Sidebar({
   isCartModalOpen = false,
 }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
-  const [businessName, setBusinessName] = useState<string>("Fashion Store");
-  const [businessLogo, setBusinessLogo] = useState<string>("");
   const [logoError, setLogoError] = useState<boolean>(false);
-
-  // Fetch business name and logo from settings API
-  useEffect(() => {
-    const fetchBusinessSettings = async () => {
-      try {
-        const response = await fetch('/api/settings');
-        const result = await response.json();
-        if (result.success && result.data) {
-          if (result.data.businessName) {
-            setBusinessName(result.data.businessName);
-          }
-          if (result.data.businessLogo) {
-            setBusinessLogo(result.data.businessLogo);
-            setLogoError(false); // Reset error state when new logo is loaded
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching business settings:', error);
-        // Keep defaults if fetch fails
-      }
-    };
-
-    fetchBusinessSettings();
-  }, []);
+  
+  // Use settings context for business name and logo
+  const { businessSettings, isLoading } = useSettings();
+  const businessName = businessSettings?.businessName;
+  const businessLogo = businessSettings?.businessLogo;
 
   // Close all expanded items when sidebar is collapsed
   useEffect(() => {
@@ -387,7 +367,9 @@ export function Sidebar({
               <Store className="w-8 h-8 text-purple-600 mr-3" />
             )}
             <div className="flex-1">
-              <h1 className="text-lg font-bold text-gray-900">{businessName || "Fashion Store"}</h1>
+              <h1 className="text-lg font-bold text-gray-900">
+                {isLoading ? "Loading..." : (businessName || "Business Name")}
+              </h1>
               <p className="text-xs text-gray-500">Owner Dashboard</p>
             </div>
           </div>

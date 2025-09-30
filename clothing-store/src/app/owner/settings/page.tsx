@@ -9,6 +9,7 @@ import { Toggle } from '@/components/ui/Toggle';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { Building2, Receipt, User, DollarSign } from 'lucide-react';
 
 interface BusinessSettings {
@@ -29,6 +30,7 @@ interface BusinessSettings {
 
 function OwnerSettingsContent() {
   const { refreshCurrencySettings } = useCurrency();
+  const { refreshSettings } = useSettings();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -134,6 +136,8 @@ function OwnerSettingsContent() {
         setSettings(result.data);
         // Refresh currency context to reflect the new settings
         await refreshCurrencySettings();
+        // Refresh settings context to reflect the new settings (including tax rate)
+        await refreshSettings();
         alert('Settings saved successfully!');
       } else {
         setError(result.error || 'Failed to save settings');
@@ -162,6 +166,8 @@ function OwnerSettingsContent() {
 
         if (result.success) {
           setSettings(result.data);
+          // Refresh settings context to reflect the reset settings
+          await refreshSettings();
           alert('Settings reset successfully!');
         } else {
           setError(result.error || 'Failed to reset settings');

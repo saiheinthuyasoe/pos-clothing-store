@@ -3,6 +3,7 @@
 import React from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { X, Minus, Plus, Settings, ShoppingCart, Eye } from "lucide-react";
 import Image from "next/image";
 
@@ -23,6 +24,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     removeVariantDiscount,
   } = useCart();
   const { formatPrice } = useCurrency();
+  const { taxRate } = useSettings();
   const [discountAmount, setDiscountAmount] = React.useState<string>("");
   const [appliedDiscount, setAppliedDiscount] = React.useState<number>(0);
   const [isBigViewOpen, setIsBigViewOpen] = React.useState<boolean>(false);
@@ -231,9 +233,10 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     return total;
   }, 0);
 
-  const tax = 0; // You can implement tax calculation here
   const discount = appliedDiscount; // Cart-wide discount
-  const grandTotal = subtotal + tax - discount;
+  const subtotalAfterAllDiscounts = subtotal - discount; // Subtotal after all discounts including cart discount
+  const tax = subtotalAfterAllDiscounts * (taxRate / 100); // Calculate tax based on tax rate from settings
+  const grandTotal = subtotalAfterAllDiscounts + tax;
 
   return (
     <div
@@ -507,10 +510,10 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
 
                 <div className="flex justify-between text-sm font-medium text-gray-800">
                   <span>Subtotal After Discounts:</span>
-                  <span className="font-bold">{formatPrice(subtotal)}</span>
+                  <span className="font-bold">{formatPrice(subtotalAfterAllDiscounts)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-medium text-gray-800">
-                  <span>Tax (12%):</span>
+                  <span>Tax ({taxRate}%):</span>
                   <span className="font-bold">{formatPrice(tax)}</span>
                 </div>
                 <div className="border-t border-gray-300 pt-2">
