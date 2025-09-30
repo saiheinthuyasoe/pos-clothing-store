@@ -11,7 +11,7 @@ import { Store, User, Package, BarChart3, ShoppingCart } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { StockItem } from "@/types/stock";
+import { StockItem, WholesaleTier } from "@/types/stock";
 import { SettingsService } from "@/services/settingsService";
 import { StockService } from "@/services/stockService";
 import { InventoryRealtimeService } from "@/services/inventoryRealtimeService";
@@ -25,6 +25,7 @@ interface ClothingInventoryItem {
   image: string;
   category: string;
   isNew: boolean;
+  wholesaleTiers: WholesaleTier[];
   colorVariants: {
     id: string;
     color: string;
@@ -328,6 +329,7 @@ function OwnerHomeContent() {
             image: stock.groupImage || `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
             category: "Clothing",
             isNew: true,
+            wholesaleTiers: stock.wholesaleTiers || [],
             colorVariants: [], // Empty array - no variants available
           };
         }
@@ -354,6 +356,7 @@ function OwnerHomeContent() {
           image: stock.groupImage || `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
           category: "Clothing",
           isNew: true,
+          wholesaleTiers: stock.wholesaleTiers || [],
           colorVariants: stock.colorVariants.map((variant, index) => {
             console.log(
               `Transforming variant ${index} for ${stock.groupName}:`,
@@ -1730,7 +1733,7 @@ function OwnerHomeContent() {
                             <div className="grid grid-cols-3 gap-1">
                               {(() => {
                                 const availableSizes = item.colorVariants
-                                  ? getAvailableSizes(item)
+                                  ? getAvailableSizes(item as ClothingInventoryItem)
                                   : [];
                                 console.log(
                                   `Size rendering for ${item.id}: availableSizes=`,

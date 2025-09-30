@@ -93,10 +93,10 @@ function EditStockContent() {
       setSelectedShop(stock.shop || "");
       setIsColorless(stock.isColorless || false);
 
-      // Set wholesale tiers with proper IDs
+      // Set wholesale tiers with original IDs preserved
       setWholesaleTiers(
         (stock.wholesaleTiers || []).map((tier, index) => ({
-          id: `tier-${index}`,
+          id: tier.id || `tier-${stock.id}-${index}`, // Use original ID or create unique fallback
           minQuantity: tier.minQuantity,
           price: tier.price,
         }))

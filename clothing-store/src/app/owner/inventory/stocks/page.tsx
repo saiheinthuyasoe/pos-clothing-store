@@ -27,6 +27,7 @@ import {
 import { StockItem, StockGroupDisplay } from "@/types/stock";
 import { StockDisplayService } from "@/services/stockDisplayService";
 import { SettingsService } from "@/services/settingsService";
+import { WholesalePricingTiers } from "@/components/ui/WholesalePricingTiers";
 
 function InventoryStocksContent() {
   const router = useRouter();
@@ -447,6 +448,15 @@ function InventoryStocksContent() {
                           </div>
                         </div>
                       )}
+
+                      {/* Wholesale Pricing Tiers */}
+                      <div className="mt-4">
+                        <WholesalePricingTiers
+                          wholesaleTiers={group.wholesaleTiers}
+                          title="Wholesale Pricing Tiers"
+                          defaultExpanded={false}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
