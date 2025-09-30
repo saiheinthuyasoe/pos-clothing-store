@@ -50,26 +50,30 @@ function OwnerHomeContent() {
   const [error, setError] = useState<string | null>(null);
 
   // Selection state for colors and sizes
-  const [selectedColors, setSelectedColors] = useState<Record<string, string>>({});
-  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
+  const [selectedColors, setSelectedColors] = useState<Record<string, string>>(
+    {}
+  );
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>(
+    {}
+  );
 
   // Helper functions for color and size selection
   const handleColorSelect = (itemId: string, colorId: string) => {
     console.log(`handleColorSelect: itemId=${itemId}, colorId=${colorId}`);
-    setSelectedColors(prev => {
+    setSelectedColors((prev) => {
       const currentSelection = prev[itemId];
       // If clicking the same color, unselect it (set to empty string)
       const newColorId = currentSelection === colorId ? "" : colorId;
       const newState = { ...prev, [itemId]: newColorId };
-      console.log('Updated selectedColors:', newState);
+      console.log("Updated selectedColors:", newState);
       return newState;
     });
     // Reset size selection when color changes or is unselected
-    setSelectedSizes(prev => ({ ...prev, [itemId]: "" }));
+    setSelectedSizes((prev) => ({ ...prev, [itemId]: "" }));
   };
 
   const handleSizeSelect = (itemId: string, size: string) => {
-    setSelectedSizes(prev => ({ ...prev, [itemId]: size }));
+    setSelectedSizes((prev) => ({ ...prev, [itemId]: size }));
   };
 
   const getSelectedColorVariant = (item: ClothingInventoryItem) => {
@@ -78,19 +82,25 @@ function OwnerHomeContent() {
       return null;
     }
     const selectedColorId = selectedColors[item.id];
-    console.log(`getSelectedColorVariant for ${item.id}: selectedColorId="${selectedColorId}"`);
-    
+    console.log(
+      `getSelectedColorVariant for ${item.id}: selectedColorId="${selectedColorId}"`
+    );
+
     // Return null if no color is selected (empty string)
     if (!selectedColorId) {
       console.log(`No color selected for item ${item.id}`);
       return null;
     }
-    
-    const foundVariant = item.colorVariants.find(variant => {
-      console.log(`Checking variant: ${variant.id} === ${selectedColorId} ? ${variant.id === selectedColorId}`);
+
+    const foundVariant = item.colorVariants.find((variant) => {
+      console.log(
+        `Checking variant: ${variant.id} === ${selectedColorId} ? ${
+          variant.id === selectedColorId
+        }`
+      );
       return variant.id === selectedColorId;
     });
-    
+
     console.log(`Found variant for ${item.id}:`, foundVariant);
     return foundVariant || null;
   };
@@ -104,14 +114,16 @@ function OwnerHomeContent() {
       sizeQuantities: selectedVariant?.sizeQuantities,
       colorVariants: item.colorVariants,
       returningSizes: sizes,
-      sizesLength: sizes.length
+      sizesLength: sizes.length,
     });
     return sizes;
   };
 
   const getStockForSize = (item: ClothingInventoryItem, size: string) => {
     const selectedVariant = getSelectedColorVariant(item);
-    const sizeQty = selectedVariant?.sizeQuantities.find(sq => sq.size === size);
+    const sizeQty = selectedVariant?.sizeQuantities.find(
+      (sq) => sq.size === size
+    );
     return sizeQty?.quantity || 0;
   };
 
@@ -119,34 +131,44 @@ function OwnerHomeContent() {
   const getCurrentImage = (item: ClothingInventoryItem) => {
     const selectedVariant = getSelectedColorVariant(item);
     // If a color variant is selected and has an image, use it; otherwise use the group image
-    return selectedVariant?.image || item.image || `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${item.name}`;
+    return (
+      selectedVariant?.image ||
+      item.image ||
+      `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${item.name}`
+    );
   };
 
   // Function to reduce inventory stock when item is added to cart
-  const reduceInventoryStock = async (itemId: string, colorId: string, size: string, quantity: number = 1) => {
+  const reduceInventoryStock = useCallback(async (
+    itemId: string,
+    colorId: string,
+    size: string,
+    quantity: number = 1
+  ) => {
     // Update local state immediately for UI responsiveness
-    setClothingInventory(prevInventory => {
-      return prevInventory.map(item => {
+    setClothingInventory((prevInventory) => {
+      return prevInventory.map((item) => {
         if (item.id === itemId) {
           return {
             ...item,
-            colorVariants: item.colorVariants?.map(variant => {
-              if (variant.id === colorId) {
-                return {
-                  ...variant,
-                  sizeQuantities: variant.sizeQuantities.map(sizeQty => {
-                    if (sizeQty.size === size) {
-                      return {
-                        ...sizeQty,
-                        quantity: Math.max(0, sizeQty.quantity - quantity)
-                      };
-                    }
-                    return sizeQty;
-                  })
-                };
-              }
-              return variant;
-            }) || []
+            colorVariants:
+              item.colorVariants?.map((variant) => {
+                if (variant.id === colorId) {
+                  return {
+                    ...variant,
+                    sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                      if (sizeQty.size === size) {
+                        return {
+                          ...sizeQty,
+                          quantity: Math.max(0, sizeQty.quantity - quantity),
+                        };
+                      }
+                      return sizeQty;
+                    }),
+                  };
+                }
+                return variant;
+              }) || [],
           };
         }
         return item;
@@ -155,62 +177,72 @@ function OwnerHomeContent() {
 
     // Persist changes to database
     try {
-      const item = clothingInventory.find(item => item.id === itemId);
+      const item = clothingInventory.find((item) => item.id === itemId);
       if (item) {
-        const updatedColorVariants = item.colorVariants?.map(variant => {
-          if (variant.id === colorId) {
-            return {
-              ...variant,
-              sizeQuantities: variant.sizeQuantities.map(sizeQty => {
-                if (sizeQty.size === size) {
-                  return {
-                    ...sizeQty,
-                    quantity: Math.max(0, sizeQty.quantity - quantity)
-                  };
-                }
-                return sizeQty;
-              })
-            };
-          }
-          return variant;
-        }) || [];
+        const updatedColorVariants =
+          item.colorVariants?.map((variant) => {
+            if (variant.id === colorId) {
+              return {
+                ...variant,
+                sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                  if (sizeQty.size === size) {
+                    return {
+                      ...sizeQty,
+                      quantity: Math.max(0, sizeQty.quantity - quantity),
+                    };
+                  }
+                  return sizeQty;
+                }),
+              };
+            }
+            return variant;
+          }) || [];
 
         await StockService.updateStock(itemId, {
-          colorVariants: updatedColorVariants
+          colorVariants: updatedColorVariants.map((variant) => ({
+            ...variant,
+            barcode: (variant as { barcode?: string }).barcode || "",
+          })),
         });
       }
     } catch (error) {
-      console.error('Error updating stock in database:', error);
+      console.error("Error updating stock in database:", error);
       // Optionally revert local state on error
       // For now, we'll keep the optimistic update
     }
-  };
+  }, [clothingInventory]);
 
   // Function to restore inventory stock when item is removed from cart
-  const restoreInventoryStock = async (itemId: string, colorId: string, size: string, quantity: number = 1) => {
+  const restoreInventoryStock = useCallback(async (
+    itemId: string,
+    colorId: string,
+    size: string,
+    quantity: number = 1
+  ) => {
     // Update local state immediately for UI responsiveness
-    setClothingInventory(prevInventory => {
-      return prevInventory.map(item => {
+    setClothingInventory((prevInventory) => {
+      return prevInventory.map((item) => {
         if (item.id === itemId) {
           return {
             ...item,
-            colorVariants: item.colorVariants?.map(variant => {
-              if (variant.id === colorId) {
-                return {
-                  ...variant,
-                  sizeQuantities: variant.sizeQuantities.map(sizeQty => {
-                    if (sizeQty.size === size) {
-                      return {
-                        ...sizeQty,
-                        quantity: sizeQty.quantity + quantity
-                      };
-                    }
-                    return sizeQty;
-                  })
-                };
-              }
-              return variant;
-            }) || []
+            colorVariants:
+              item.colorVariants?.map((variant) => {
+                if (variant.id === colorId) {
+                  return {
+                    ...variant,
+                    sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                      if (sizeQty.size === size) {
+                        return {
+                          ...sizeQty,
+                          quantity: sizeQty.quantity + quantity,
+                        };
+                      }
+                      return sizeQty;
+                    }),
+                  };
+                }
+                return variant;
+              }) || [],
           };
         }
         return item;
@@ -219,106 +251,127 @@ function OwnerHomeContent() {
 
     // Persist changes to database
     try {
-      const item = clothingInventory.find(item => item.id === itemId);
+      const item = clothingInventory.find((item) => item.id === itemId);
       if (item) {
-        const updatedColorVariants = item.colorVariants?.map(variant => {
-          if (variant.id === colorId) {
-            return {
-              ...variant,
-              sizeQuantities: variant.sizeQuantities.map(sizeQty => {
-                if (sizeQty.size === size) {
-                  return {
-                    ...sizeQty,
-                    quantity: sizeQty.quantity + quantity
-                  };
-                }
-                return sizeQty;
-              })
-            };
-          }
-          return variant;
-        }) || [];
+        const updatedColorVariants =
+          item.colorVariants?.map((variant) => {
+            if (variant.id === colorId) {
+              return {
+                ...variant,
+                sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                  if (sizeQty.size === size) {
+                    return {
+                      ...sizeQty,
+                      quantity: sizeQty.quantity + quantity,
+                    };
+                  }
+                  return sizeQty;
+                }),
+              };
+            }
+            return variant;
+          }) || [];
 
         await StockService.updateStock(itemId, {
-          colorVariants: updatedColorVariants
+          colorVariants: updatedColorVariants.map((variant) => ({
+            ...variant,
+            barcode: (variant as { barcode?: string }).barcode || "",
+          })),
         });
       }
     } catch (error) {
-      console.error('Error updating stock in database:', error);
+      console.error("Error updating stock in database:", error);
       // Optionally revert local state on error
       // For now, we'll keep the optimistic update
     }
-  };
+  }, [clothingInventory]);
 
   // Function to check available stock for a specific item, color, and size
-  const checkInventoryStock = (itemId: string, colorId: string, size: string): number => {
-    const item = clothingInventory.find(item => item.id === itemId);
+  const checkInventoryStock = useCallback((
+    itemId: string,
+    colorId: string,
+    size: string
+  ): number => {
+    const item = clothingInventory.find((item) => item.id === itemId);
     if (!item) return 0;
-    
-    const colorVariant = item.colorVariants?.find(variant => variant.id === colorId);
+
+    const colorVariant = item.colorVariants?.find(
+      (variant) => variant.id === colorId
+    );
     if (!colorVariant) return 0;
-    
-    const sizeQuantity = colorVariant.sizeQuantities.find(sizeQty => sizeQty.size === size);
+
+    const sizeQuantity = colorVariant.sizeQuantities.find(
+      (sizeQty) => sizeQty.size === size
+    );
     return sizeQuantity?.quantity || 0;
-  };
+  }, [clothingInventory]);
 
   // Transform stock data to clothing inventory format
-  const transformStockData = useCallback((stocks: StockItem[]): ClothingInventoryItem[] => {
-    return stocks.map((stock: StockItem) => {
-      // Handle missing or empty colorVariants
-      const hasColorVariants = stock.colorVariants && stock.colorVariants.length > 0;
-      
-      if (!hasColorVariants) {
-        console.log(`No colorVariants for ${stock.groupName}, skipping item without variants`);
-        // Return item without color variants - UI will handle this appropriately
+  const transformStockData = useCallback(
+    (stocks: StockItem[]): ClothingInventoryItem[] => {
+      return stocks.map((stock: StockItem) => {
+        // Handle missing or empty colorVariants
+        const hasColorVariants =
+          stock.colorVariants && stock.colorVariants.length > 0;
+
+        if (!hasColorVariants) {
+          console.log(
+            `No colorVariants for ${stock.groupName}, skipping item without variants`
+          );
+          // Return item without color variants - UI will handle this appropriately
+          return {
+            id: stock.id,
+            name: stock.groupName,
+            price: stock.unitPrice,
+            stock: 0, // No stock since no variants
+            colors: [],
+            image: stock.groupImage || `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
+            category: "Clothing",
+            isNew: true,
+            colorVariants: [], // Empty array - no variants available
+          };
+        }
+
+        // Use existing colorVariants if they exist
         return {
           id: stock.id,
           name: stock.groupName,
           price: stock.unitPrice,
-          stock: 0, // No stock since no variants
-          colors: [],
-          image: stock.groupImage,
+          stock: stock.colorVariants.reduce(
+            (total, variant) =>
+              total +
+              variant.sizeQuantities.reduce(
+                (sizeTotal, sizeQty) => sizeTotal + sizeQty.quantity,
+                0
+              ),
+            0
+          ),
+          colors: [
+            ...new Set(
+              stock.colorVariants.map((variant) => variant.color.toLowerCase())
+            ),
+          ],
+          image: stock.groupImage || `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
           category: "Clothing",
           isNew: true,
-          colorVariants: [] // Empty array - no variants available
+          colorVariants: stock.colorVariants.map((variant, index) => {
+            console.log(
+              `Transforming variant ${index} for ${stock.groupName}:`,
+              variant
+            );
+            return {
+              id: variant.id || `cv${index + 1}-${stock.id}`, // Ensure ID exists
+              color: variant.color,
+              colorCode: variant.colorCode,
+              image: variant.image,
+              sizeQuantities: variant.sizeQuantities,
+            };
+          }),
         };
-      }
-
-      // Use existing colorVariants if they exist
-      return {
-        id: stock.id,
-        name: stock.groupName,
-        price: stock.unitPrice,
-        stock: stock.colorVariants.reduce(
-          (total, variant) =>
-            total +
-            variant.sizeQuantities.reduce(
-              (sizeTotal, sizeQty) => sizeTotal + sizeQty.quantity,
-              0
-            ),
-          0
-        ),
-        colors: [
-          ...new Set(
-            stock.colorVariants.map((variant) => variant.color.toLowerCase())
-          ),
-        ],
-        image: stock.groupImage,
-        category: "Clothing",
-        isNew: true,
-        colorVariants: stock.colorVariants.map((variant, index) => {
-          console.log(`Transforming variant ${index} for ${stock.groupName}:`, variant);
-          return {
-            id: variant.id || `cv${index + 1}-${stock.id}`, // Ensure ID exists
-            color: variant.color,
-            colorCode: variant.colorCode,
-            image: variant.image,
-            sizeQuantities: variant.sizeQuantities
-          };
-        })
-      };
-    });
-  }, []);
+      });
+    },
+    []
+  );
 
   // Set up real-time inventory updates
   useEffect(() => {
@@ -326,12 +379,14 @@ function OwnerHomeContent() {
     setError(null);
 
     // Subscribe to real-time stock updates
-    const unsubscribe = InventoryRealtimeService.subscribeToAllStocks((stocks) => {
-      console.log('Real-time stock update received:', stocks);
-      const transformedData = transformStockData(stocks);
-      setClothingInventory(transformedData);
-      setIsLoading(false);
-    });
+    const unsubscribe = InventoryRealtimeService.subscribeToAllStocks(
+      (stocks) => {
+        console.log("Real-time stock update received:", stocks);
+        const transformedData = transformStockData(stocks);
+        setClothingInventory(transformedData);
+        setIsLoading(false);
+      }
+    );
 
     // Fallback: If Firebase is not configured, fetch from API
     if (!unsubscribe) {
@@ -343,7 +398,7 @@ function OwnerHomeContent() {
           }
 
           const data = await response.json();
-          console.log('Fallback API data:', data);
+          console.log("Fallback API data:", data);
           const transformedData = transformStockData(data.data);
           setClothingInventory(transformedData);
         } catch (err) {
@@ -361,29 +416,30 @@ function OwnerHomeContent() {
     }
 
     // Cleanup function
-     return () => {
-       if (unsubscribe) {
-         unsubscribe();
-       }
-     };
-   }, [transformStockData]);
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [transformStockData]);
 
   // Initialize color selection for each item when inventory loads
   useEffect(() => {
-    const currentInventory = clothingInventory.length > 0 ? clothingInventory : fallbackInventory;
-    
+    const currentInventory =
+      clothingInventory.length > 0 ? clothingInventory : fallbackInventory;
+
     // Initialize selectedColors as empty - no auto-selection
-    setSelectedColors(prev => {
+    setSelectedColors((prev) => {
       const newColors = { ...prev };
       let hasChanges = false;
-      
-      currentInventory.forEach(item => {
+
+      currentInventory.forEach((item) => {
         if (!newColors[item.id]) {
           newColors[item.id] = ""; // No color selected initially
           hasChanges = true;
         }
       });
-      
+
       return hasChanges ? newColors : prev;
     });
   }, [clothingInventory]);
@@ -392,54 +448,79 @@ function OwnerHomeContent() {
   useEffect(() => {
     if (setInventoryCallbacks) {
       setInventoryCallbacks({
-        reduceStock: (stockId: string, color: string, size: string, quantity: number) => {
-          
+        reduceStock: (
+          stockId: string,
+          color: string,
+          size: string,
+          quantity: number
+        ) => {
           // Find the color variant ID based on the color name
-          const item = clothingInventory.find(item => item.id === stockId);
-          const colorVariant = item?.colorVariants?.find(variant => 
-            variant.color.toLowerCase() === color.toLowerCase()
+          const item = clothingInventory.find((item) => item.id === stockId);
+          const colorVariant = item?.colorVariants?.find(
+            (variant) => variant.color.toLowerCase() === color.toLowerCase()
           );
-          
+
           if (colorVariant) {
             reduceInventoryStock(stockId, colorVariant.id, size, quantity);
           } else {
-            console.warn('Color variant not found:', { stockId, color, availableVariants: item?.colorVariants });
+            console.warn("Color variant not found:", {
+              stockId,
+              color,
+              availableVariants: item?.colorVariants,
+            });
           }
         },
-        restoreStock: (stockId: string, color: string, size: string, quantity: number) => {
-          
+        restoreStock: (
+          stockId: string,
+          color: string,
+          size: string,
+          quantity: number
+        ) => {
           // Find the color variant ID based on the color name
-          const item = clothingInventory.find(item => item.id === stockId);
-          const colorVariant = item?.colorVariants?.find(variant => 
-            variant.color.toLowerCase() === color.toLowerCase()
+          const item = clothingInventory.find((item) => item.id === stockId);
+          const colorVariant = item?.colorVariants?.find(
+            (variant) => variant.color.toLowerCase() === color.toLowerCase()
           );
-          
+
           if (colorVariant) {
             restoreInventoryStock(stockId, colorVariant.id, size, quantity);
           } else {
-            console.warn('Color variant not found:', { stockId, color, availableVariants: item?.colorVariants });
+            console.warn("Color variant not found:", {
+              stockId,
+              color,
+              availableVariants: item?.colorVariants,
+            });
           }
         },
         checkStock: (stockId: string, color: string, size: string) => {
-          
           // Find the color variant ID based on the color name
-          const item = clothingInventory.find(item => item.id === stockId);
+          const item = clothingInventory.find((item) => item.id === stockId);
           if (!item) return 0;
-          
-          const colorVariant = item.colorVariants?.find(variant => 
-            variant.color.toLowerCase() === color.toLowerCase()
+
+          const colorVariant = item.colorVariants?.find(
+            (variant) => variant.color.toLowerCase() === color.toLowerCase()
           );
-          
+
           if (colorVariant) {
             return checkInventoryStock(stockId, colorVariant.id, size);
           } else {
-            console.warn('Color variant not found for stock check:', { stockId, color, availableVariants: item?.colorVariants });
+            console.warn("Color variant not found for stock check:", {
+              stockId,
+              color,
+              availableVariants: item?.colorVariants,
+            });
             return 0;
           }
-        }
+        },
       });
     }
-  }, [clothingInventory]); // Include clothingInventory in dependencies
+  }, [
+    clothingInventory,
+    checkInventoryStock,
+    reduceInventoryStock,
+    restoreInventoryStock,
+    setInventoryCallbacks,
+  ]); // Include all dependencies
 
   // Mock data as fallback (keeping a few items for when no API data is available)
   const fallbackInventory = [
@@ -457,36 +538,39 @@ function OwnerHomeContent() {
           id: "cv1",
           color: "Red",
           colorCode: "#FF0000",
-          image: "https://via.placeholder.com/200x250/FF0000/FFFFFF?text=Red+Jean7010",
+          image:
+            "https://via.placeholder.com/200x250/FF0000/FFFFFF?text=Red+Jean7010",
           sizeQuantities: [
             { size: "S", quantity: 1 },
             { size: "M", quantity: 2 },
-            { size: "L", quantity: 1 }
-          ]
+            { size: "L", quantity: 1 },
+          ],
         },
         {
           id: "cv2",
           color: "Green",
           colorCode: "#00FF00",
-          image: "https://via.placeholder.com/200x250/00FF00/FFFFFF?text=Green+Jean7010",
+          image:
+            "https://via.placeholder.com/200x250/00FF00/FFFFFF?text=Green+Jean7010",
           sizeQuantities: [
             { size: "S", quantity: 0 },
             { size: "M", quantity: 1 },
-            { size: "L", quantity: 2 }
-          ]
+            { size: "L", quantity: 2 },
+          ],
         },
         {
           id: "cv3",
           color: "Blue",
           colorCode: "#0000FF",
-          image: "https://via.placeholder.com/200x250/0000FF/FFFFFF?text=Blue+Jean7010",
+          image:
+            "https://via.placeholder.com/200x250/0000FF/FFFFFF?text=Blue+Jean7010",
           sizeQuantities: [
             { size: "S", quantity: 1 },
             { size: "M", quantity: 0 },
-            { size: "L", quantity: 1 }
-          ]
-        }
-      ]
+            { size: "L", quantity: 1 },
+          ],
+        },
+      ],
     },
     {
       id: "Jean9035",
@@ -505,8 +589,8 @@ function OwnerHomeContent() {
           sizeQuantities: [
             { size: "S", quantity: 2 },
             { size: "M", quantity: 2 },
-            { size: "L", quantity: 2 }
-          ]
+            { size: "L", quantity: 2 },
+          ],
         },
         {
           id: "cv5",
@@ -515,8 +599,8 @@ function OwnerHomeContent() {
           sizeQuantities: [
             { size: "S", quantity: 1 },
             { size: "M", quantity: 1 },
-            { size: "L", quantity: 1 }
-          ]
+            { size: "L", quantity: 1 },
+          ],
         },
         {
           id: "cv6",
@@ -525,10 +609,10 @@ function OwnerHomeContent() {
           sizeQuantities: [
             { size: "S", quantity: 1 },
             { size: "M", quantity: 2 },
-            { size: "L", quantity: 0 }
-          ]
-        }
-      ]
+            { size: "L", quantity: 0 },
+          ],
+        },
+      ],
     },
     {
       id: "Jean8803",
@@ -1138,14 +1222,15 @@ function OwnerHomeContent() {
   const itemsPerPage = 60;
 
   // Use API data if available, otherwise use fallback data
-  const displayInventory = clothingInventory.length > 0 ? clothingInventory : fallbackInventory;
-  
+  const displayInventory =
+    clothingInventory.length > 0 ? clothingInventory : fallbackInventory;
+
   // Debug inventory source
-  console.log('Inventory source:', {
+  console.log("Inventory source:", {
     clothingInventoryLength: clothingInventory.length,
     usingFallback: clothingInventory.length === 0,
     firstItem: displayInventory[0],
-    firstItemColorVariants: displayInventory[0]?.colorVariants
+    firstItemColorVariants: displayInventory[0]?.colorVariants,
   });
 
   // Filter items based on search term
@@ -1176,22 +1261,22 @@ function OwnerHomeContent() {
     try {
       const selectedVariant = getSelectedColorVariant(item);
       const selectedSize = selectedSizes[item.id];
-      
+
       // Validate that color and size are selected
       if (!selectedVariant) {
-        alert('Please select a color');
+        alert("Please select a color");
         return;
       }
-      
+
       if (!selectedSize) {
-        alert('Please select a size');
+        alert("Please select a size");
         return;
       }
-      
+
       // Check if selected size has stock
       const stockForSize = getStockForSize(item, selectedSize);
       if (stockForSize === 0) {
-        alert('Selected size is out of stock');
+        alert("Selected size is out of stock");
         return;
       }
 
@@ -1205,15 +1290,17 @@ function OwnerHomeContent() {
         selectedSize: selectedSize,
         colorCode: selectedVariant.colorCode,
         image: item.image,
-        shop: 'default'
+        shop: "default",
       });
 
       // Inventory reduction will be handled by CartContext through callbacks
-      
+
       // Optional: Show success message
-      console.log(`Added ${item.name} (${selectedVariant.color}, ${selectedSize}) to cart - Stock reduced`);
+      console.log(
+        `Added ${item.name} (${selectedVariant.color}, ${selectedSize}) to cart - Stock reduced`
+      );
     } catch (error) {
-      console.error('Error adding item to cart:', error);
+      console.error("Error adding item to cart:", error);
     }
   };
 
@@ -1538,7 +1625,9 @@ function OwnerHomeContent() {
                   ) : (
                     getCurrentPageItems().map((item) => (
                       <div
-                        key={`${item.id}-${selectedColors[item.id] || 'no-color'}`}
+                        key={`${item.id}-${
+                          selectedColors[item.id] || "no-color"
+                        }`}
                         className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                       >
                         {/* Product Image */}
@@ -1549,7 +1638,9 @@ function OwnerHomeContent() {
                             </span>
                           )}
                           <Image
-                            key={`${item.id}-image-${selectedColors[item.id] || 'default'}`}
+                            key={`${item.id}-image-${
+                              selectedColors[item.id] || "default"
+                            }`}
                             src={getCurrentImage(item as ClothingInventoryItem)}
                             alt={item.name}
                             width={200}
@@ -1583,75 +1674,114 @@ function OwnerHomeContent() {
                               Color:
                             </label>
                             <div className="flex items-center space-x-1">
-                               {item.colorVariants && item.colorVariants.length > 0 ? (
-                                 item.colorVariants.map((variant, index) => {
-                                   const variantId = variant.id || `variant-${index}`;
-                                   const isSelected = selectedColors[item.id] === variantId;
-                                   return (
-                                     <button
-                                        key={`${item.id}-${variantId}`}
-                                        onClick={() => handleColorSelect(item.id, variantId)}
-                                        className={`relative w-6 h-6 rounded-full border-2 transition-all ${
-                                          isSelected
-                                            ? "border-blue-500 ring-2 ring-blue-200"
-                                            : "border-gray-300 hover:border-gray-400"
-                                        }`}
-                                       style={{ backgroundColor: variant.colorCode }}
-                                       title={isSelected ? `${variant.color} (click to unselect)` : variant.color}
-                                     >
-                                       {isSelected && (
-                                         <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow-sm">
-                                           ×
-                                         </span>
-                                       )}
-                                     </button>
-                                   );
-                                 })
-                               ) : (
-                                 <span className="text-xs text-gray-500">No color variants available</span>
-                               )}
+                              {item.colorVariants &&
+                              item.colorVariants.length > 0 ? (
+                                item.colorVariants.map((variant, index) => {
+                                  const variantId =
+                                    variant.id || `variant-${index}`;
+                                  const isSelected =
+                                    selectedColors[item.id] === variantId;
+                                  return (
+                                    <button
+                                      key={`${item.id}-${variantId}`}
+                                      onClick={() =>
+                                        handleColorSelect(item.id, variantId)
+                                      }
+                                      className={`relative w-6 h-6 rounded-full border-2 transition-all ${
+                                        isSelected
+                                          ? "border-blue-500 ring-2 ring-blue-200"
+                                          : "border-gray-300 hover:border-gray-400"
+                                      }`}
+                                      style={{
+                                        backgroundColor: variant.colorCode,
+                                      }}
+                                      title={
+                                        isSelected
+                                          ? `${variant.color} (click to unselect)`
+                                          : variant.color
+                                      }
+                                    >
+                                      {isSelected && (
+                                        <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow-sm">
+                                          ×
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-xs text-gray-500">
+                                  No color variants available
+                                </span>
+                              )}
                             </div>
                           </div>
 
                           {/* Size Selection */}
-                          <div className="mb-3" key={`sizes-${item.id}-${selectedColors[item.id] || 'no-color'}`}>
+                          <div
+                            className="mb-3"
+                            key={`sizes-${item.id}-${
+                              selectedColors[item.id] || "no-color"
+                            }`}
+                          >
                             <label className="text-xs font-medium text-gray-700 mb-1 block">
                               Size:
                             </label>
                             <div className="grid grid-cols-3 gap-1">
                               {(() => {
-                                const availableSizes = item.colorVariants ? getAvailableSizes(item) : [];
-                                console.log(`Size rendering for ${item.id}: availableSizes=`, availableSizes, `length=${availableSizes.length}`);
+                                const availableSizes = item.colorVariants
+                                  ? getAvailableSizes(item)
+                                  : [];
+                                console.log(
+                                  `Size rendering for ${item.id}: availableSizes=`,
+                                  availableSizes,
+                                  `length=${availableSizes.length}`
+                                );
                                 return availableSizes.length > 0 ? (
                                   availableSizes.map((sizeQty) => {
-                                  const isSelected = selectedSizes[item.id] === sizeQty.size;
-                                  const isOutOfStock = sizeQty.quantity === 0;
-                                  return (
-                                    <button
-                                      key={`${item.id}-${sizeQty.size}`}
-                                      onClick={() => !isOutOfStock && handleSizeSelect(item.id, sizeQty.size)}
-                                      disabled={isOutOfStock}
-                                      className={`text-xs py-1 px-2 rounded border transition-all ${
-                                        isOutOfStock
-                                          ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                                          : isSelected
-                                          ? "bg-blue-600 text-white border-blue-600"
-                                          : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-                                      }`}
-                                      title={`${sizeQty.size} - ${sizeQty.quantity} in stock`}
-                                    >
-                                      <div className="flex flex-col items-center">
-                                        <span>{sizeQty.size}</span>
-                                        <span className={`text-xs ${isSelected ? 'text-blue-200' : 'text-gray-500'}`}>
-                                          ({sizeQty.quantity})
-                                        </span>
-                                      </div>
-                                    </button>
-                                  );
+                                    const isSelected =
+                                      selectedSizes[item.id] === sizeQty.size;
+                                    const isOutOfStock = sizeQty.quantity === 0;
+                                    return (
+                                      <button
+                                        key={`${item.id}-${sizeQty.size}`}
+                                        onClick={() =>
+                                          !isOutOfStock &&
+                                          handleSizeSelect(
+                                            item.id,
+                                            sizeQty.size
+                                          )
+                                        }
+                                        disabled={isOutOfStock}
+                                        className={`text-xs py-1 px-2 rounded border transition-all ${
+                                          isOutOfStock
+                                            ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                            : isSelected
+                                            ? "bg-blue-600 text-white border-blue-600"
+                                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                                        }`}
+                                        title={`${sizeQty.size} - ${sizeQty.quantity} in stock`}
+                                      >
+                                        <div className="flex flex-col items-center">
+                                          <span>{sizeQty.size}</span>
+                                          <span
+                                            className={`text-xs ${
+                                              isSelected
+                                                ? "text-blue-200"
+                                                : "text-gray-500"
+                                            }`}
+                                          >
+                                            ({sizeQty.quantity})
+                                          </span>
+                                        </div>
+                                      </button>
+                                    );
                                   })
                                 ) : (
                                   <span className="text-xs text-gray-500 col-span-3">
-                                    {selectedColors[item.id] ? "No sizes available" : "Select a color first"}
+                                    {selectedColors[item.id]
+                                      ? "No sizes available"
+                                      : "Select a color first"}
                                   </span>
                                 );
                               })()}
@@ -1659,8 +1789,10 @@ function OwnerHomeContent() {
                           </div>
 
                           {/* Add to Cart Button */}
-                          <button 
-                            onClick={() => handleAddToCart(item as ClothingInventoryItem)}
+                          <button
+                            onClick={() =>
+                              handleAddToCart(item as ClothingInventoryItem)
+                            }
                             className={`w-full py-2 px-3 text-sm font-medium rounded transition-colors flex items-center justify-center space-x-2 ${
                               selectedColors[item.id] && selectedSizes[item.id]
                                 ? "bg-blue-600 hover:bg-blue-700 text-white"

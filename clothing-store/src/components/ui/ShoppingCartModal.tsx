@@ -372,6 +372,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                 {discountMode === "group" && (
                   <div className="space-y-2">
                     <select
+                      title="Select a group for discount"
                       value={selectedGroupForDiscount}
                       onChange={(e) =>
                         setSelectedGroupForDiscount(e.target.value)
@@ -410,6 +411,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                 {discountMode === "variant" && (
                   <div className="space-y-2">
                     <select
+                      title="Select a variant for discount"
                       value={selectedVariantForDiscount}
                       onChange={(e) =>
                         setSelectedVariantForDiscount(e.target.value)
