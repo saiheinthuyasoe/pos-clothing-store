@@ -235,22 +235,13 @@ function OwnerSettingsContent() {
                 <div className="space-y-6">
                   {/* Logo Upload */}
                   <div className="text-center">
-                    <div className="w-24 h-24 mx-auto mb-4 bg-blue-100 rounded-lg flex items-center justify-center">
-                      {settings.businessLogo ? (
-                        <img 
-                          src={settings.businessLogo} 
-                          alt="Business Logo" 
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-blue-500 rounded transform rotate-12"></div>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">Click to select logo</p>
-                    <p className="text-xs text-gray-500 mb-4">PNG, JPG, JPEG, GIF up to 10MB</p>
-                    <Button variant="outline" size="sm">
-                      Upload Logo
-                    </Button>
+                    <h3 className="text-sm font-medium text-gray-900 mb-4">Business Logo</h3>
+                    <ImageUpload
+                      value={settings.businessLogo}
+                      onChange={(url) => handleInputChange('businessLogo', url)}
+                      folder="business-logos"
+                      className="mx-auto"
+                    />
                   </div>
 
                   {/* Business Details */}

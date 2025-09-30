@@ -225,23 +225,31 @@ export function Sidebar({
 }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [businessName, setBusinessName] = useState<string>("Fashion Store");
+  const [businessLogo, setBusinessLogo] = useState<string>("");
+  const [logoError, setLogoError] = useState<boolean>(false);
 
-  // Fetch business name from settings API
+  // Fetch business name and logo from settings API
   useEffect(() => {
-    const fetchBusinessName = async () => {
+    const fetchBusinessSettings = async () => {
       try {
         const response = await fetch('/api/settings');
         const result = await response.json();
-        if (result.success && result.data?.businessName) {
-          setBusinessName(result.data.businessName);
+        if (result.success && result.data) {
+          if (result.data.businessName) {
+            setBusinessName(result.data.businessName);
+          }
+          if (result.data.businessLogo) {
+            setBusinessLogo(result.data.businessLogo);
+            setLogoError(false); // Reset error state when new logo is loaded
+          }
         }
       } catch (error) {
-        console.error('Error fetching business name:', error);
-        // Keep default "Fashion Store" if fetch fails
+        console.error('Error fetching business settings:', error);
+        // Keep defaults if fetch fails
       }
     };
 
-    fetchBusinessName();
+    fetchBusinessSettings();
   }, []);
 
   // Close all expanded items when sidebar is collapsed
@@ -355,11 +363,29 @@ export function Sidebar({
       <div className="px-4 py-7 border-b border-gray-200 flex-shrink-0">
         {isCollapsed ? (
           <div className="flex flex-col items-center space-y-2">
-            <Store className="w-8 h-8 text-purple-600" />
+            {businessLogo && !logoError ? (
+              <img 
+                src={businessLogo} 
+                alt="Business Logo" 
+                className="w-8 h-8 object-cover rounded"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <Store className="w-8 h-8 text-purple-600" />
+            )}
           </div>
         ) : (
           <div className="flex items-center">
-            <Store className="w-8 h-8 text-purple-600 mr-3" />
+            {businessLogo && !logoError ? (
+              <img 
+                src={businessLogo} 
+                alt="Business Logo" 
+                className="w-8 h-8 object-cover rounded mr-3"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <Store className="w-8 h-8 text-purple-600 mr-3" />
+            )}
             <div className="flex-1">
               <h1 className="text-lg font-bold text-gray-900">{businessName || "Fashion Store"}</h1>
               <p className="text-xs text-gray-500">Owner Dashboard</p>
