@@ -365,19 +365,13 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Helper function to calculate discounted price
   const calculateDiscountedPrice = (originalPrice: number, groupDiscount?: number, variantDiscount?: number) => {
-    let price = originalPrice;
+    // Sum all discounts first, then apply the total discount
+    const totalDiscountPercent = (groupDiscount || 0) + (variantDiscount || 0);
     
-    // Apply group discount first
-    if (groupDiscount && groupDiscount > 0) {
-      price = price * (1 - groupDiscount / 100);
-    }
+    // Apply the total discount to the original price
+    const discountedPrice = originalPrice * (1 - totalDiscountPercent / 100);
     
-    // Apply variant discount on top of group discount
-    if (variantDiscount && variantDiscount > 0) {
-      price = price * (1 - variantDiscount / 100);
-    }
-    
-    return price;
+    return discountedPrice;
   };
 
   // Apply discount to all items in a specific group

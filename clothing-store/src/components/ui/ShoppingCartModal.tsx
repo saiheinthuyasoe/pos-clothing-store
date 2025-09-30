@@ -222,12 +222,10 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   // Calculate variant discount savings
   const variantDiscountSavings = cart.items.reduce((total, item) => {
     if (item.variantDiscount && item.variantDiscount > 0) {
-      // Calculate variant discount on the price after group discount
-      const priceAfterGroupDiscount = item.groupDiscount
-        ? item.originalPrice * (1 - item.groupDiscount / 100)
-        : item.originalPrice;
+      // Calculate variant discount on the original price (not after group discount)
+      const originalItemTotal = item.originalPrice * item.quantity;
       const variantDiscountAmount =
-        priceAfterGroupDiscount * item.quantity * (item.variantDiscount / 100);
+        originalItemTotal * (item.variantDiscount / 100);
       return total + variantDiscountAmount;
     }
     return total;

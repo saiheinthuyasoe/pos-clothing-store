@@ -224,6 +224,25 @@ export function Sidebar({
   isCartModalOpen = false,
 }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [businessName, setBusinessName] = useState<string>("Fashion Store");
+
+  // Fetch business name from settings API
+  useEffect(() => {
+    const fetchBusinessName = async () => {
+      try {
+        const response = await fetch('/api/settings');
+        const result = await response.json();
+        if (result.success && result.data?.businessName) {
+          setBusinessName(result.data.businessName);
+        }
+      } catch (error) {
+        console.error('Error fetching business name:', error);
+        // Keep default "Fashion Store" if fetch fails
+      }
+    };
+
+    fetchBusinessName();
+  }, []);
 
   // Close all expanded items when sidebar is collapsed
   useEffect(() => {
@@ -342,7 +361,7 @@ export function Sidebar({
           <div className="flex items-center">
             <Store className="w-8 h-8 text-purple-600 mr-3" />
             <div className="flex-1">
-              <h1 className="text-lg font-bold text-gray-900">Fashion Store</h1>
+              <h1 className="text-lg font-bold text-gray-900">{businessName || "Fashion Store"}</h1>
               <p className="text-xs text-gray-500">Owner Dashboard</p>
             </div>
           </div>
