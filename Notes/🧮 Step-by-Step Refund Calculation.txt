@@ -1,0 +1,51 @@
+🧮 Step-by-Step Refund Calculation
+1. Item Amount Calculation
+PlainText
+
+
+
+For each refunded item:Item Refund Amount = Unit Price × Refund Quantity
+Uses the actual price paid (discounted price if item had individual discounts)
+Sums up all selected items to get Total Item Refund Amount
+2. Proportional Cart Discount Calculation
+PlainText
+
+
+
+For each item:Item Proportion = Item Refund Amount ÷ Transaction SubtotalProportional Cart Discount = Item Proportion × Total Cart DiscountTotal Proportional Cart Discount = Sum of all item proportional discounts
+3. Final Refund Amount
+PlainText
+
+
+
+Final Refund Amount = Total Item Refund Amount - Total Proportional Cart Discount
+📊 Example Calculation
+Let's say you have a transaction:
+
+Item A: THB 500 × 2 = THB 1,000
+Item B: THB 250 × 1 = THB 250
+Subtotal: THB 1,250
+Cart Discount: THB 107.50 (8.6%)
+Tax: THB 85.65
+Total: THB 1,228.15
+If refunding Item A (2 units):
+
+1.
+Item Amount: THB 1,000
+2.
+Item Proportion: THB 1,000 ÷ THB 1,250 = 80%
+3.
+Proportional Cart Discount: 80% × THB 107.50 = THB 86
+4.
+Final Refund: THB 1,000 - THB 86 = THB 914
+🎯 Key Features
+✅ What IS Refunded:
+Item prices (including any item-level discounts)
+Proportional reduction of cart discount
+❌ What is NOT Refunded:
+Tax - Not refunded as per store policy (tax was paid to government)
+Full cart discount - Only the proportional amount
+🔒 Built-in Protections:
+Over-refund Prevention: Cannot refund more than the customer actually paid
+Quantity Validation: Cannot refund more items than available
+Double-refund Prevention: Tracks already refunded quantities

@@ -1,0 +1,58 @@
+POS CLOTHING
+
+- Size
+- http://localhost:3000/owner/inventory/stocks/new-stock (multiple choice shop branch at Shop)
+- need to add wholesale tire with hide button
+
+I would like to build POS system specific for Clothing-store.
+
+I want to use Next.js (AppRouter, typescript) and Firebase.
+
+We will have to implement 2 sides, buyer and seller.
+
+Let's implement Authentication for both Buyer and Seller side only frontend with simple and clean code, also don't forget ESLint and Type and syntax error.
+
+
+🏠 Home
+📊 Dashboard  
+📈 Sales ▼
+   ├── 💳 Transactions
+   ├── 📋 Reports  
+   └── 💰 Payments
+📦 Inventory ▼
+   └── 📦 Stocks
+   └── 👥 Customers
+
+💸 Expenses ▼
+   ├── 📄 Details
+   ├── ✅ Approvals
+   └── 📊 Headings
+🏷️ Barcode ▼
+   ├── 🖨️ Label Print
+   └── 📦 New Stock
+   └── 📦 Print Settings
+📊 Exchange Sales
+👥 Tellers
+⚙️ Settings
+🔒 Privacy Policy
+
+
+###  Example with Your Test Transaction
+Let's say you have a transaction with:
+
+- Item 1 : THB 500 × 2 = THB 1,000
+- Item 2 : THB 250 × 1 = THB 250
+- Subtotal : THB 1,250
+- Cart Discount : THB 107.50 (8.6%)
+- Final Amount : THB 1,142.50
+If you refund Item 1 individually:
+
+- Item 1 proportion: THB 1,000 ÷ THB 1,250 = 80%
+- Cart discount for Item 1: 80% × THB 107.50 = THB 86
+- Refund amount: THB 1,000 - THB 86 = THB 914
+If you later refund Item 2:
+
+- Item 2 proportion: THB 250 ÷ THB 1,250 = 20%
+- Cart discount for Item 2: 20% × THB 107.50 = THB 21.50
+- Refund amount: THB 250 - THB 21.50 = THB 228.50
+Total individual refunds : THB 914 + THB 228.50 = THB 1,142.50 ✅
