@@ -245,7 +245,7 @@ function OwnerSettingsContent() {
                     <ImageUpload
                       value={settings.businessLogo}
                       onChange={(url) => handleInputChange('businessLogo', url)}
-                      folder="business-logos"
+                      folder="pos-clothing-store/business-logos"
                       className="mx-auto"
                     />
                   </div>

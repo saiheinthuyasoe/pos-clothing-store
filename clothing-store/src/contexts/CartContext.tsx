@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Cart, CartItem, CartContextType } from '@/types/cart';
+import { Cart, CartItem, CartContextType, SelectedCustomer } from '@/types/cart';
 import { useAuth } from '@/contexts/AuthContext';
 import { CartService } from '@/services/cartService';
 
@@ -25,7 +25,8 @@ export function CartProvider({ children }: CartProviderProps) {
     items: [],
     totalItems: 0,
     totalAmount: 0,
-    currency: 'THB'
+    currency: 'THB',
+    selectedCustomer: null
   });
   const [isLoadingCart, setIsLoadingCart] = useState(false);
 
@@ -351,7 +352,19 @@ export function CartProvider({ children }: CartProviderProps) {
       items: [],
       totalItems: 0,
       totalAmount: 0,
-      currency: cart.currency
+      currency: cart.currency,
+      selectedCustomer: null
+    });
+  };
+
+  const completePurchase = () => {
+    // Clear cart without restoring inventory (items have been sold)
+    setCart({
+      items: [],
+      totalItems: 0,
+      totalAmount: 0,
+      currency: cart.currency,
+      selectedCustomer: null
     });
   };
 
@@ -508,14 +521,29 @@ export function CartProvider({ children }: CartProviderProps) {
     setInventoryCallbacks(callbacks);
   }, []);
 
+  // Customer management functions
+  const setSelectedCustomer = useCallback((customer: SelectedCustomer | null) => {
+    setCart(prevCart => ({
+      ...prevCart,
+      selectedCustomer: customer
+    }));
+  }, []);
+
+  const getSelectedCustomer = useCallback((): SelectedCustomer | null => {
+    return cart.selectedCustomer || null;
+  }, [cart.selectedCustomer]);
+
   const value: CartContextType = {
     cart,
     addToCart,
     removeFromCart,
     updateQuantity,
     clearCart,
+    completePurchase,
     getCartTotal,
     getCartItemCount,
+    setSelectedCustomer,
+    getSelectedCustomer,
     applyGroupDiscount,
     applyVariantDiscount,
     removeGroupDiscount,

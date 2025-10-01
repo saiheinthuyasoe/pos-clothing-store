@@ -110,4 +110,129 @@ export function extractPublicId(url: string): string {
   }
 }
 
+/**
+ * Upload customer image with optimized settings
+ * @param file - The file buffer or base64 string
+ * @param customerId - Optional customer ID for naming
+ * @returns Promise with upload result
+ */
+export async function uploadCustomerImage(
+  file: Buffer | string,
+  customerId?: string
+): Promise<CloudinaryUploadResult> {
+  try {
+    const uploadOptions: UploadApiOptions = {
+      resource_type: 'image',
+      folder: 'pos-clothing-store/customers',
+      quality: 'auto:good',
+      transformation: [
+        { width: 400, height: 400, crop: 'fill' }
+      ],
+    };
+
+    if (customerId) {
+      uploadOptions.public_id = `pos-clothing-store/customers/${customerId}`;
+    }
+
+    // Convert buffer to base64 data URL if needed
+    const fileToUpload = (file instanceof Buffer 
+      ? `data:image/jpeg;base64,${file.toString('base64')}` 
+      : file) as string;
+
+    const result = await cloudinary.uploader.upload(
+      fileToUpload,
+      uploadOptions
+    );
+
+    return {
+      public_id: result.public_id,
+      secure_url: result.secure_url,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      resource_type: result.resource_type,
+      created_at: result.created_at,
+    };
+  } catch (error) {
+    console.error('Customer image upload error:', error);
+    throw new Error('Failed to upload customer image to Cloudinary');
+  }
+}
+
+/**
+ * Upload business logo with optimized settings
+ * @param file - The file buffer or base64 string
+ * @param businessId - Optional business ID for naming
+ * @returns Promise with upload result
+ */
+export async function uploadBusinessLogo(
+  file: Buffer | string,
+  businessId?: string
+): Promise<CloudinaryUploadResult> {
+  try {
+    const uploadOptions: UploadApiOptions = {
+      resource_type: 'image',
+      folder: 'pos-clothing-store/business-logos',
+      quality: 'auto:best',
+      transformation: [
+        { width: 300, height: 300, crop: 'fit' }
+      ],
+    };
+
+    if (businessId) {
+      uploadOptions.public_id = `pos-clothing-store/business-logos/${businessId}`;
+    }
+
+    // Convert buffer to base64 data URL if needed
+    const fileToUpload = (file instanceof Buffer 
+      ? `data:image/jpeg;base64,${file.toString('base64')}` 
+      : file) as string;
+
+    const result = await cloudinary.uploader.upload(
+      fileToUpload,
+      uploadOptions
+    );
+
+    return {
+      public_id: result.public_id,
+      secure_url: result.secure_url,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      resource_type: result.resource_type,
+      created_at: result.created_at,
+    };
+  } catch (error) {
+    console.error('Business logo upload error:', error);
+    throw new Error('Failed to upload business logo to Cloudinary');
+  }
+}
+
+/**
+ * Validate image file on client side
+ * @param file - The file to validate
+ * @returns Validation result
+ */
+export function validateImageFile(file: File): { isValid: boolean; error?: string } {
+  // Check file type
+  const validTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/gif', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    return {
+      isValid: false,
+      error: 'Please select a valid image file (PNG, JPG, JPEG, GIF, WebP)',
+    };
+  }
+
+  // Check file size (5MB limit)
+  const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+  if (file.size > maxSize) {
+    return {
+      isValid: false,
+      error: 'File size must be less than 5MB',
+    };
+  }
+
+  return { isValid: true };
+}
+
 export default cloudinary;

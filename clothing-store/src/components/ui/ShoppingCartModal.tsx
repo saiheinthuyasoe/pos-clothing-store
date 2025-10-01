@@ -1,11 +1,14 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { X, Minus, Plus, Settings, ShoppingCart, Eye } from "lucide-react";
+import { X, Minus, Plus, Settings, ShoppingCart, Eye, User, Users } from "lucide-react";
 import Image from "next/image";
+import { CustomerSelectionModal } from "@/components/cart/CustomerSelectionModal";
+import { PaymentClearanceModal } from "@/components/payment/PaymentClearanceModal";
 
 interface ShoppingCartModalProps {
   isOpen: boolean;
@@ -13,20 +16,24 @@ interface ShoppingCartModalProps {
 }
 
 export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
+  const router = useRouter();
   const {
     cart,
     updateQuantity,
     removeFromCart,
     clearCart,
+    completePurchase,
     applyGroupDiscount,
     applyVariantDiscount,
     removeGroupDiscount,
     removeVariantDiscount,
+    setSelectedCustomer,
+    getSelectedCustomer,
   } = useCart();
   const { formatPrice } = useCurrency();
   const { taxRate } = useSettings();
   const [discountAmount, setDiscountAmount] = React.useState<string>("");
-  const [appliedDiscount, setAppliedDiscount] = React.useState<number>(0);
+  const [cartDiscountPercent, setCartDiscountPercent] = React.useState<number>(0);
   const [isBigViewOpen, setIsBigViewOpen] = React.useState<boolean>(false);
 
   // New discount management state
@@ -41,6 +48,12 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   const [discountMode, setDiscountMode] = React.useState<
     "cart" | "group" | "variant"
   >("cart");
+
+  // Customer selection state
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = React.useState(false);
+  
+  // Payment clearance state
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
 
   // Prevent background scrolling when modal is open and auto-open big view
   React.useEffect(() => {
@@ -64,7 +77,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   React.useEffect(() => {
     if (cart.items.length === 0) {
       setDiscountAmount("");
-      setAppliedDiscount(0);
+    setCartDiscountPercent(0);
       setGroupDiscountAmount("");
       setSelectedGroupForDiscount("");
       setVariantDiscountAmount("");
@@ -115,8 +128,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   const handleApplyDiscount = () => {
     const discountPercent = parseFloat(discountAmount) || 0;
     if (discountPercent >= 0 && discountPercent <= 100) {
-      const discountValue = (subtotal * discountPercent) / 100;
-      setAppliedDiscount(discountValue);
+      // Store the cart discount percentage - it will be applied to subtotal after individual discounts
+      setCartDiscountPercent(discountPercent);
     } else {
       alert("Please enter a valid discount percentage (0-100)");
     }
@@ -176,24 +189,38 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
       return;
     }
 
-    // Here you would typically integrate with a payment system
-    // For now, we'll just show a success message and clear the cart
-    const confirmed = confirm(
-      `Proceed with checkout for ${formatPrice(grandTotal)}?`
-    );
-    if (confirmed) {
-      clearCart();
-      // Reset all discount states
-      setAppliedDiscount(0);
-      setDiscountAmount("");
-      setGroupDiscountAmount("");
-      setSelectedGroupForDiscount("");
-      setVariantDiscountAmount("");
-      setSelectedVariantForDiscount("");
-      setDiscountMode("cart");
-      onClose();
-      alert("Checkout completed successfully!");
-    }
+    setIsPaymentModalOpen(true);
+  };
+
+  const handlePaymentComplete = (paymentData: {
+    transactionId: string;
+    total: number;
+    // add other known fields here as needed
+  }) => {
+    // In a real application, you would send this data to your backend
+    console.log('Payment completed:', paymentData);
+    
+    // Complete purchase and reset states
+    completePurchase();
+    setCartDiscountPercent(0);
+    setDiscountAmount("");
+    setGroupDiscountAmount("");
+    setSelectedGroupForDiscount("");
+    setVariantDiscountAmount("");
+    setSelectedVariantForDiscount("");
+    setDiscountMode("cart");
+    
+    // Close modals
+    setIsPaymentModalOpen(false);
+    onClose();
+    
+    // Show success message and navigate to transactions page
+    alert(`Payment completed successfully!\n\nTransaction ID: ${paymentData.transactionId}\nTotal: ${formatPrice(paymentData.total)}\n\nRedirecting to transactions page...`);
+    
+    // Navigate to transactions page after a short delay
+    setTimeout(() => {
+      router.push('/owner/sales/transactions');
+    }, 1500);
   };
 
   // Calculate subtotal using discounted prices when available
@@ -233,6 +260,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     return total;
   }, 0);
 
+  // Calculate cart discount dynamically based on percentage and current subtotal (after individual discounts)
+  const appliedDiscount = subtotal * (cartDiscountPercent / 100);
   const discount = appliedDiscount; // Cart-wide discount
   const subtotalAfterAllDiscounts = subtotal - discount; // Subtotal after all discounts including cart discount
   const tax = subtotalAfterAllDiscounts * (taxRate / 100); // Calculate tax based on tax rate from settings
@@ -278,17 +307,40 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
           <div className="border-b border-gray-200 px-6 py-4">
             <div className="flex items-center space-x-3">
               <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
-                <span className="text-white text-sm font-medium">D</span>
+                {getSelectedCustomer()?.customerImage ? (
+                  <img
+                    className="h-8 w-8 rounded-full object-cover"
+                    src={getSelectedCustomer()?.customerImage}
+                    alt={getSelectedCustomer()?.displayName || getSelectedCustomer()?.email || 'Customer'}
+                  />
+                ) : getSelectedCustomer() ? (
+                  <span className="text-white text-sm font-medium">
+                    {getSelectedCustomer()?.displayName?.charAt(0)?.toUpperCase() || 
+                     getSelectedCustomer()?.email?.charAt(0)?.toUpperCase() || 'C'}
+                  </span>
+                ) : (
+                  <User className="h-4 w-4 text-white" />
+                )}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">Default</p>
-                <p className="text-xs text-blue-600">Unknown</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {getSelectedCustomer()?.displayName || 'Unknown Customer'}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {getSelectedCustomer()?.email || 'Walk-in customer'}
+                </p>
+                {getSelectedCustomer()?.customerType && (
+                  <p className="text-xs text-gray-500">
+                    {getSelectedCustomer()?.customerType}
+                  </p>
+                )}
               </div>
               <button
+                onClick={() => setIsCustomerModalOpen(true)}
                 className="text-gray-400 hover:text-gray-600"
-                title="Edit customer info"
+                title="Select customer"
               >
-                <Settings className="h-4 w-4" />
+                <Users className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -301,7 +353,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
               <p className="text-sm">Add some items to get started</p>
             </div>
           ) : (
-            <div className="flex-1 border-t border-gray-200 px-6 py-6 space-y-6">
+            <div className="flex-1 border-t border-gray-200 overflow-y-auto">
+              <div className="px-6 py-6 space-y-6">
               {/* Discount section */}
               <div className="p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
                 <div className="flex items-center space-x-2 text-blue-700 mb-3">
@@ -496,7 +549,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                     <span className="flex items-center space-x-1">
                       <span>
                         Cart Discount
-                        {discountAmount ? ` (${discountAmount}%)` : ""}:
+                        {cartDiscountPercent > 0 ? ` (${cartDiscountPercent}%)` : ""}:
                       </span>
                       <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
                         CART
@@ -540,6 +593,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
               >
                 Proceed to Checkout
               </button>
+              </div>
             </div>
           )}
         </div>
@@ -828,6 +882,36 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
           </div>
         </div>
       )}
+
+      {/* Customer Selection Modal */}
+      <CustomerSelectionModal
+        isOpen={isCustomerModalOpen}
+        onClose={() => setIsCustomerModalOpen(false)}
+        onSelectCustomer={setSelectedCustomer}
+        selectedCustomer={getSelectedCustomer()}
+      />
+
+      {/* Payment Clearance Modal */}
+      <PaymentClearanceModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onPaymentComplete={() => {
+          // Generate a transaction ID
+          const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          // Call the original handler with the expected shape
+          handlePaymentComplete({
+            transactionId,
+            total: grandTotal,
+          });
+        }}
+        customer={getSelectedCustomer()}
+        items={cart.items}
+        subtotal={subtotal}
+        discount={appliedDiscount}
+        tax={tax}
+        total={grandTotal}
+        currency="B"
+      />
     </div>
   );
 }

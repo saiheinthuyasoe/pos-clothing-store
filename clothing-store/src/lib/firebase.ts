@@ -50,6 +50,19 @@ console.log("Firestore initialization:", {
 // Test Firestore connection
 if (db) {
   console.log("Testing Firestore connection...");
+  // Test basic Firestore operations
+  import('firebase/firestore').then(({ connectFirestoreEmulator, enableNetwork }) => {
+    console.log("Firestore modules loaded successfully");
+  }).catch(error => {
+    console.error("Error loading Firestore modules:", error);
+  });
+} else {
+  console.error("Firestore not initialized - check environment variables:", {
+    hasApiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    hasAuthDomain: !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    isFirebaseConfigured
+  });
 }
 
 // Export configuration status

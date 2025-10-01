@@ -11,6 +11,7 @@ import {
   where,
   serverTimestamp,
   Timestamp,
+  getDoc,
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import {
@@ -301,5 +302,167 @@ export class StockService {
         createdBy: "mock-user-id",
       },
     ];
+  }
+
+  /**
+   * Restore inventory for a specific item, color, and size
+   */
+  static async restoreInventory(
+    stockId: string,
+    colorName: string,
+    size: string,
+    quantity: number
+  ): Promise<void> {
+    if (!db || !isFirebaseConfigured) {
+      console.warn("Firebase not configured, skipping inventory restoration");
+      return;
+    }
+
+    try {
+      console.log(`Attempting to restore inventory: stockId=${stockId}, color=${colorName}, size=${size}, quantity=${quantity}`);
+      
+      // Get the current stock item
+      const stockRef = doc(db, COLLECTION_NAME, stockId);
+      const stockDoc = await getDoc(stockRef);
+      
+      if (!stockDoc.exists()) {
+        console.error(`Stock item ${stockId} not found`);
+        return;
+      }
+
+      const stockData = stockDoc.data() as StockItem;
+      console.log(`Found stock item: ${stockData.groupName}, variants:`, stockData.colorVariants?.map(v => ({ id: v.id, color: v.color })));
+      
+      // Find the color variant by color name (case-insensitive)
+      const targetVariant = stockData.colorVariants?.find(variant => 
+        variant.color.toLowerCase() === colorName.toLowerCase()
+      );
+      
+      if (!targetVariant) {
+        console.error(`Color variant "${colorName}" not found in stock item ${stockId}. Available colors:`, 
+          stockData.colorVariants?.map(v => v.color));
+        return;
+      }
+      
+      console.log(`Found color variant: ${targetVariant.id} (${targetVariant.color})`);
+      
+      // Log current inventory state before restoration
+      const currentSizeQty = targetVariant.sizeQuantities.find(sq => sq.size === size);
+      console.log(`BEFORE RESTORATION - ${stockId} (${colorName}, ${size}): current quantity = ${currentSizeQty?.quantity || 0}`);
+      
+      // Find and update the specific color variant and size
+      const updatedColorVariants = stockData.colorVariants?.map(variant => {
+        if (variant.id === targetVariant.id) {
+          const updatedSizeQuantities = variant.sizeQuantities.map(sizeQty => {
+            if (sizeQty.size === size) {
+              const newQuantity = sizeQty.quantity + quantity;
+              console.log(`DURING RESTORATION - ${stockId} (${colorName}, ${size}): ${sizeQty.quantity} + ${quantity} = ${newQuantity}`);
+              return {
+                ...sizeQty,
+                quantity: newQuantity
+              };
+            }
+            return sizeQty;
+          });
+          
+          return {
+            ...variant,
+            sizeQuantities: updatedSizeQuantities
+          };
+        }
+        return variant;
+      }) || [];
+
+      // Update the stock in the database
+      await updateDoc(stockRef, {
+        colorVariants: updatedColorVariants,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Verify the update by checking the final state
+      const updatedVariant = updatedColorVariants.find(v => v.id === targetVariant.id);
+      const finalSizeQty = updatedVariant?.sizeQuantities.find(sq => sq.size === size);
+      console.log(`AFTER RESTORATION - ${stockId} (${colorName}, ${size}): final quantity = ${finalSizeQty?.quantity || 0}`);
+      console.log(`✓ Successfully restored ${quantity} units of ${stockId} (${colorName}, ${size})`);
+    } catch (error) {
+      console.error("Error restoring inventory:", error);
+      throw new Error("Failed to restore inventory");
+    }
+  }
+
+  /**
+   * Restore inventory for multiple items (used for transaction cancellation)
+   */
+  static async restoreMultipleItems(
+    items: Array<{
+      stockId: string;
+      colorName: string;
+      size: string;
+      quantity: number;
+    }>
+  ): Promise<void> {
+    if (!db || !isFirebaseConfigured) {
+      console.warn("Firebase not configured, skipping inventory restoration");
+      return;
+    }
+
+    try {
+      console.log(`Restoring inventory for ${items.length} items:`, items);
+      
+      // Group items by stockId to avoid race conditions
+      const itemsByStockId = items.reduce((groups, item) => {
+        if (!groups[item.stockId]) {
+          groups[item.stockId] = [];
+        }
+        groups[item.stockId].push(item);
+        return groups;
+      }, {} as Record<string, typeof items>);
+      
+      console.log(`Grouped items into ${Object.keys(itemsByStockId).length} stock groups:`, 
+        Object.entries(itemsByStockId).map(([stockId, items]) => ({ stockId, count: items.length })));
+      
+      // Process each stock group sequentially to avoid race conditions
+      const restorationResults: Array<{ success: boolean; item: { stockId: string; colorName: string; size: string; quantity: number }; error?: unknown }> = [];
+      
+      for (const [stockId, stockItems] of Object.entries(itemsByStockId)) {
+        console.log(`Processing ${stockItems.length} items for stock ${stockId}`);
+        
+        // Process items for this stock sequentially
+        for (let i = 0; i < stockItems.length; i++) {
+          const item = stockItems[i];
+          try {
+            console.log(`Restoring item ${i + 1}/${stockItems.length} for stock ${stockId}: (${item.colorName}, ${item.size}) x${item.quantity}`);
+            await this.restoreInventory(item.stockId, item.colorName, item.size, item.quantity);
+            console.log(`✓ Successfully restored item ${i + 1} for stock ${stockId}`);
+            restorationResults.push({ success: true, item });
+          } catch (error) {
+            console.error(`✗ Failed to restore item ${i + 1} for stock ${stockId}:`, error);
+            restorationResults.push({ success: false, item, error });
+          }
+        }
+      }
+
+      // Count successful and failed restorations
+      const successful = restorationResults.filter(result => result.success).length;
+      const failed = restorationResults.filter(result => !result.success).length;
+
+      console.log(`Inventory restoration completed: ${successful} successful, ${failed} failed out of ${items.length} items`);
+
+      // Log failed items for debugging
+      if (failed > 0) {
+        const failedItems = restorationResults
+          .filter(result => !result.success)
+          .map(result => result.item);
+        console.warn('Failed to restore these items:', failedItems);
+      }
+
+      // Only throw error if ALL items failed
+      if (successful === 0 && failed > 0) {
+        throw new Error(`Failed to restore inventory for all ${items.length} items`);
+      }
+    } catch (error) {
+      console.error("Error restoring multiple items:", error);
+      throw new Error("Failed to restore inventory for multiple items");
+    }
   }
 }

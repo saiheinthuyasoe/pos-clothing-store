@@ -16,11 +16,20 @@ export interface CartItem {
   discountedPrice?: number; // Final price after applying discounts
 }
 
+export interface SelectedCustomer {
+  uid: string;
+  email: string;
+  displayName?: string;
+  customerImage?: string;
+  customerType?: 'retailer' | 'wholesaler' | 'distributor' | 'individual' | 'other';
+}
+
 export interface Cart {
   items: CartItem[];
   totalItems: number;
   totalAmount: number;
   currency: 'THB' | 'MMK';
+  selectedCustomer?: SelectedCustomer | null;
 }
 
 export interface CartContextType {
@@ -29,8 +38,12 @@ export interface CartContextType {
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
+  completePurchase: () => void;
   getCartTotal: () => number;
   getCartItemCount: () => number;
+  // Customer management functions
+  setSelectedCustomer: (customer: SelectedCustomer | null) => void;
+  getSelectedCustomer: () => SelectedCustomer | null;
   // Discount management functions
   applyGroupDiscount: (groupName: string, discountPercent: number) => void;
   applyVariantDiscount: (itemId: string, discountPercent: number) => void;
