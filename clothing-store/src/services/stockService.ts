@@ -212,6 +212,40 @@ export class StockService {
     }
   }
 
+  static async getStockById(id: string): Promise<StockItem | null> {
+    if (!db || !isFirebaseConfigured) {
+      // Return mock data when Firebase is not configured
+      const mockStocks = this.getMockStocks();
+      return mockStocks.find(stock => stock.id === id) || null;
+    }
+
+    try {
+      const stockRef = doc(db, COLLECTION_NAME, id);
+      const stockDoc = await getDoc(stockRef);
+      
+      if (!stockDoc.exists()) {
+        return null;
+      }
+
+      const data = stockDoc.data();
+      return {
+        id: stockDoc.id,
+        ...data,
+        createdAt:
+          data.createdAt instanceof Timestamp
+            ? data.createdAt.toDate().toISOString()
+            : data.createdAt,
+        updatedAt:
+          data.updatedAt instanceof Timestamp
+            ? data.updatedAt.toDate().toISOString()
+            : data.updatedAt,
+      } as StockItem;
+    } catch (error) {
+      console.error("Error fetching stock by ID:", error);
+      throw new Error("Failed to fetch stock item");
+    }
+  }
+
   static async deleteStock(id: string): Promise<void> {
     if (!db || !isFirebaseConfigured) {
       throw new Error("Firebase is not configured");
@@ -234,7 +268,7 @@ export class StockService {
         unitPrice: 25.99,
         originalPrice: 35.99,
         releaseDate: "2024-01-15",
-        shop: "Main Shop",
+        shop: "1",
         isColorless: false,
         groupImage: "/api/placeholder/200/250",
         wholesaleTiers: [
@@ -278,7 +312,7 @@ export class StockService {
         unitPrice: 89.99,
         originalPrice: 120.99,
         releaseDate: "2024-01-10",
-        shop: "Branch Store",
+        shop: "2",
         isColorless: false,
         groupImage: "/api/placeholder/200/250",
         wholesaleTiers: [],

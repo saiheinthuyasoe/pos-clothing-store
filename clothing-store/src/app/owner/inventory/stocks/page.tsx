@@ -21,10 +21,12 @@ import {
   Package,
   Palette,
   Ruler,
+  Store,
   AlertTriangle,
   X,
 } from "lucide-react";
 import { StockItem, StockGroupDisplay } from "@/types/stock";
+import { Shop } from "@/types/shop";
 import { StockDisplayService } from "@/services/stockDisplayService";
 import { SettingsService } from "@/services/settingsService";
 import { WholesalePricingTiers } from "@/components/ui/WholesalePricingTiers";
@@ -37,6 +39,8 @@ function InventoryStocksContent() {
 
   // API state
   const [stockGroups, setStockGroups] = useState<StockGroupDisplay[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [shopLookup, setShopLookup] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,9 +68,10 @@ function InventoryStocksContent() {
         setIsLoading(true);
         setError(null);
 
-        // Fetch both stocks and currency settings
-        const [stocksResponse, settings] = await Promise.all([
+        // Fetch stocks, shops, and currency settings
+        const [stocksResponse, shopsResponse, settings] = await Promise.all([
           fetch("/api/stocks"),
+          fetch("/api/shops"),
           SettingsService.getBusinessSettings()
         ]);
 
@@ -74,11 +79,30 @@ function InventoryStocksContent() {
           throw new Error("Failed to fetch stocks");
         }
 
-        const stocksData = await stocksResponse.json();
+        if (!shopsResponse.ok) {
+          throw new Error("Failed to fetch shops");
+        }
+
+        const [stocksData, shopsData] = await Promise.all([
+          stocksResponse.json(),
+          shopsResponse.json()
+        ]);
 
         if (!stocksData.success || !stocksData.data) {
           throw new Error(stocksData.error || "Invalid response format");
         }
+
+        if (!shopsData.success || !shopsData.data) {
+          throw new Error(shopsData.error || "Failed to fetch shops");
+        }
+
+        // Set shops data and create lookup map
+        setShops(shopsData.data);
+        const lookup = new Map<string, string>();
+        shopsData.data.forEach((shop: Shop) => {
+          lookup.set(shop.id, shop.name);
+        });
+        setShopLookup(lookup);
 
         // Set currency from settings
         const currency = (settings?.defaultCurrency as 'THB' | 'MMK') || 'THB';
@@ -326,6 +350,10 @@ function InventoryStocksContent() {
                               </span>
                             </div>
                             <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                              <span className="flex items-center">
+                                <Store className="h-4 w-4 mr-1" />
+                                {shopLookup.get(group.shop) || group.shop}
+                              </span>
                               <span className="flex items-center">
                                 <Package className="h-4 w-4 mr-1" />
                                 {group.totalQuantity} items

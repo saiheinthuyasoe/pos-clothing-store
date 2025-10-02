@@ -54,3 +54,31 @@ export interface NavigationProps {
   activeItem?: string;
   onItemClick?: (item: MenuItem) => void;
 }
+
+// Clothing inventory types
+export interface WholesaleTier {
+  id: string;
+  minQuantity: number;
+  price: number;
+}
+
+export interface ClothingInventoryItem {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  colors: string[];
+  image: string;
+  category: string;
+  shop: string; // branch/shop information
+  isNew: boolean;
+  barcode?: string;
+  wholesaleTiers: WholesaleTier[];
+  colorVariants: {
+    id: string;
+    color: string;
+    colorCode: string;
+    image?: string;
+    sizeQuantities: { size: string; quantity: number }[];
+  }[];
+}

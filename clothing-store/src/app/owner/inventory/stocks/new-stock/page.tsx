@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { ArrowLeft, Plus, DollarSign, X } from "lucide-react";
+import { ArrowLeft, Plus, DollarSign, X, BarChart3, ScanLine } from "lucide-react";
 import {
   WholesaleTier,
   ColorVariant,
@@ -29,7 +29,7 @@ function NewStockContent() {
   const [unitPrice, setUnitPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
-  const [selectedShop, setSelectedShop] = useState("");
+  const [selectedShops, setSelectedShops] = useState<string[]>([]);
 
   const [isColorless, setIsColorless] = useState(false);
   const [wholesaleTiers, setWholesaleTiers] = useState<WholesaleTier[]>([]);
@@ -39,6 +39,8 @@ function NewStockContent() {
   // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingShops, setIsLoadingShops] = useState(false);
+  const [isUploadingMultiple, setIsUploadingMultiple] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{current: number, total: number}>({current: 0, total: 0});
   const [error, setError] = useState<string>("");
 
   // Currency state
@@ -119,6 +121,113 @@ function NewStockContent() {
       sizeQuantities: [],
     };
     setColorVariants([...colorVariants, newVariant]);
+  };
+
+  const handleMultipleImageUpload = () => {
+    // Create a hidden file input for multiple image selection
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*';
+    
+    input.onchange = async (event) => {
+      const files = (event.target as HTMLInputElement).files;
+      if (!files || files.length === 0) return;
+
+      // Start loading state
+      setIsUploadingMultiple(true);
+      setUploadProgress({current: 0, total: files.length});
+      setError("");
+
+      const newVariants: ColorVariant[] = [];
+      let validFiles = 0;
+      
+      // First pass: validate all files
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          setError(prev => prev + `${file.name} is not an image file. `);
+          continue;
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          setError(prev => prev + `${file.name} is too large (max 5MB). `);
+          continue;
+        }
+
+        validFiles++;
+      }
+
+      if (validFiles === 0) {
+        setIsUploadingMultiple(false);
+        setUploadProgress({current: 0, total: 0});
+        return;
+      }
+
+      // Update total with valid files only
+      setUploadProgress({current: 0, total: validFiles});
+
+      // Process each valid file
+      let processedCount = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Skip invalid files
+        if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+          continue;
+        }
+
+        try {
+          // Upload image to Cloudinary
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('folder', 'pos-clothing-store/variants');
+
+          const response = await fetch('/api/cloudinary/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            // Create new color variant with uploaded image
+            const newVariant: ColorVariant = {
+              id: (Date.now() + i).toString(),
+              color: "",
+              colorCode: "#000000",
+              barcode: "",
+              sizeQuantities: [],
+              image: data.secure_url,
+            };
+            newVariants.push(newVariant);
+          } else {
+            setError(prev => prev + `Failed to upload ${file.name}. `);
+          }
+        } catch (error) {
+          setError(prev => prev + `Error uploading ${file.name}. `);
+        }
+
+        // Update progress
+        processedCount++;
+        setUploadProgress({current: processedCount, total: validFiles});
+      }
+
+      // Add all successfully uploaded variants
+      if (newVariants.length > 0) {
+        setColorVariants([...colorVariants, ...newVariants]);
+      }
+
+      // End loading state
+      setIsUploadingMultiple(false);
+      setUploadProgress({current: 0, total: 0});
+    };
+
+    // Trigger file selection dialog
+    input.click();
   };
 
   const updateColorVariant = (
@@ -213,6 +322,139 @@ function NewStockContent() {
     );
   };
 
+  // EAN-13 barcode generation function
+  const generateBarcode = (variantId: string) => {
+    // EAN-13 format: Country(2-3) + Manufacturer(4-5) + Product(5) + Check(1) = 13 digits
+    
+    // Country code (Thailand = 885, Myanmar = 858) - using 885 for Thailand
+    const countryCode = "885";
+    
+    // Manufacturer code (4 digits) - using a fixed code for this store
+    const manufacturerCode = "1001";
+    
+    // Product code (5 digits) - using timestamp for uniqueness
+    const timestamp = Date.now().toString();
+    const productCode = timestamp.slice(-5);
+    
+    // First 12 digits without check digit
+    const first12Digits = countryCode + manufacturerCode + productCode;
+    
+    // Calculate EAN-13 check digit
+    const calculateCheckDigit = (digits: string): string => {
+      let sum = 0;
+      for (let i = 0; i < 12; i++) {
+        const digit = parseInt(digits[i]);
+        sum += i % 2 === 0 ? digit : digit * 3;
+      }
+      const checkDigit = (10 - (sum % 10)) % 10;
+      return checkDigit.toString();
+    };
+    
+    const checkDigit = calculateCheckDigit(first12Digits);
+    const generatedBarcode = first12Digits + checkDigit;
+    
+    updateColorVariant(variantId, "barcode", generatedBarcode);
+  };
+
+  // Barcode scanning function
+  const scanBarcode = async (variantId: string) => {
+    try {
+      // Check if the browser supports the Barcode Detection API
+      if ('BarcodeDetector' in window) {
+        // Use the native Barcode Detection API if available
+        const barcodeDetector = new (window as any).BarcodeDetector();
+        
+        // Request camera access
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        
+        // Create a video element to display camera feed
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+        
+        // Create a modal for scanning
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+          <div class="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold mb-4">Scan Barcode</h3>
+            <div class="relative">
+              <video id="scanner-video" class="w-full h-64 bg-black rounded" autoplay></video>
+              <div class="absolute inset-0 border-2 border-red-500 rounded pointer-events-none"></div>
+            </div>
+            <div class="flex gap-2 mt-4">
+              <button id="cancel-scan" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancel</button>
+              <input id="manual-barcode" type="text" placeholder="Or enter manually" class="flex-1 px-3 py-2 border rounded">
+              <button id="manual-submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(modal);
+        const videoElement = modal.querySelector('#scanner-video') as HTMLVideoElement;
+        videoElement.srcObject = stream;
+        
+        // Handle manual input
+        const manualInput = modal.querySelector('#manual-barcode') as HTMLInputElement;
+        const manualSubmit = modal.querySelector('#manual-submit') as HTMLButtonElement;
+        const cancelButton = modal.querySelector('#cancel-scan') as HTMLButtonElement;
+        
+        let cleanup = () => {
+           stream.getTracks().forEach(track => track.stop());
+           document.body.removeChild(modal);
+         };
+         
+         manualSubmit.onclick = () => {
+           if (manualInput.value.trim()) {
+             updateColorVariant(variantId, "barcode", manualInput.value.trim());
+             cleanup();
+           }
+         };
+         
+         cancelButton.onclick = cleanup;
+         
+         // Try to detect barcodes from video
+         const detectBarcodes = async () => {
+           try {
+             const barcodes = await barcodeDetector.detect(videoElement);
+             if (barcodes.length > 0) {
+               updateColorVariant(variantId, "barcode", barcodes[0].rawValue);
+               cleanup();
+             }
+           } catch (error) {
+             console.log('Barcode detection failed:', error);
+           }
+         };
+         
+         // Check for barcodes every 500ms
+         const interval = setInterval(detectBarcodes, 500);
+         
+         // Cleanup interval when modal is closed
+         const originalCleanup = cleanup;
+         cleanup = () => {
+           clearInterval(interval);
+           originalCleanup();
+         };
+        
+      } else {
+        // Fallback: prompt for manual input
+        const barcode = prompt('Enter barcode manually:');
+        if (barcode && barcode.trim()) {
+          updateColorVariant(variantId, "barcode", barcode.trim());
+        }
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      // Fallback to manual input
+      const barcode = prompt('Camera access failed. Enter barcode manually:');
+      if (barcode && barcode.trim()) {
+        updateColorVariant(variantId, "barcode", barcode.trim());
+      }
+    }
+  };
+
   const handleSaveStock = async () => {
     setError("");
 
@@ -237,45 +479,56 @@ function NewStockContent() {
       return;
     }
 
+    if (selectedShops.length === 0) {
+      setError("At least one shop must be selected");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Prepare the request data
-      const stockData: CreateStockRequest = {
-        groupName: groupName.trim(),
-        unitPrice: parseFloat(unitPrice),
-        originalPrice: parseFloat(originalPrice),
-        releaseDate,
-        shop: selectedShop,
-        isColorless,
-        groupImage: groupImage, // Use Cloudinary URL directly
-        wholesaleTiers: wholesaleTiers.map((tier) => ({
-          minQuantity: tier.minQuantity,
-          price: tier.price,
-        })),
-        colorVariants: colorVariants.map((variant) => ({
-          color: variant.color,
-          colorCode: variant.colorCode,
-          barcode: variant.barcode,
-          sizeQuantities: variant.sizeQuantities,
-          image: variant.image,
-        })),
-      };
+      // Create stock for each selected shop
+      const stockPromises = selectedShops.map(async (shopId) => {
+        const stockData: CreateStockRequest = {
+          groupName: groupName.trim(),
+          unitPrice: parseFloat(unitPrice),
+          originalPrice: parseFloat(originalPrice),
+          releaseDate,
+          shop: shopId,
+          isColorless,
+          groupImage: groupImage, // Use Cloudinary URL directly
+          wholesaleTiers: wholesaleTiers.map((tier) => ({
+            minQuantity: tier.minQuantity,
+            price: tier.price,
+          })),
+          colorVariants: colorVariants.map((variant) => ({
+            color: variant.color,
+            colorCode: variant.colorCode,
+            barcode: variant.barcode,
+            sizeQuantities: variant.sizeQuantities,
+            image: variant.image,
+          })),
+        };
 
-      // Make API call
-      const response = await fetch("/api/stocks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(stockData),
+        const response = await fetch("/api/stocks", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(stockData),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || `Failed to create stock item for shop ${shopId}`);
+        }
+
+        return result;
       });
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to create stock item");
-      }
+      // Wait for all stock creations to complete
+      await Promise.all(stockPromises);
 
       // Success - redirect to stocks page
       router.push("/owner/inventory/stocks");
@@ -400,26 +653,35 @@ function NewStockContent() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Shop
+                      Shops ({selectedShops.length} selected)
                     </label>
-                    <select
-                      title="Select shop"
-                      value={selectedShop}
-                      onChange={(e) => setSelectedShop(e.target.value)}
-                      disabled={isLoadingShops}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">
-                        {isLoadingShops ? "Loading shops..." : "Select a shop"}
-                      </option>
-                      {shops &&
-                        shops.length > 0 &&
-                        shops.map((shop) => (
-                          <option key={shop.id} value={shop.id}>
-                            {shop.name}
-                          </option>
-                        ))}
-                    </select>
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md focus-within:ring-blue-500 focus-within:border-blue-500 bg-white min-h-[42px] max-h-40 overflow-y-auto">
+                      {isLoadingShops ? (
+                        <div className="text-gray-500 text-sm">Loading shops...</div>
+                      ) : shops && shops.length > 0 ? (
+                        <div className="space-y-2">
+                          {shops.map((shop) => (
+                            <label key={shop.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedShops.includes(shop.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedShops(prev => [...prev, shop.id]);
+                                  } else {
+                                    setSelectedShops(prev => prev.filter(id => id !== shop.id));
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2"
+                              />
+                              <span className="text-sm text-gray-900">{shop.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 text-sm">No shops available</div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-6">
@@ -519,12 +781,13 @@ function NewStockContent() {
             </div>
 
             {/* Color Variants Section */}
-            <div className="bg-white rounded-lg shadow mb-6">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-medium text-gray-900">
-                  Color Variants
-                </h2>
-              </div>
+            {!isColorless && (
+              <div className="bg-white rounded-lg shadow mb-6">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-medium text-gray-900">
+                    Color Variants
+                  </h2>
+                </div>
               <div className="p-6">
                 {colorVariants.length === 0 ? (
                   <div className="text-center py-8">
@@ -613,19 +876,37 @@ function NewStockContent() {
                               <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Barcode Number
                               </label>
-                              <input
-                                type="text"
-                                value={variant.barcode}
-                                onChange={(e) =>
-                                  updateColorVariant(
-                                    variant.id,
-                                    "barcode",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Enter barcode"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                              />
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={variant.barcode}
+                                  onChange={(e) =>
+                                    updateColorVariant(
+                                      variant.id,
+                                      "barcode",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter EAN-13 Barcode"
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => generateBarcode(variant.id)}
+                                  className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                  title="Generate barcode automatically"
+                                >
+                                  <BarChart3 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => scanBarcode(variant.id)}
+                                  className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                                  title="Scan existing barcode"
+                                >
+                                  <ScanLine className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
 
                             {/* Size Selector */}
@@ -721,22 +1002,42 @@ function NewStockContent() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <Button variant="outline" className="flex items-center">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Multiple
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={addColorVariant}
+                <Button 
+                  variant="outline" 
+                  onClick={handleMultipleImageUpload}
+                  disabled={isUploadingMultiple}
                   className="flex items-center"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New
+                  {isUploadingMultiple ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      {uploadProgress.total > 0 ? 
+                        `Uploading ${uploadProgress.current}/${uploadProgress.total}` : 
+                        'Uploading...'
+                      }
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Multiple
+                    </>
+                  )}
                 </Button>
+                {!isColorless && (
+                  <Button
+                    variant="outline"
+                    onClick={addColorVariant}
+                    className="flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New
+                  </Button>
+                )}
               </div>
               <div className="flex flex-col items-end space-y-2">
                 {error && (
