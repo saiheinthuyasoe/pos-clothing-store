@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { transactionService, Transaction } from '@/services/transactionService';
 import { Sidebar } from '@/components/ui/Sidebar';
 import { TopNavBar } from '@/components/ui/TopNavBar';
@@ -10,6 +11,7 @@ import { Search, Filter, Download, Eye, Calendar, CreditCard, Smartphone, Wallet
 
 export default function TransactionsPage() {
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,10 +133,6 @@ export default function TransactionsPage() {
 
   // Calculate completed transactions count (excluding fully refunded)
   const completedTransactionsCount = revenueTransactions.filter(t => t.status !== 'refunded').length;
-
-  const formatCurrency = (amount: number) => {
-    return `THB ${amount.toFixed(0)}`;
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -298,7 +296,7 @@ export default function TransactionsPage() {
         'Owner' // processedBy
       );
 
-      alert(`Refund processed successfully!\nRefund ID: ${refundId}\nAmount: ${formatCurrency(refundAmount)}`);
+      alert(`Refund processed successfully!\nRefund ID: ${refundId}\nAmount: ${formatPrice(refundAmount)}`);
       
       setShowRefundModal(false);
       setSelectedTransaction(null);
@@ -368,7 +366,7 @@ export default function TransactionsPage() {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-sm font-medium text-gray-500">Total Revenue</h3>
             <p className="text-2xl font-bold text-green-600">
-              {formatCurrency(calculateNetRevenue(revenueTransactions))}
+              {formatPrice(calculateNetRevenue(revenueTransactions))}
             </p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -380,7 +378,7 @@ export default function TransactionsPage() {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-sm font-medium text-gray-500">Average Order</h3>
             <p className="text-2xl font-bold text-purple-600">
-              {formatCurrency(
+              {formatPrice(
                 completedTransactionsCount > 0 
                   ? calculateNetRevenue(revenueTransactions) / completedTransactionsCount 
                   : 0
@@ -486,6 +484,12 @@ export default function TransactionsPage() {
                       Tax
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Branch
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Selling Currency
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Payment Method
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -533,18 +537,18 @@ export default function TransactionsPage() {
                           if (refundedAmount > 0) {
                             return (
                               <div className="flex flex-col group relative">
-                                <span className="text-gray-900">{formatCurrency(netTotal)}</span>
+                                <span className="text-gray-900">{formatPrice(netTotal)}</span>
                                 <span className="text-xs text-gray-500">
-                                  (Original: {formatCurrency(transaction.total)})
+                                  (Original: {formatPrice(transaction.total)})
                                 </span>
                                 {/* Tooltip */}
                                 <div className="absolute top-full left-0 mt-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-2 px-3 whitespace-nowrap z-10 shadow-lg">
-                                  <div>Subtotal: {formatCurrency(subtotal)}</div>
-                                  <div>Tax: {formatCurrency(tax)}</div>
+                                  <div>Subtotal: {formatPrice(subtotal)}</div>
+                                  <div>Tax: {formatPrice(tax)}</div>
                                   <div className="border-t border-gray-600 pt-1 mt-1">
-                                    <div>Total: {formatCurrency(transaction.total)}</div>
-                                    <div>Refunded: -{formatCurrency(refundedAmount)}</div>
-                                    <div className="font-semibold">Net: {formatCurrency(netTotal)}</div>
+                                    <div>Total: {formatPrice(transaction.total)}</div>
+                                    <div>Refunded: -{formatPrice(refundedAmount)}</div>
+                                    <div className="font-semibold">Net: {formatPrice(netTotal)}</div>
                                   </div>
                                 </div>
                               </div>
@@ -553,13 +557,13 @@ export default function TransactionsPage() {
                           
                           return (
                             <div className="group relative">
-                              <span className="cursor-help">{formatCurrency(transaction.total)}</span>
+                              <span className="cursor-help">{formatPrice(transaction.total)}</span>
                               {/* Tooltip */}
                               <div className="absolute top-full left-0 mt-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-2 px-3 whitespace-nowrap z-10 shadow-lg">
-                                <div>Subtotal: {formatCurrency(subtotal)}</div>
-                                <div>Tax: {formatCurrency(tax)}</div>
+                                <div>Subtotal: {formatPrice(subtotal)}</div>
+                                <div>Tax: {formatPrice(tax)}</div>
                                 <div className="border-t border-gray-600 pt-1 mt-1 font-semibold">
-                                  Total: {formatCurrency(transaction.total)}
+                                  Total: {formatPrice(transaction.total)}
                                 </div>
                               </div>
                             </div>
@@ -567,7 +571,24 @@ export default function TransactionsPage() {
                         })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(transaction.tax || 0)}
+                        {formatPrice(transaction.tax || 0)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {transaction.branchName || 'Main Branch'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {transaction.sellingCurrency && transaction.exchangeRate && transaction.sellingTotal ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">
+                              {transaction.sellingCurrency === 'MMK' ? 'Ks' : transaction.sellingCurrency} {transaction.sellingTotal.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Rate: 1 THB = {transaction.exchangeRate} {transaction.sellingCurrency === 'MMK' ? 'Ks' : transaction.sellingCurrency}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -653,7 +674,7 @@ export default function TransactionsPage() {
                             {item.selectedColor && `Color: ${item.selectedColor}`} {item.selectedSize && `Size: ${item.selectedSize}`}
                           </p>
                           <p className="text-sm text-gray-600">
-                            Price: {formatCurrency(item.unitPrice)} × {item.quantity} = {formatCurrency(item.unitPrice * item.quantity)}
+                            Price: {formatPrice(item.unitPrice)} × {item.quantity} = {formatPrice(item.unitPrice * item.quantity)}
                           </p>
                           {alreadyRefunded > 0 && (
                             <p className="text-sm text-orange-600">
@@ -740,7 +761,7 @@ export default function TransactionsPage() {
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-600">Items Subtotal:</span>
-                            <span className="text-gray-900">{formatCurrency(totalItemRefundAmount)}</span>
+                            <span className="text-gray-900">{formatPrice(totalItemRefundAmount)}</span>
                           </div>
                           
                           {transactionCartDiscount > 0 && (
@@ -749,11 +770,11 @@ export default function TransactionsPage() {
                                 <span className="text-gray-600">
                                   Cart Discount ({(cartDiscountRate * 100).toFixed(1)}%):
                                 </span>
-                                <span className="text-orange-600">-{formatCurrency(totalProportionalCartDiscount)}</span>
+                                <span className="text-orange-600">-{formatPrice(totalProportionalCartDiscount)}</span>
                               </div>
                               <div className="border-t border-gray-200 pt-2">
                                 <div className="flex justify-between text-xs text-gray-500">
-                                  <span>Original transaction had {formatCurrency(transactionCartDiscount)} cart discount</span>
+                                  <span>Original transaction had {formatPrice(transactionCartDiscount)} cart discount</span>
                                 </div>
                               </div>
                             </>
@@ -763,7 +784,7 @@ export default function TransactionsPage() {
                             <div className="flex justify-between items-center">
                               <span className="font-medium text-gray-900">Total Refund Amount:</span>
                               <span className="text-xl font-bold text-blue-600">
-                                {formatCurrency(finalRefundAmount)}
+                                {formatPrice(finalRefundAmount)}
                               </span>
                             </div>
                           </div>
@@ -834,7 +855,7 @@ export default function TransactionsPage() {
                   <p className="text-sm text-gray-600">Transaction ID:</p>
                   <p className="font-medium text-gray-900">{selectedTransaction.transactionId}</p>
                   <p className="text-sm text-gray-600 mt-2">Total Amount:</p>
-                  <p className="font-medium text-gray-900">{formatCurrency(selectedTransaction.total)}</p>
+                  <p className="font-medium text-gray-900">{formatPrice(selectedTransaction.total)}</p>
                 </div>
                 
                 <div className="flex justify-end space-x-3">
@@ -943,29 +964,29 @@ export default function TransactionsPage() {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Subtotal:</span>
-                          <span className="text-sm font-medium text-gray-900">{formatCurrency(selectedTransaction.subtotal)}</span>
+                          <span className="text-sm font-medium text-gray-900">{formatPrice(selectedTransaction.subtotal)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Tax:</span>
-                          <span className="text-sm font-medium text-gray-900">{formatCurrency(selectedTransaction.tax)}</span>
+                          <span className="text-sm font-medium text-gray-900">{formatPrice(selectedTransaction.tax)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Discount:</span>
-                          <span className="text-sm font-medium text-gray-900">-{formatCurrency(selectedTransaction.discount)}</span>
+                          <span className="text-sm font-medium text-gray-900">-{formatPrice(selectedTransaction.discount)}</span>
                         </div>
                         <div className="border-t border-gray-300 pt-3">
                           <div className="flex justify-between">
                             <span className="text-base font-medium text-gray-900">Total:</span>
-                            <span className="text-base font-bold text-gray-900">{formatCurrency(selectedTransaction.total)}</span>
+                            <span className="text-base font-bold text-gray-900">{formatPrice(selectedTransaction.total)}</span>
                           </div>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Amount Paid:</span>
-                          <span className="text-sm font-medium text-gray-900">{formatCurrency(selectedTransaction.amountPaid)}</span>
+                          <span className="text-sm font-medium text-gray-900">{formatPrice(selectedTransaction.amountPaid)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Change:</span>
-                          <span className="text-sm font-medium text-gray-900">{formatCurrency(selectedTransaction.change)}</span>
+                          <span className="text-sm font-medium text-gray-900">{formatPrice(selectedTransaction.change)}</span>
                         </div>
                       </div>
                     </div>
@@ -1017,10 +1038,10 @@ export default function TransactionsPage() {
                                   </div>
                                   <div className="text-right">
                                     <div className="text-sm font-medium text-gray-900">
-                                      {formatCurrency(item.unitPrice * item.quantity)}
+                                      {formatPrice(item.unitPrice * item.quantity)}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                      {formatCurrency(item.unitPrice)} each
+                                      {formatPrice(item.unitPrice)} each
                                     </div>
                                   </div>
                                 </div>
@@ -1050,7 +1071,7 @@ export default function TransactionsPage() {
                                 </div>
                                 <div className="text-right">
                                   <p className="text-sm font-medium text-orange-600">
-                                    -{formatCurrency(refund.totalAmount)}
+                                    -{formatPrice(refund.totalAmount)}
                                   </p>
                                   <p className="text-xs text-gray-500 capitalize">{refund.status}</p>
                                 </div>

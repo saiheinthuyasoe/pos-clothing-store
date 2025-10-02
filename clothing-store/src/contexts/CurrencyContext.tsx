@@ -1,25 +1,34 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { SettingsService, BusinessSettings } from '@/services/settingsService';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { SettingsService, BusinessSettings } from "@/services/settingsService";
 
 interface CurrencyContextType {
-  selectedCurrency: 'THB' | 'MMK';
-  defaultCurrency: 'THB' | 'MMK';
+  selectedCurrency: "THB" | "MMK";
+  defaultCurrency: "THB" | "MMK";
   currencyRate: number;
-  setSelectedCurrency: (currency: 'THB' | 'MMK') => void;
+  setSelectedCurrency: (currency: "THB" | "MMK") => void;
   convertPrice: (price: number) => number;
-  getCurrencySymbol: (currency?: 'THB' | 'MMK') => string;
-  formatPrice: (price: number, currency?: 'THB' | 'MMK') => string;
+  getCurrencySymbol: (currency?: "THB" | "MMK") => string;
+  formatPrice: (price: number, currency?: "THB" | "MMK") => string;
+  formatDualCurrency: (defaultAmount: number, sellingAmount?: number, sellingCurrency?: "THB" | "MMK", exchangeRate?: number) => string;
   refreshCurrencySettings: () => Promise<void>;
 }
 
-const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
+const CurrencyContext = createContext<CurrencyContextType | undefined>(
+  undefined
+);
 
 export function useCurrency() {
   const context = useContext(CurrencyContext);
   if (context === undefined) {
-    throw new Error('useCurrency must be used within a CurrencyProvider');
+    throw new Error("useCurrency must be used within a CurrencyProvider");
   }
   return context;
 }
@@ -29,8 +38,10 @@ interface CurrencyProviderProps {
 }
 
 export function CurrencyProvider({ children }: CurrencyProviderProps) {
-  const [selectedCurrency, setSelectedCurrency] = useState<'THB' | 'MMK'>('THB');
-  const [defaultCurrency, setDefaultCurrency] = useState<'THB' | 'MMK'>('THB');
+  const [selectedCurrency, setSelectedCurrency] = useState<"THB" | "MMK">(
+    "THB"
+  );
+  const [defaultCurrency, setDefaultCurrency] = useState<"THB" | "MMK">("THB");
   const [currencyRate, setCurrencyRate] = useState<number>(0);
 
   // Load currency settings from business settings
@@ -38,13 +49,13 @@ export function CurrencyProvider({ children }: CurrencyProviderProps) {
     try {
       const settings = await SettingsService.getBusinessSettings();
       if (settings) {
-        const currency = (settings.defaultCurrency as 'THB' | 'MMK') || 'THB';
+        const currency = (settings.defaultCurrency as "THB" | "MMK") || "THB";
         setDefaultCurrency(currency);
         setSelectedCurrency(currency); // Start with default currency
         setCurrencyRate(settings.currencyRate || 0);
       }
     } catch (error) {
-      console.error('Error loading currency settings:', error);
+      console.error("Error loading currency settings:", error);
     }
   };
 
@@ -73,17 +84,36 @@ export function CurrencyProvider({ children }: CurrencyProviderProps) {
   };
 
   // Get currency symbol
-  const getCurrencySymbol = (currency?: 'THB' | 'MMK'): string => {
+  const getCurrencySymbol = (currency?: "THB" | "MMK"): string => {
     const targetCurrency = currency || selectedCurrency;
     const currencyInfo = SettingsService.getCurrencyInfo(targetCurrency);
     return currencyInfo.symbol;
   };
 
   // Format price with currency symbol
-  const formatPrice = (price: number, currency?: 'THB' | 'MMK'): string => {
+  const formatPrice = (price: number, currency?: "THB" | "MMK"): string => {
     const targetCurrency = currency || selectedCurrency;
     const convertedPrice = currency ? price : convertPrice(price);
     return SettingsService.formatPrice(convertedPrice, targetCurrency);
+  };
+
+  // Format dual currency display (default currency + selling currency with exchange rate)
+  const formatDualCurrency = (
+    defaultAmount: number, 
+    sellingAmount?: number, 
+    sellingCurrency?: "THB" | "MMK", 
+    exchangeRate?: number
+  ): string => {
+    const defaultFormatted = SettingsService.formatPrice(defaultAmount, defaultCurrency);
+    
+    if (!sellingAmount || !sellingCurrency || !exchangeRate) {
+      return defaultFormatted;
+    }
+    
+    const sellingFormatted = SettingsService.formatPrice(sellingAmount, sellingCurrency);
+    const rateDisplay = sellingCurrency === 'MMK' ? 'Ks' : sellingCurrency;
+    
+    return `${defaultFormatted} (${sellingFormatted} @ 1 ${defaultCurrency} = ${exchangeRate} ${rateDisplay})`;
   };
 
   const value: CurrencyContextType = {
@@ -94,7 +124,8 @@ export function CurrencyProvider({ children }: CurrencyProviderProps) {
     convertPrice,
     getCurrencySymbol,
     formatPrice,
-    refreshCurrencySettings
+    formatDualCurrency,
+    refreshCurrencySettings,
   };
 
   return (

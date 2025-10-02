@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { transactionService, Transaction } from '@/services/transactionService';
 import { Sidebar } from '@/components/ui/Sidebar';
@@ -33,6 +34,7 @@ interface PaymentStats {
 }
 
 function PaymentsPageContent() {
+  const { formatPrice } = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -171,10 +173,6 @@ function PaymentsPageContent() {
 
   const paymentStats = calculatePaymentStats();
 
-  const formatCurrency = (amount: number) => {
-    return `THB ${amount.toFixed(0)}`;
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -277,7 +275,7 @@ function PaymentsPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Revenue</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(paymentStats.totalAmount)}
+                  {formatPrice(paymentStats.totalAmount)}
                 </p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
@@ -368,7 +366,7 @@ function PaymentsPageContent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Amount:</span>
-                <span className="text-sm font-medium">{formatCurrency(paymentStats.cashPayments.amount)}</span>
+                <span className="text-sm font-medium">{formatPrice(paymentStats.cashPayments.amount)}</span>
               </div>
             </div>
           </div>
@@ -385,7 +383,7 @@ function PaymentsPageContent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Amount:</span>
-                <span className="text-sm font-medium">{formatCurrency(paymentStats.scanPayments.amount)}</span>
+                <span className="text-sm font-medium">{formatPrice(paymentStats.scanPayments.amount)}</span>
               </div>
             </div>
           </div>
@@ -402,7 +400,7 @@ function PaymentsPageContent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Amount:</span>
-                <span className="text-sm font-medium">{formatCurrency(paymentStats.walletPayments.amount)}</span>
+                <span className="text-sm font-medium">{formatPrice(paymentStats.walletPayments.amount)}</span>
               </div>
             </div>
           </div>
@@ -476,7 +474,13 @@ function PaymentsPageContent() {
                       Customer
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
+                      Branch
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Selling Currency
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount (THB)
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Payment Method
@@ -503,8 +507,25 @@ function PaymentsPageContent() {
                           {transaction.customer?.email}
                         </div>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {transaction.branchName || 'Main Branch'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {transaction.sellingCurrency && transaction.exchangeRate && transaction.sellingTotal ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">
+                              {transaction.sellingCurrency === 'MMK' ? 'Ks' : transaction.sellingCurrency} {transaction.sellingTotal.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Rate: 1 THB = {transaction.exchangeRate} {transaction.sellingCurrency === 'MMK' ? 'Ks' : transaction.sellingCurrency}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatCurrency(transaction.total)}
+                        {formatPrice(transaction.total)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

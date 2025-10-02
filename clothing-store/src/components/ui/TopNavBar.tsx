@@ -14,7 +14,7 @@ interface TopNavBarProps {
 export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
   const { user, logout } = useAuth();
   const { getCartItemCount } = useCart();
-  const { selectedCurrency, setSelectedCurrency } = useCurrency();
+  const { selectedCurrency, setSelectedCurrency, defaultCurrency, getCurrencySymbol } = useCurrency();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
@@ -101,6 +101,16 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
                 month: "long",
                 day: "numeric",
               })}
+            </div>
+
+            {/* Main Currency Title */}
+            <div className="flex items-center space-x-1 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <span className="text-sm font-semibold text-blue-800">
+                Main Currency:
+              </span>
+              <span className="text-sm font-bold text-blue-900">
+                {getCurrencySymbol(defaultCurrency)} {defaultCurrency}
+              </span>
             </div>
 
             {/* Currency Selector */}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
@@ -37,6 +38,7 @@ import NewCustomerModal from "@/components/customers/NewCustomerModal";
 import { DeleteConfirmationModal } from "@/components/customers/DeleteConfirmationModal";
 
 function CustomerPageContent() {
+  const { formatPrice } = useCurrency();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<CustomerStats>({
     totalCustomers: 0,
@@ -303,13 +305,7 @@ function CustomerPageContent() {
       customer.phone?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
+
 
   // Format date
   const formatDate = (date: Date | string) => {
@@ -436,7 +432,7 @@ function CustomerPageContent() {
                         Receivables
                       </p>
                       <p className="text-2xl font-semibold text-gray-900">
-                        {formatCurrency(stats.totalReceivables)}
+                        {formatPrice(stats.totalReceivables)}
                       </p>
                     </div>
                   </div>
@@ -581,10 +577,10 @@ function CustomerPageContent() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatCurrency(customer.totalSpent || 0)}
+                              {formatPrice(customer.totalSpent || 0)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatCurrency(customer.receivables || 0)}
+                              {formatPrice(customer.receivables || 0)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {formatDate(customer.createdAt)}

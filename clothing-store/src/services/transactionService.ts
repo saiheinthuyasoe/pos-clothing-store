@@ -29,6 +29,10 @@ export interface Transaction {
   createdAt: Timestamp;
   status: 'completed' | 'pending' | 'cancelled' | 'refunded' | 'partially_refunded';
   shopId?: string;
+  branchName?: string;
+  sellingCurrency?: 'THB' | 'MMK';
+  exchangeRate?: number;
+  sellingTotal?: number;
   refunds?: Refund[];
   cancelledAt?: Timestamp;
   cancelReason?: string;

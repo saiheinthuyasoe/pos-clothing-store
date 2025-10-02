@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { transactionService, Transaction } from '@/services/transactionService';
 import { Sidebar } from '@/components/ui/Sidebar';
@@ -38,10 +39,12 @@ interface ReportData {
     count: number;
     percentage: number;
   }>;
+  recentTransactions: Transaction[];
 }
 
 function ReportsPageContent() {
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
@@ -179,6 +182,11 @@ function ReportsPageContent() {
       percentage: totalTransactions > 0 ? (count / totalTransactions) * 100 : 0
     }));
 
+    // Get recent transactions (latest 10)
+    const recentTransactions = transactions
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 10);
+
     return {
       totalRevenue,
       totalTransactions,
@@ -186,7 +194,8 @@ function ReportsPageContent() {
       averageOrderValue,
       topSellingItems,
       dailySales: dailySalesArray,
-      paymentMethodBreakdown
+      paymentMethodBreakdown,
+      recentTransactions
     };
   };
 
@@ -194,10 +203,6 @@ function ReportsPageContent() {
     setRefreshing(true);
     await loadReportData();
     setRefreshing(false);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return `THB ${amount.toFixed(0)}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -284,7 +289,7 @@ function ReportsPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Revenue</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(reportData?.totalRevenue || 0)}
+                  {formatPrice(reportData?.totalRevenue || 0)}
                 </p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
@@ -338,7 +343,7 @@ function ReportsPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Average Order Value</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(reportData?.averageOrderValue || 0)}
+                  {formatPrice(reportData?.averageOrderValue || 0)}
                 </p>
               </div>
               <div className="p-3 bg-orange-100 rounded-full">
@@ -366,7 +371,7 @@ function ReportsPageContent() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(day.revenue)}
+                      {formatPrice(day.revenue)}
                     </div>
                     <div className="text-xs text-gray-500">
                       {day.transactions} transactions
@@ -402,7 +407,7 @@ function ReportsPageContent() {
         </div>
 
         {/* Top Selling Items */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Top Selling Items</h3>
           </div>
@@ -441,7 +446,7 @@ function ReportsPageContent() {
                       {item.quantity} units
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {formatCurrency(item.revenue)}
+                      {formatPrice(item.revenue)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -457,6 +462,93 @@ function ReportsPageContent() {
                           {Math.round((item.quantity / (reportData?.topSellingItems[0]?.quantity || 1)) * 100)}%
                         </span>
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Recent Transactions */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Transaction ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Branch
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Selling Currency
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total (THB)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {reportData?.recentTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                      #{transaction.transactionId}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.customer?.uid ? transaction.customer.uid : 'Walk-in Customer'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.branchName || 'Main Branch'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.sellingCurrency && transaction.exchangeRate && transaction.sellingTotal ? (
+                        <div className="space-y-1">
+                          <div className="font-medium">
+                            {transaction.sellingCurrency === 'MMK' ? 'Ks' : transaction.sellingCurrency} {transaction.sellingTotal.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Rate: 1 THB = {transaction.exchangeRate} {transaction.sellingCurrency === 'MMK' ? 'Ks' : transaction.sellingCurrency}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {formatPrice(transaction.total)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        transaction.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        transaction.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                        transaction.status === 'refunded' ? 'bg-gray-100 text-gray-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {transaction.status === 'completed' ? 'Completed' :
+                         transaction.status === 'pending' ? 'Pending' :
+                         transaction.status === 'cancelled' ? 'Cancelled' :
+                         transaction.status === 'refunded' ? 'Refunded' :
+                         transaction.status === 'partially_refunded' ? 'Partially Refunded' :
+                         transaction.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(transaction.timestamp)}
                     </td>
                   </tr>
                 ))}
