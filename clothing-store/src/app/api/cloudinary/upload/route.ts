@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadToCloudinary } from '@/lib/cloudinary';
+import { uploadToR2 } from '@/lib/r2';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,16 +34,18 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Upload to Cloudinary
-    const result = await uploadToCloudinary(buffer, folder);
+    // Upload to Cloudflare R2 (with duplicate detection)
+    const result = await uploadToR2(buffer, file.type, folder, file.name);
 
     return NextResponse.json({
       success: true,
-      public_id: result.public_id,
-      secure_url: result.secure_url,
+      key: result.key,
+      url: result.url,
+      hash: result.hash,
       width: result.width,
       height: result.height,
-      format: result.format,
+      size: result.size,
+      contentType: result.contentType,
     });
 
   } catch (error) {

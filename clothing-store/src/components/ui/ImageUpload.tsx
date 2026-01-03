@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import Image from "next/image";
+import { Upload, X, Loader2 } from "lucide-react";
 
 interface ImageUploadProps {
   value?: string;
@@ -19,58 +19,64 @@ export function ImageUpload({
   onChange,
   onRemove,
   disabled = false,
-  folder = 'pos-clothing-store',
-  className = '',
-  placeholder = 'Click to upload image'
+  folder = "pos-clothing-store",
+  className = "",
+  placeholder = "Click to upload image",
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image size should be less than 5MB');
+      setError("Image size should be less than 5MB");
       return;
     }
 
     setIsUploading(true);
-    setError('');
+    setError("");
 
     try {
       // Create FormData for upload
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', folder);
+      formData.append("file", file);
+      formData.append("folder", folder);
 
       // Upload to Cloudinary via API route
-      const response = await fetch('/api/cloudinary/upload', {
-        method: 'POST',
+      const response = await fetch("/api/cloudinary/upload", {
+        method: "POST",
         body: formData,
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data.error || "Upload failed");
       }
 
       if (data.success) {
-        onChange(data.secure_url);
+        onChange(data.url);
       } else {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data.error || "Upload failed");
       }
     } catch (error) {
-      console.error('Upload error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
+      console.error("Upload error:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to upload image. Please try again."
+      );
     } finally {
       setIsUploading(false);
     }
@@ -80,25 +86,28 @@ export function ImageUpload({
     if (!value) return;
 
     try {
-      // If it's a Cloudinary URL, delete from Cloudinary
-      if (value.includes('cloudinary.com')) {
-        await fetch('/api/cloudinary/delete', {
-          method: 'POST',
+      // If it's an R2 URL, delete from R2
+      if (
+        value.includes(".r2.") ||
+        value.includes("r2.cloudflarestorage.com")
+      ) {
+        await fetch("/api/cloudinary/delete", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({ url: value }),
         });
       }
     } catch (error) {
-      console.error('Error deleting image:', error);
+      console.error("Error deleting image:", error);
       // Continue with removal even if deletion fails
     }
 
     if (onRemove) {
       onRemove();
     } else {
-      onChange('');
+      onChange("");
     }
   };
 
@@ -117,7 +126,7 @@ export function ImageUpload({
             </div>
             {!disabled && (
               <button
-                title='Remove image'
+                title="Remove image"
                 type="button"
                 onClick={handleRemove}
                 className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors z-10"
@@ -129,7 +138,7 @@ export function ImageUpload({
           {!disabled && (
             <div className="relative mt-3">
               <input
-                aria-label='Change image'
+                aria-label="Change image"
                 type="file"
                 accept="image/*"
                 onChange={handleFileUpload}
@@ -146,7 +155,7 @@ export function ImageUpload({
       ) : (
         <div className="relative">
           <input
-            aria-label='Upload image'
+            aria-label="Upload image"
             type="file"
             accept="image/*"
             onChange={handleFileUpload}
@@ -165,16 +174,16 @@ export function ImageUpload({
                   <Upload className="h-4 w-4" />
                   Select File
                 </div>
-                <p className="text-xs text-gray-400">PNG, JPG, JPEG, GIF up to 5MB</p>
+                <p className="text-xs text-gray-400">
+                  PNG, JPG, JPEG, GIF up to 5MB
+                </p>
               </div>
             )}
           </div>
         </div>
       )}
-      
-      {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
-      )}
+
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

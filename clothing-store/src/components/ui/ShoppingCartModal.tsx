@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { X, Minus, Plus, Settings, ShoppingCart, Eye, User, Users } from "lucide-react";
+import {
+  X,
+  Minus,
+  Plus,
+  Settings,
+  ShoppingCart,
+  Eye,
+  User,
+  Users,
+} from "lucide-react";
 import Image from "next/image";
 import { CustomerSelectionModal } from "@/components/cart/CustomerSelectionModal";
 import { PaymentClearanceModal } from "@/components/payment/PaymentClearanceModal";
@@ -33,8 +42,12 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   const { formatPrice } = useCurrency();
   const { taxRate } = useSettings();
   const [discountAmount, setDiscountAmount] = React.useState<string>("");
-  const [cartDiscountPercent, setCartDiscountPercent] = React.useState<number>(0);
+  const [cartDiscountPercent, setCartDiscountPercent] =
+    React.useState<number>(0);
   const [isBigViewOpen, setIsBigViewOpen] = React.useState<boolean>(false);
+
+  // Shop name mapping
+  const [shopNames, setShopNames] = React.useState<Record<string, string>>({});
 
   // New discount management state
   const [groupDiscountAmount, setGroupDiscountAmount] =
@@ -51,7 +64,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
 
   // Customer selection state
   const [isCustomerModalOpen, setIsCustomerModalOpen] = React.useState(false);
-  
+
   // Payment clearance state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
 
@@ -61,6 +74,24 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
       document.body.style.overflow = "hidden";
       // Automatically open big view when cart is opened
       setIsBigViewOpen(true);
+
+      // Fetch shop names
+      const fetchShops = async () => {
+        try {
+          const response = await fetch("/api/shops");
+          if (response.ok) {
+            const data = await response.json();
+            const shopsMap: Record<string, string> = {};
+            data.data?.forEach((shop: { id: string; name: string }) => {
+              shopsMap[shop.id] = shop.name;
+            });
+            setShopNames(shopsMap);
+          }
+        } catch (error) {
+          console.error("Error fetching shops:", error);
+        }
+      };
+      fetchShops();
     } else {
       document.body.style.overflow = "unset";
       // Reset big view when cart is closed
@@ -77,7 +108,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   React.useEffect(() => {
     if (cart.items.length === 0) {
       setDiscountAmount("");
-    setCartDiscountPercent(0);
+      setCartDiscountPercent(0);
       setGroupDiscountAmount("");
       setSelectedGroupForDiscount("");
       setVariantDiscountAmount("");
@@ -198,8 +229,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     // add other known fields here as needed
   }) => {
     // In a real application, you would send this data to your backend
-    console.log('Payment completed:', paymentData);
-    
+    console.log("Payment completed:", paymentData);
+
     // Complete purchase and reset states
     completePurchase();
     setCartDiscountPercent(0);
@@ -209,17 +240,23 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     setVariantDiscountAmount("");
     setSelectedVariantForDiscount("");
     setDiscountMode("cart");
-    
+
     // Close modals
     setIsPaymentModalOpen(false);
     onClose();
-    
+
     // Show success message and navigate to transactions page
-    alert(`Payment completed successfully!\n\nTransaction ID: ${paymentData.transactionId}\nTotal: ${formatPrice(paymentData.total)}\n\nRedirecting to transactions page...`);
-    
+    alert(
+      `Payment completed successfully!\n\nTransaction ID: ${
+        paymentData.transactionId
+      }\nTotal: ${formatPrice(
+        paymentData.total
+      )}\n\nRedirecting to transactions page...`
+    );
+
     // Navigate to transactions page after a short delay
     setTimeout(() => {
-      router.push('/owner/sales/transactions');
+      router.push("/owner/sales/transactions");
     }, 1500);
   };
 
@@ -234,13 +271,13 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
 
   // Calculate original subtotal (without any discounts)
   const originalSubtotal = cart.items.reduce((total, item) => {
-    return total + item.originalPrice * item.quantity;
+    return total + item.unitPrice * item.quantity;
   }, 0);
 
   // Calculate group discount savings
   const groupDiscountSavings = cart.items.reduce((total, item) => {
     if (item.groupDiscount && item.groupDiscount > 0) {
-      const originalItemTotal = item.originalPrice * item.quantity;
+      const originalItemTotal = item.unitPrice * item.quantity;
       const groupDiscountAmount =
         originalItemTotal * (item.groupDiscount / 100);
       return total + groupDiscountAmount;
@@ -252,7 +289,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   const variantDiscountSavings = cart.items.reduce((total, item) => {
     if (item.variantDiscount && item.variantDiscount > 0) {
       // Calculate variant discount on the original price (not after group discount)
-      const originalItemTotal = item.originalPrice * item.quantity;
+      const originalItemTotal = item.unitPrice * item.quantity;
       const variantDiscountAmount =
         originalItemTotal * (item.variantDiscount / 100);
       return total + variantDiscountAmount;
@@ -311,12 +348,19 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                   <img
                     className="h-8 w-8 rounded-full object-cover"
                     src={getSelectedCustomer()?.customerImage}
-                    alt={getSelectedCustomer()?.displayName || getSelectedCustomer()?.email || 'Customer'}
+                    alt={
+                      getSelectedCustomer()?.displayName ||
+                      getSelectedCustomer()?.email ||
+                      "Customer"
+                    }
                   />
                 ) : getSelectedCustomer() ? (
                   <span className="text-white text-sm font-medium">
-                    {getSelectedCustomer()?.displayName?.charAt(0)?.toUpperCase() || 
-                     getSelectedCustomer()?.email?.charAt(0)?.toUpperCase() || 'C'}
+                    {getSelectedCustomer()
+                      ?.displayName?.charAt(0)
+                      ?.toUpperCase() ||
+                      getSelectedCustomer()?.email?.charAt(0)?.toUpperCase() ||
+                      "C"}
                   </span>
                 ) : (
                   <User className="h-4 w-4 text-white" />
@@ -324,10 +368,10 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-900">
-                  {getSelectedCustomer()?.displayName || 'Unknown Customer'}
+                  {getSelectedCustomer()?.displayName || "Unknown Customer"}
                 </p>
                 <p className="text-xs text-blue-600">
-                  {getSelectedCustomer()?.email || 'Walk-in customer'}
+                  {getSelectedCustomer()?.email || "Walk-in customer"}
                 </p>
                 {getSelectedCustomer()?.customerType && (
                   <p className="text-xs text-gray-500">
@@ -355,244 +399,251 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
           ) : (
             <div className="flex-1 border-t border-gray-200 overflow-y-auto">
               <div className="px-6 py-6 space-y-6">
-              {/* Discount section */}
-              <div className="p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
-                <div className="flex items-center space-x-2 text-blue-700 mb-3">
-                  <div className="w-7 h-7 bg-blue-200 rounded-full flex items-center justify-center border border-blue-300">
-                    <span className="text-sm font-bold text-blue-800">%</span>
+                {/* Discount section */}
+                <div className="p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <div className="flex items-center space-x-2 text-blue-700 mb-3">
+                    <div className="w-7 h-7 bg-blue-200 rounded-full flex items-center justify-center border border-blue-300">
+                      <span className="text-sm font-bold text-blue-800">%</span>
+                    </div>
+                    <span className="text-sm font-bold text-blue-800">
+                      Discount Management
+                    </span>
                   </div>
-                  <span className="text-sm font-bold text-blue-800">
-                    Discount Management
-                  </span>
-                </div>
 
-                {/* Discount Mode Selector */}
-                <div className="flex space-x-2 mb-3">
-                  <button
-                    onClick={() => setDiscountMode("cart")}
-                    className={`px-3 py-1 text-xs font-medium rounded ${
-                      discountMode === "cart"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-blue-600 border border-blue-300"
-                    }`}
-                  >
-                    Cart
-                  </button>
-                  <button
-                    onClick={() => setDiscountMode("group")}
-                    className={`px-3 py-1 text-xs font-medium rounded ${
-                      discountMode === "group"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-blue-600 border border-blue-300"
-                    }`}
-                  >
-                    Group
-                  </button>
-                  <button
-                    onClick={() => setDiscountMode("variant")}
-                    className={`px-3 py-1 text-xs font-medium rounded ${
-                      discountMode === "variant"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-blue-600 border border-blue-300"
-                    }`}
-                  >
-                    Variant
-                  </button>
-                </div>
-
-                {/* Cart-wide Discount */}
-                {discountMode === "cart" && (
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      placeholder="Enter discount percentage (0-100)"
-                      value={discountAmount}
-                      onChange={(e) => setDiscountAmount(e.target.value)}
-                      className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
+                  {/* Discount Mode Selector */}
+                  <div className="flex space-x-2 mb-3">
                     <button
-                      onClick={handleApplyDiscount}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
+                      onClick={() => setDiscountMode("cart")}
+                      className={`px-3 py-1 text-xs font-medium rounded ${
+                        discountMode === "cart"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-blue-600 border border-blue-300"
+                      }`}
                     >
-                      Apply
+                      Cart
+                    </button>
+                    <button
+                      onClick={() => setDiscountMode("group")}
+                      className={`px-3 py-1 text-xs font-medium rounded ${
+                        discountMode === "group"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-blue-600 border border-blue-300"
+                      }`}
+                    >
+                      Group
+                    </button>
+                    <button
+                      onClick={() => setDiscountMode("variant")}
+                      className={`px-3 py-1 text-xs font-medium rounded ${
+                        discountMode === "variant"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-blue-600 border border-blue-300"
+                      }`}
+                    >
+                      Variant
                     </button>
                   </div>
-                )}
 
-                {/* Group Discount */}
-                {discountMode === "group" && (
-                  <div className="space-y-2">
-                    <select
-                      title="Select a group for discount"
-                      value={selectedGroupForDiscount}
-                      onChange={(e) =>
-                        setSelectedGroupForDiscount(e.target.value)
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    >
-                      <option value="">Select a group</option>
-                      {uniqueGroups.map((group) => (
-                        <option key={group} value={group}>
-                          {group}
-                        </option>
-                      ))}
-                    </select>
+                  {/* Cart-wide Discount */}
+                  {discountMode === "cart" && (
                     <div className="flex items-center space-x-2">
                       <input
                         type="number"
-                        placeholder="Discount %"
-                        value={groupDiscountAmount}
-                        onChange={(e) => setGroupDiscountAmount(e.target.value)}
+                        placeholder="Enter discount percentage (0-100)"
+                        value={discountAmount}
+                        onChange={(e) => setDiscountAmount(e.target.value)}
                         className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                         min="0"
                         max="100"
                         step="0.1"
                       />
                       <button
-                        onClick={handleApplyGroupDiscount}
+                        onClick={handleApplyDiscount}
                         className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
                       >
                         Apply
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Variant Discount */}
-                {discountMode === "variant" && (
-                  <div className="space-y-2">
-                    <select
-                      title="Select a variant for discount"
-                      value={selectedVariantForDiscount}
-                      onChange={(e) =>
-                        setSelectedVariantForDiscount(e.target.value)
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    >
-                      <option value="">Select a variant</option>
-                      {cart.items.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.groupName} - {item.selectedColor} /{" "}
-                          {item.selectedSize}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="number"
-                        placeholder="Discount %"
-                        value={variantDiscountAmount}
+                  {/* Group Discount */}
+                  {discountMode === "group" && (
+                    <div className="space-y-2">
+                      <select
+                        title="Select a group for discount"
+                        value={selectedGroupForDiscount}
                         onChange={(e) =>
-                          setVariantDiscountAmount(e.target.value)
+                          setSelectedGroupForDiscount(e.target.value)
                         }
-                        className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
-                      <button
-                        onClick={handleApplyVariantDiscount}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
+                        className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                       >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Totals */}
-              <div className="border-t border-gray-300 pt-4 space-y-2 bg-gray-50 p-3 rounded-lg">
-                <div className="flex justify-between text-sm font-medium text-gray-800">
-                  <span>Original Subtotal:</span>
-                  <span className="font-bold">
-                    {formatPrice(originalSubtotal)}
-                  </span>
-                </div>
-
-                {/* Group Discount Display */}
-                {groupDiscountSavings > 0 && (
-                  <div className="flex justify-between text-sm font-medium text-gray-800">
-                    <span className="flex items-center space-x-1">
-                      <span>Group Discount:</span>
-                      <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
-                        GROUP
-                      </span>
-                    </span>
-                    <span className="font-bold text-red-600">
-                      -{formatPrice(groupDiscountSavings)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Variant Discount Display */}
-                {variantDiscountSavings > 0 && (
-                  <div className="flex justify-between text-sm font-medium text-gray-800">
-                    <span className="flex items-center space-x-1">
-                      <span>Variant Discount:</span>
-                      <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">
-                        VARIANT
-                      </span>
-                    </span>
-                    <span className="font-bold text-red-600">
-                      -{formatPrice(variantDiscountSavings)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Cart-wide Discount Display */}
-                {discount > 0 && (
-                  <div className="flex justify-between text-sm font-medium text-gray-800">
-                    <span className="flex items-center space-x-1">
-                      <span>
-                        Cart Discount
-                        {cartDiscountPercent > 0 ? ` (${cartDiscountPercent}%)` : ""}:
-                      </span>
-                      <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
-                        CART
-                      </span>
-                    </span>
-                    <span className="font-bold text-red-600">
-                      -{formatPrice(discount)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-sm font-medium text-gray-800">
-                  <span>Subtotal After Discounts:</span>
-                  <span className="font-bold">{formatPrice(subtotalAfterAllDiscounts)}</span>
-                </div>
-                <div className="flex justify-between text-sm font-medium text-gray-800">
-                  <span>Tax ({taxRate}%):</span>
-                  <span className="font-bold">{formatPrice(tax)}</span>
-                </div>
-                <div className="border-t border-gray-300 pt-2">
-                  <div className="flex justify-between items-center bg-white p-2 rounded">
-                    <span className="font-bold text-lg text-gray-900">
-                      Grand Total:
-                    </span>
-                    <div className="text-right">
-                      <div className="text-xs font-medium text-gray-700">
-                        (Qty. {cart.totalItems})
-                      </div>
-                      <div className="font-bold text-lg text-green-600">
-                        {formatPrice(grandTotal)}
+                        <option value="">Select a group</option>
+                        {uniqueGroups.map((group) => (
+                          <option key={group} value={group}>
+                            {group}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          placeholder="Discount %"
+                          value={groupDiscountAmount}
+                          onChange={(e) =>
+                            setGroupDiscountAmount(e.target.value)
+                          }
+                          className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                        <button
+                          onClick={handleApplyGroupDiscount}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
+                        >
+                          Apply
+                        </button>
                       </div>
                     </div>
+                  )}
+
+                  {/* Variant Discount */}
+                  {discountMode === "variant" && (
+                    <div className="space-y-2">
+                      <select
+                        title="Select a variant for discount"
+                        value={selectedVariantForDiscount}
+                        onChange={(e) =>
+                          setSelectedVariantForDiscount(e.target.value)
+                        }
+                        className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      >
+                        <option value="">Select a variant</option>
+                        {cart.items.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.groupName} - {item.selectedColor} /{" "}
+                            {item.selectedSize}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          placeholder="Discount %"
+                          value={variantDiscountAmount}
+                          onChange={(e) =>
+                            setVariantDiscountAmount(e.target.value)
+                          }
+                          className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                        <button
+                          onClick={handleApplyVariantDiscount}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Totals */}
+                <div className="border-t border-gray-300 pt-4 space-y-2 bg-gray-50 p-3 rounded-lg">
+                  <div className="flex justify-between text-sm font-medium text-gray-800">
+                    <span>Original Subtotal:</span>
+                    <span className="font-bold">
+                      {formatPrice(originalSubtotal)}
+                    </span>
+                  </div>
+
+                  {/* Group Discount Display */}
+                  {groupDiscountSavings > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-gray-800">
+                      <span className="flex items-center space-x-1">
+                        <span>Group Discount:</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                          GROUP
+                        </span>
+                      </span>
+                      <span className="font-bold text-red-600">
+                        -{formatPrice(groupDiscountSavings)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Variant Discount Display */}
+                  {variantDiscountSavings > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-gray-800">
+                      <span className="flex items-center space-x-1">
+                        <span>Variant Discount:</span>
+                        <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">
+                          VARIANT
+                        </span>
+                      </span>
+                      <span className="font-bold text-red-600">
+                        -{formatPrice(variantDiscountSavings)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Cart-wide Discount Display */}
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-gray-800">
+                      <span className="flex items-center space-x-1">
+                        <span>
+                          Cart Discount
+                          {cartDiscountPercent > 0
+                            ? ` (${cartDiscountPercent}%)`
+                            : ""}
+                          :
+                        </span>
+                        <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
+                          CART
+                        </span>
+                      </span>
+                      <span className="font-bold text-red-600">
+                        -{formatPrice(discount)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-sm font-medium text-gray-800">
+                    <span>Subtotal After Discounts:</span>
+                    <span className="font-bold">
+                      {formatPrice(subtotalAfterAllDiscounts)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm font-medium text-gray-800">
+                    <span>Tax ({taxRate}%):</span>
+                    <span className="font-bold">{formatPrice(tax)}</span>
+                  </div>
+                  <div className="border-t border-gray-300 pt-2">
+                    <div className="flex justify-between items-center bg-white p-2 rounded">
+                      <span className="font-bold text-lg text-gray-900">
+                        Grand Total:
+                      </span>
+                      <div className="text-right">
+                        <div className="text-xs font-medium text-gray-700">
+                          (Qty. {cart.totalItems})
+                        </div>
+                        <div className="font-bold text-lg text-green-600">
+                          {formatPrice(grandTotal)}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Checkout button */}
-              <button
-                onClick={handleCheckout}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors"
-              >
-                Proceed to Checkout
-              </button>
+                {/* Checkout button */}
+                <button
+                  onClick={handleCheckout}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors"
+                >
+                  Proceed to Checkout
+                </button>
               </div>
             </div>
           )}
@@ -668,7 +719,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                 #{index + 1}. {item.groupName}
                               </h3>
                               <p className="text-xs text-gray-600">
-                                Shop: {item.shop}
+                                Shop: {shopNames[item.shop] || item.shop}
                               </p>
                             </div>
                             <button
@@ -721,7 +772,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                   <div className="flex items-center gap-1 text-sm font-mono">
                                     {/* Original Price */}
                                     <span className="font-semibold text-gray-900">
-                                      {formatPrice(item.originalPrice)}
+                                      {formatPrice(item.unitPrice)}
                                     </span>
 
                                     {/* Group Discount */}
@@ -770,7 +821,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                     Price:
                                   </span>
                                   <span className="font-medium text-gray-700">
-                                    {formatPrice(item.originalPrice)}
+                                    {formatPrice(item.unitPrice)}
                                   </span>
                                 </div>
                               )}
@@ -801,7 +852,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                     item.variantDiscount) &&
                                     (() => {
                                       const originalTotal =
-                                        item.originalPrice * item.quantity;
+                                        item.unitPrice * item.quantity;
                                       const discountedTotal =
                                         (item.discountedPrice ||
                                           item.unitPrice) * item.quantity;
@@ -897,7 +948,9 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         onClose={() => setIsPaymentModalOpen(false)}
         onPaymentComplete={() => {
           // Generate a transaction ID
-          const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const transactionId = `TXN-${Date.now()}-${Math.floor(
+            Math.random() * 1000
+          )}`;
           // Call the original handler with the expected shape
           handlePaymentComplete({
             transactionId,

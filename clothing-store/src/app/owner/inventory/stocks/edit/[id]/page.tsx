@@ -7,7 +7,14 @@ import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { ArrowLeft, Plus, DollarSign, X, BarChart3, ScanLine } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  DollarSign,
+  X,
+  BarChart3,
+  ScanLine,
+} from "lucide-react";
 import {
   WholesaleTier,
   ColorVariant,
@@ -17,6 +24,7 @@ import {
 } from "@/types/stock";
 import { Shop, ShopListResponse } from "@/types/shop";
 import { SettingsService } from "@/services/settingsService";
+import { CategoryService } from "@/services/categoryService";
 
 function EditStockContent() {
   const router = useRouter();
@@ -29,14 +37,24 @@ function EditStockContent() {
   // Form state
   const [groupImage, setGroupImage] = useState<string>("");
   const [groupName, setGroupName] = useState("");
+  const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState<string[]>([
+    "Shirt",
+    "Pants",
+    "Dress",
+    "Jacket",
+    "Accessories",
+  ]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
-  const [selectedShop, setSelectedShop] = useState("");
+  const [selectedShops, setSelectedShops] = useState<string[]>([]);
 
   // Currency state
-  const [defaultCurrency, setDefaultCurrency] = useState<string>('THB');
-  const [currencySymbol, setCurrencySymbol] = useState<string>('฿');
+  const [defaultCurrency, setDefaultCurrency] = useState<string>("THB");
+  const [currencySymbol, setCurrencySymbol] = useState<string>("฿");
 
   const [isColorless, setIsColorless] = useState(false);
   const [wholesaleTiers, setWholesaleTiers] = useState<WholesaleTier[]>([]);
@@ -48,7 +66,10 @@ function EditStockContent() {
   const [isLoadingShops, setIsLoadingShops] = useState(false);
   const [isLoadingStock, setIsLoadingStock] = useState(true);
   const [isUploadingMultiple, setIsUploadingMultiple] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{current: number, total: number}>({current: 0, total: 0});
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+  }>({ current: 0, total: 0 });
   const [error, setError] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState<string>("");
 
@@ -89,10 +110,11 @@ function EditStockContent() {
       // Populate form with existing data
       setGroupImage(stock.groupImage || "");
       setGroupName(stock.groupName || "");
+      setCategory((stock as any).category || "");
       setUnitPrice(stock.unitPrice?.toString() || "");
       setOriginalPrice(stock.originalPrice?.toString() || "");
       setReleaseDate(stock.releaseDate || "");
-      setSelectedShop(stock.shop || "");
+      setSelectedShops(stock.shop ? [stock.shop] : []);
       setIsColorless(stock.isColorless || false);
 
       // Set wholesale tiers with original IDs preserved
@@ -129,11 +151,13 @@ function EditStockContent() {
   const fetchCurrencySettings = async () => {
     try {
       const settings = await SettingsService.getBusinessSettings();
-      setDefaultCurrency(settings?.defaultCurrency || 'THB');
-      const currencyInfo = SettingsService.getCurrencyInfo((settings?.defaultCurrency as "THB" | "MMK") || "THB");
+      setDefaultCurrency(settings?.defaultCurrency || "THB");
+      const currencyInfo = SettingsService.getCurrencyInfo(
+        (settings?.defaultCurrency as "THB" | "MMK") || "THB"
+      );
       setCurrencySymbol(currencyInfo.symbol);
     } catch (error) {
-      console.error('Error fetching currency settings:', error);
+      console.error("Error fetching currency settings:", error);
     }
   };
 
@@ -145,6 +169,30 @@ function EditStockContent() {
       fetchStockData();
     }
   }, [stockId]);
+
+  // Load categories from Firebase
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const cats = await CategoryService.getCategories();
+        setCategories(cats);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+
+    // Subscribe to real-time category updates
+    const unsubscribe = CategoryService.subscribeToCategories((cats) => {
+      setCategories(cats);
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
 
   const addWholesaleTier = () => {
     const newTier: WholesaleTier = {
@@ -182,36 +230,36 @@ function EditStockContent() {
 
   const handleMultipleImageUpload = () => {
     // Create a hidden file input for multiple image selection
-    const input = document.createElement('input');
-    input.type = 'file';
+    const input = document.createElement("input");
+    input.type = "file";
     input.multiple = true;
-    input.accept = 'image/*';
-    
+    input.accept = "image/*";
+
     input.onchange = async (event) => {
       const files = (event.target as HTMLInputElement).files;
       if (!files || files.length === 0) return;
 
       // Start loading state
       setIsUploadingMultiple(true);
-      setUploadProgress({current: 0, total: files.length});
+      setUploadProgress({ current: 0, total: files.length });
       setError("");
 
       const newVariants: ColorVariant[] = [];
       let validFiles = 0;
-      
+
       // First pass: validate all files
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
+
         // Validate file type
-        if (!file.type.startsWith('image/')) {
-          setError(prev => prev + `${file.name} is not an image file. `);
+        if (!file.type.startsWith("image/")) {
+          setError((prev) => prev + `${file.name} is not an image file. `);
           continue;
         }
 
         // Validate file size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-          setError(prev => prev + `${file.name} is too large (max 5MB). `);
+          setError((prev) => prev + `${file.name} is too large (max 5MB). `);
           continue;
         }
 
@@ -220,31 +268,31 @@ function EditStockContent() {
 
       if (validFiles === 0) {
         setIsUploadingMultiple(false);
-        setUploadProgress({current: 0, total: 0});
+        setUploadProgress({ current: 0, total: 0 });
         return;
       }
 
       // Update total with valid files only
-      setUploadProgress({current: 0, total: validFiles});
+      setUploadProgress({ current: 0, total: validFiles });
 
       // Process each valid file
       let processedCount = 0;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
+
         // Skip invalid files
-        if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+        if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
           continue;
         }
 
         try {
           // Upload image to Cloudinary
           const formData = new FormData();
-          formData.append('file', file);
-          formData.append('folder', 'pos-clothing-store/variants');
+          formData.append("file", file);
+          formData.append("folder", "pos-clothing-store/variants");
 
-          const response = await fetch('/api/cloudinary/upload', {
-            method: 'POST',
+          const response = await fetch("/api/cloudinary/upload", {
+            method: "POST",
             body: formData,
           });
 
@@ -258,19 +306,19 @@ function EditStockContent() {
               colorCode: "#000000",
               barcode: "",
               sizeQuantities: [],
-              image: data.secure_url,
+              image: data.url,
             };
             newVariants.push(newVariant);
           } else {
-            setError(prev => prev + `Failed to upload ${file.name}. `);
+            setError((prev) => prev + `Failed to upload ${file.name}. `);
           }
         } catch (error) {
-          setError(prev => prev + `Error uploading ${file.name}. `);
+          setError((prev) => prev + `Error uploading ${file.name}. `);
         }
 
         // Update progress
         processedCount++;
-        setUploadProgress({current: processedCount, total: validFiles});
+        setUploadProgress({ current: processedCount, total: validFiles });
       }
 
       // Add all successfully uploaded variants
@@ -280,7 +328,7 @@ function EditStockContent() {
 
       // End loading state
       setIsUploadingMultiple(false);
-      setUploadProgress({current: 0, total: 0});
+      setUploadProgress({ current: 0, total: 0 });
     };
 
     // Trigger file selection dialog
@@ -307,6 +355,7 @@ function EditStockContent() {
 
   // Size management functions
   const availableSizes = [
+    "Free Size",
     "XXS",
     "XS",
     "S",
@@ -382,20 +431,20 @@ function EditStockContent() {
   // EAN-13 barcode generation function
   const generateBarcode = (variantId: string) => {
     // EAN-13 format: Country(2-3) + Manufacturer(4-5) + Product(5) + Check(1) = 13 digits
-    
+
     // Country code (Thailand = 885, Myanmar = 858) - using 885 for Thailand
     const countryCode = "885";
-    
+
     // Manufacturer code (4 digits) - using a fixed code for this store
     const manufacturerCode = "1001";
-    
+
     // Product code (5 digits) - using timestamp for uniqueness
     const timestamp = Date.now().toString();
     const productCode = timestamp.slice(-5);
-    
+
     // First 12 digits without check digit
     const first12Digits = countryCode + manufacturerCode + productCode;
-    
+
     // Calculate EAN-13 check digit
     const calculateCheckDigit = (digits: string): string => {
       let sum = 0;
@@ -406,10 +455,10 @@ function EditStockContent() {
       const checkDigit = (10 - (sum % 10)) % 10;
       return checkDigit.toString();
     };
-    
+
     const checkDigit = calculateCheckDigit(first12Digits);
     const generatedBarcode = first12Digits + checkDigit;
-    
+
     updateColorVariant(variantId, "barcode", generatedBarcode);
   };
 
@@ -417,23 +466,24 @@ function EditStockContent() {
   const scanBarcode = async (variantId: string) => {
     try {
       // Check if the browser supports the Barcode Detection API
-      if ('BarcodeDetector' in window) {
+      if ("BarcodeDetector" in window) {
         // Use the native Barcode Detection API if available
         const barcodeDetector = new (window as any).BarcodeDetector();
-        
+
         // Request camera access
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
         });
-        
+
         // Create a video element to display camera feed
-        const video = document.createElement('video');
+        const video = document.createElement("video");
         video.srcObject = stream;
         video.play();
-        
+
         // Create a modal for scanning
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        const modal = document.createElement("div");
+        modal.className =
+          "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50";
         modal.innerHTML = `
           <div class="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <h3 class="text-lg font-semibold mb-4">Scan Barcode</h3>
@@ -448,64 +498,71 @@ function EditStockContent() {
             </div>
           </div>
         `;
-        
+
         document.body.appendChild(modal);
-        const videoElement = modal.querySelector('#scanner-video') as HTMLVideoElement;
+        const videoElement = modal.querySelector(
+          "#scanner-video"
+        ) as HTMLVideoElement;
         videoElement.srcObject = stream;
-        
+
         // Handle manual input
-        const manualInput = modal.querySelector('#manual-barcode') as HTMLInputElement;
-        const manualSubmit = modal.querySelector('#manual-submit') as HTMLButtonElement;
-        const cancelButton = modal.querySelector('#cancel-scan') as HTMLButtonElement;
-        
+        const manualInput = modal.querySelector(
+          "#manual-barcode"
+        ) as HTMLInputElement;
+        const manualSubmit = modal.querySelector(
+          "#manual-submit"
+        ) as HTMLButtonElement;
+        const cancelButton = modal.querySelector(
+          "#cancel-scan"
+        ) as HTMLButtonElement;
+
         let cleanup = () => {
-           stream.getTracks().forEach(track => track.stop());
-           document.body.removeChild(modal);
-         };
-         
-         manualSubmit.onclick = () => {
-           if (manualInput.value.trim()) {
-             updateColorVariant(variantId, "barcode", manualInput.value.trim());
-             cleanup();
-           }
-         };
-         
-         cancelButton.onclick = cleanup;
-         
-         // Try to detect barcodes from video
-         const detectBarcodes = async () => {
-           try {
-             const barcodes = await barcodeDetector.detect(videoElement);
-             if (barcodes.length > 0) {
-               updateColorVariant(variantId, "barcode", barcodes[0].rawValue);
-               cleanup();
-             }
-           } catch (error) {
-             console.log('Barcode detection failed:', error);
-           }
-         };
-         
-         // Check for barcodes every 500ms
-         const interval = setInterval(detectBarcodes, 500);
-         
-         // Cleanup interval when modal is closed
-         const originalCleanup = cleanup;
-         cleanup = () => {
-           clearInterval(interval);
-           originalCleanup();
-         };
-        
+          stream.getTracks().forEach((track) => track.stop());
+          document.body.removeChild(modal);
+        };
+
+        manualSubmit.onclick = () => {
+          if (manualInput.value.trim()) {
+            updateColorVariant(variantId, "barcode", manualInput.value.trim());
+            cleanup();
+          }
+        };
+
+        cancelButton.onclick = cleanup;
+
+        // Try to detect barcodes from video
+        const detectBarcodes = async () => {
+          try {
+            const barcodes = await barcodeDetector.detect(videoElement);
+            if (barcodes.length > 0) {
+              updateColorVariant(variantId, "barcode", barcodes[0].rawValue);
+              cleanup();
+            }
+          } catch (error) {
+            console.log("Barcode detection failed:", error);
+          }
+        };
+
+        // Check for barcodes every 500ms
+        const interval = setInterval(detectBarcodes, 500);
+
+        // Cleanup interval when modal is closed
+        const originalCleanup = cleanup;
+        cleanup = () => {
+          clearInterval(interval);
+          originalCleanup();
+        };
       } else {
         // Fallback: prompt for manual input
-        const barcode = prompt('Enter barcode manually:');
+        const barcode = prompt("Enter barcode manually:");
         if (barcode && barcode.trim()) {
           updateColorVariant(variantId, "barcode", barcode.trim());
         }
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
+      console.error("Error accessing camera:", error);
       // Fallback to manual input
-      const barcode = prompt('Camera access failed. Enter barcode manually:');
+      const barcode = prompt("Camera access failed. Enter barcode manually:");
       if (barcode && barcode.trim()) {
         updateColorVariant(variantId, "barcode", barcode.trim());
       }
@@ -537,18 +594,23 @@ function EditStockContent() {
       return;
     }
 
+    if (selectedShops.length === 0) {
+      setError("At least one shop must be selected");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Prepare the request data
+      // First, update the current stock
       const stockData: CreateStockRequest = {
         groupName: groupName.trim(),
         unitPrice: parseFloat(unitPrice),
         originalPrice: parseFloat(originalPrice),
         releaseDate,
-        shop: selectedShop,
+        shop: selectedShops[0],
         isColorless,
-        groupImage: groupImage, // Use Cloudinary URL directly
+        groupImage: groupImage,
         wholesaleTiers: wholesaleTiers.map((tier) => ({
           minQuantity: tier.minQuantity,
           price: tier.price,
@@ -562,8 +624,8 @@ function EditStockContent() {
         })),
       };
 
-      // Make API call
-      const response = await fetch(`/api/stocks/${stockId}`, {
+      // Update the current stock (first shop)
+      const updateResponse = await fetch(`/api/stocks/${stockId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -571,16 +633,47 @@ function EditStockContent() {
         body: JSON.stringify(stockData),
       });
 
-      const result = await response.json();
+      const updateResult = await updateResponse.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to update stock item");
+      if (!updateResponse.ok || !updateResult.success) {
+        throw new Error(updateResult.error || "Failed to update stock item");
+      }
+
+      // Create stocks for additional shops (if any)
+      if (selectedShops.length > 1) {
+        const additionalShops = selectedShops.slice(1);
+        const createPromises = additionalShops.map(async (shopId) => {
+          const newStockData: CreateStockRequest = {
+            ...stockData,
+            shop: shopId,
+          };
+
+          const response = await fetch("/api/stocks", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(newStockData),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(
+              result.error || `Failed to create stock item for shop ${shopId}`
+            );
+          }
+
+          return result;
+        });
+
+        await Promise.all(createPromises);
       }
 
       // Success
-      setSuccessMessage("Stock item updated successfully!");
+      setSuccessMessage("Stock item(s) updated successfully!");
 
-      // Optionally redirect after a delay
+      // Redirect after a delay
       setTimeout(() => {
         router.push("/owner/inventory/stocks");
       }, 2000);
@@ -699,6 +792,32 @@ function EditStockContent() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Category
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowCategoryModal(true)}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 whitespace-nowrap"
+                      >
+                        + Add New
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Unit Price ({currencySymbol})
                     </label>
                     <input
@@ -735,26 +854,49 @@ function EditStockContent() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Shop
+                      Shops ({selectedShops.length} selected)
                     </label>
-                    <select
-                      title="Select shop"
-                      value={selectedShop}
-                      onChange={(e) => setSelectedShop(e.target.value)}
-                      disabled={isLoadingShops}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">
-                        {isLoadingShops ? "Loading shops..." : "Select a shop"}
-                      </option>
-                      {shops &&
-                        shops.length > 0 &&
-                        shops.map((shop) => (
-                          <option key={shop.id} value={shop.id}>
-                            {shop.name}
-                          </option>
-                        ))}
-                    </select>
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md focus-within:ring-blue-500 focus-within:border-blue-500 bg-white min-h-[42px] max-h-40 overflow-y-auto">
+                      {isLoadingShops ? (
+                        <div className="text-gray-500 text-sm">
+                          Loading shops...
+                        </div>
+                      ) : shops && shops.length > 0 ? (
+                        <div className="space-y-2">
+                          {shops.map((shop) => (
+                            <label
+                              key={shop.id}
+                              className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedShops.includes(shop.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedShops((prev) => [
+                                      ...prev,
+                                      shop.id,
+                                    ]);
+                                  } else {
+                                    setSelectedShops((prev) =>
+                                      prev.filter((id) => id !== shop.id)
+                                    );
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2"
+                              />
+                              <span className="text-sm text-gray-900">
+                                {shop.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 text-sm">
+                          No shops available
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-6">
@@ -861,227 +1003,229 @@ function EditStockContent() {
                     Color Variants
                   </h2>
                 </div>
-              <div className="p-6">
-                {colorVariants.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">
-                      No color variants added yet. Click &quot;+ Add
-                      Variant&quot; to begin.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {colorVariants.map((variant) => (
-                      <div
-                        key={variant.id}
-                        className="p-4 border border-gray-200 rounded-lg"
-                      >
-                        <div className="flex items-start justify-between mb-4">
-                          <h3 className="text-sm font-medium text-gray-700">
-                            Variant #{variant.id.slice(-4)}
-                          </h3>
-                          <button
-                            aria-label="Remove color variant"
-                            onClick={() => removeColorVariant(variant.id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded-md"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {/* Left side - Image Upload */}
-                          <div>
-                            <ImageUpload
-                              value={variant.image || ""}
-                              onChange={(url) =>
-                                updateColorVariant(variant.id, "image", url)
-                              }
-                              folder="pos-clothing-store/variants"
-                              placeholder="Upload variant image"
-                              className="h-48"
-                            />
+                <div className="p-6">
+                  {colorVariants.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">
+                        No color variants added yet. Click &quot;+ Add
+                        Variant&quot; to begin.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {colorVariants.map((variant) => (
+                        <div
+                          key={variant.id}
+                          className="p-4 border border-gray-200 rounded-lg"
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <h3 className="text-sm font-medium text-gray-700">
+                              Variant #{variant.id.slice(-4)}
+                            </h3>
+                            <button
+                              aria-label="Remove color variant"
+                              onClick={() => removeColorVariant(variant.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded-md"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
                           </div>
 
-                          {/* Right side - Form Fields */}
-                          <div className="space-y-4">
-                            {/* Color Detection Display */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Left side - Image Upload */}
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Color (Detected)
-                              </label>
-                              <div className="flex items-center space-x-3">
-                                <div
-                                  className="w-8 h-8 rounded border border-gray-300"
-                                  style={{ backgroundColor: variant.colorCode }}
-                                ></div>
-                                <input
-                                  type="text"
-                                  value={variant.color}
-                                  onChange={(e) =>
-                                    updateColorVariant(
-                                      variant.id,
-                                      "color",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Color name"
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                />
-                                <input
-                                  aria-label="Select color code"
-                                  type="color"
-                                  value={variant.colorCode}
-                                  onChange={(e) =>
-                                    updateColorVariant(
-                                      variant.id,
-                                      "colorCode",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-10 h-10 border border-gray-300 rounded-md"
-                                />
-                              </div>
+                              <ImageUpload
+                                value={variant.image || ""}
+                                onChange={(url) =>
+                                  updateColorVariant(variant.id, "image", url)
+                                }
+                                folder="pos-clothing-store/variants"
+                                placeholder="Upload variant image"
+                                className="h-48"
+                              />
                             </div>
 
-                            {/* Barcode Number */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Barcode Number
-                              </label>
-                              <div className="flex space-x-2">
-                                <input
-                                  type="text"
-                                  value={variant.barcode}
-                                  onChange={(e) =>
-                                    updateColorVariant(
-                                      variant.id,
-                                      "barcode",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Enter EAN-13 Barcode"
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => generateBarcode(variant.id)}
-                                  className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                                  title="Generate barcode automatically"
-                                >
-                                  <BarChart3 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => scanBarcode(variant.id)}
-                                  className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                                  title="Scan existing barcode"
-                                >
-                                  <ScanLine className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Size Selector */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Available Sizes
-                              </label>
-                              <div className="grid grid-cols-2 gap-2 mb-3">
-                                {availableSizes.map((size) => {
-                                  const isSelected =
-                                    variant.sizeQuantities.some(
-                                      (sq) => sq.size === size
-                                    );
-                                  return (
-                                    <button
-                                      key={size}
-                                      type="button"
-                                      onClick={() => {
-                                        if (isSelected) {
-                                          removeSizeFromVariant(
-                                            variant.id,
-                                            size
-                                          );
-                                        } else {
-                                          addSizeToVariant(variant.id, size);
-                                        }
-                                      }}
-                                      className={`flex items-center justify-center p-3 border-2 rounded-md cursor-pointer transition-colors min-h-[44px] ${
-                                        isSelected
-                                          ? "bg-blue-500 border-blue-500 text-white font-semibold"
-                                          : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:border-gray-400"
-                                      }`}
-                                    >
-                                      <span className="text-sm font-semibold">
-                                        {size}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Quantity inputs for selected sizes */}
-                              {variant.sizeQuantities.length > 0 && (
-                                <div className="space-y-2">
-                                  <h4 className="text-sm font-medium text-gray-700">
-                                    Quantities by Size
-                                  </h4>
-                                  {variant.sizeQuantities.map((sizeQty) => (
-                                    <div
-                                      key={sizeQty.size}
-                                      className="flex items-center space-x-2"
-                                    >
-                                      <span className="text-sm font-medium text-gray-600 w-16">
-                                        {sizeQty.size}:
-                                      </span>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={sizeQty.quantity}
-                                        onChange={(e) =>
-                                          updateSizeQuantity(
-                                            variant.id,
-                                            sizeQty.size,
-                                            parseInt(e.target.value) || 0
-                                          )
-                                        }
-                                        className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                        placeholder="0"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removeSizeFromVariant(
-                                            variant.id,
-                                            sizeQty.size
-                                          )
-                                        }
-                                        className="p-1 text-red-600 hover:bg-red-50 rounded-md"
-                                        aria-label={`Remove ${sizeQty.size} size`}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  ))}
+                            {/* Right side - Form Fields */}
+                            <div className="space-y-4">
+                              {/* Color Detection Display */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Color (Detected)
+                                </label>
+                                <div className="flex items-center space-x-3">
+                                  <div
+                                    className="w-8 h-8 rounded border border-gray-300"
+                                    style={{
+                                      backgroundColor: variant.colorCode,
+                                    }}
+                                  ></div>
+                                  <input
+                                    type="text"
+                                    value={variant.color}
+                                    onChange={(e) =>
+                                      updateColorVariant(
+                                        variant.id,
+                                        "color",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Color name"
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                                  />
+                                  <input
+                                    aria-label="Select color code"
+                                    type="color"
+                                    value={variant.colorCode}
+                                    onChange={(e) =>
+                                      updateColorVariant(
+                                        variant.id,
+                                        "colorCode",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-10 h-10 border border-gray-300 rounded-md"
+                                  />
                                 </div>
-                              )}
+                              </div>
+
+                              {/* Barcode Number */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Barcode Number
+                                </label>
+                                <div className="flex space-x-2">
+                                  <input
+                                    type="text"
+                                    value={variant.barcode}
+                                    onChange={(e) =>
+                                      updateColorVariant(
+                                        variant.id,
+                                        "barcode",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Enter EAN-13 Barcode"
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => generateBarcode(variant.id)}
+                                    className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                                    title="Generate barcode automatically"
+                                  >
+                                    <BarChart3 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => scanBarcode(variant.id)}
+                                    className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                                    title="Scan existing barcode"
+                                  >
+                                    <ScanLine className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Size Selector */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Available Sizes
+                                </label>
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                  {availableSizes.map((size) => {
+                                    const isSelected =
+                                      variant.sizeQuantities.some(
+                                        (sq) => sq.size === size
+                                      );
+                                    return (
+                                      <button
+                                        key={size}
+                                        type="button"
+                                        onClick={() => {
+                                          if (isSelected) {
+                                            removeSizeFromVariant(
+                                              variant.id,
+                                              size
+                                            );
+                                          } else {
+                                            addSizeToVariant(variant.id, size);
+                                          }
+                                        }}
+                                        className={`flex items-center justify-center p-3 border-2 rounded-md cursor-pointer transition-colors min-h-[44px] ${
+                                          isSelected
+                                            ? "bg-blue-500 border-blue-500 text-white font-semibold"
+                                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:border-gray-400"
+                                        }`}
+                                      >
+                                        <span className="text-sm font-semibold">
+                                          {size}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Quantity inputs for selected sizes */}
+                                {variant.sizeQuantities.length > 0 && (
+                                  <div className="space-y-2">
+                                    <h4 className="text-sm font-medium text-gray-700">
+                                      Quantities by Size
+                                    </h4>
+                                    {variant.sizeQuantities.map((sizeQty) => (
+                                      <div
+                                        key={sizeQty.size}
+                                        className="flex items-center space-x-2"
+                                      >
+                                        <span className="text-sm font-medium text-gray-600 w-16">
+                                          {sizeQty.size}:
+                                        </span>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          value={sizeQty.quantity}
+                                          onChange={(e) =>
+                                            updateSizeQuantity(
+                                              variant.id,
+                                              sizeQty.size,
+                                              parseInt(e.target.value) || 0
+                                            )
+                                          }
+                                          className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                                          placeholder="0"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            removeSizeFromVariant(
+                                              variant.id,
+                                              sizeQty.size
+                                            )
+                                          }
+                                          className="p-1 text-red-600 hover:bg-red-50 rounded-md"
+                                          aria-label={`Remove ${sizeQty.size} size`}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
             )}
 
             {/* Action Buttons */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleMultipleImageUpload}
                   disabled={isUploadingMultiple}
                   className="flex items-center"
@@ -1089,10 +1233,9 @@ function EditStockContent() {
                   {isUploadingMultiple ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                      {uploadProgress.total > 0 ? 
-                        `Uploading ${uploadProgress.current}/${uploadProgress.total}` : 
-                        'Uploading...'
-                      }
+                      {uploadProgress.total > 0
+                        ? `Uploading ${uploadProgress.current}/${uploadProgress.total}`
+                        : "Uploading..."}
                     </>
                   ) : (
                     <>
@@ -1130,6 +1273,114 @@ function EditStockContent() {
           </div>
         </main>
       </div>
+
+      {/* Add Category Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900">
+              Add New Category
+            </h3>
+
+            {/* Current Categories List */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">
+                Current Categories
+              </h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2">
+                {categories.length === 0 ? (
+                  <p className="text-gray-500 text-center py-2 text-sm">
+                    No categories available
+                  </p>
+                ) : (
+                  categories.map((cat) => (
+                    <div
+                      key={cat}
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100"
+                    >
+                      <span className="text-gray-900 text-sm">{cat}</span>
+                      <button
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Are you sure you want to delete "${cat}" category?`
+                            )
+                          ) {
+                            setCategories(categories.filter((c) => c !== cat));
+                            if (category === cat) {
+                              setCategory("");
+                            }
+                          }
+                        }}
+                        className="px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Add New Category Input */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">
+                Add New Category
+              </h4>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Enter category name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (
+                      newCategoryName.trim() &&
+                      !categories.includes(newCategoryName.trim())
+                    ) {
+                      setCategories([...categories, newCategoryName.trim()]);
+                      setCategory(newCategoryName.trim());
+                      setNewCategoryName("");
+                    }
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (
+                    newCategoryName.trim() &&
+                    !categories.includes(newCategoryName.trim())
+                  ) {
+                    setCategories([...categories, newCategoryName.trim()]);
+                    setCategory(newCategoryName.trim());
+                    setNewCategoryName("");
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                disabled={
+                  !newCategoryName.trim() ||
+                  categories.includes(newCategoryName.trim())
+                }
+              >
+                Add Category
+              </button>
+              <button
+                onClick={() => {
+                  setNewCategoryName("");
+                  setShowCategoryModal(false);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

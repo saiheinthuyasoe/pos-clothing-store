@@ -20,11 +20,13 @@ interface ClothingInventoryItem {
   id: string;
   name: string;
   price: number;
+  originalPrice: number;
   stock: number;
   colors: string[];
   image: string;
   category: string;
   isNew: boolean;
+  shop: string;
   wholesaleTiers: WholesaleTier[];
   colorVariants: {
     id: string;
@@ -49,6 +51,11 @@ function OwnerHomeContent() {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Shop filter state
+  const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
+  const [selectedShopFilter, setSelectedShopFilter] = useState<string>("");
+  const [isLoadingShops, setIsLoadingShops] = useState(false);
 
   // Selection state for colors and sizes
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>(
@@ -139,173 +146,191 @@ function OwnerHomeContent() {
     );
   };
 
-  // Function to reduce inventory stock when item is added to cart
-  const reduceInventoryStock = useCallback(async (
-    itemId: string,
-    colorId: string,
-    size: string,
-    quantity: number = 1
-  ) => {
-    // Update local state immediately for UI responsiveness
-    setClothingInventory((prevInventory) => {
-      return prevInventory.map((item) => {
-        if (item.id === itemId) {
-          return {
-            ...item,
-            colorVariants:
-              item.colorVariants?.map((variant) => {
-                if (variant.id === colorId) {
-                  return {
-                    ...variant,
-                    sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
-                      if (sizeQty.size === size) {
-                        return {
-                          ...sizeQty,
-                          quantity: Math.max(0, sizeQty.quantity - quantity),
-                        };
-                      }
-                      return sizeQty;
-                    }),
-                  };
-                }
-                return variant;
-              }) || [],
-          };
-        }
-        return item;
-      });
-    });
+  // Helper function to get display stock (total or for selected color)
+  const getDisplayStock = (item: ClothingInventoryItem) => {
+    const selectedVariant = getSelectedColorVariant(item);
+    if (!selectedVariant || !selectedVariant.sizeQuantities) {
+      return item.stock;
+    }
+    // Calculate total stock for the selected color variant
+    return selectedVariant.sizeQuantities.reduce(
+      (total, sq) => total + (sq.quantity || 0),
+      0
+    );
+  };
 
-    // Persist changes to database
-    try {
-      const item = clothingInventory.find((item) => item.id === itemId);
-      if (item) {
-        const updatedColorVariants =
-          item.colorVariants?.map((variant) => {
-            if (variant.id === colorId) {
-              return {
-                ...variant,
-                sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
-                  if (sizeQty.size === size) {
+  // Function to reduce inventory stock when item is added to cart
+  const reduceInventoryStock = useCallback(
+    async (
+      itemId: string,
+      colorId: string,
+      size: string,
+      quantity: number = 1
+    ) => {
+      // Update local state immediately for UI responsiveness
+      setClothingInventory((prevInventory) => {
+        return prevInventory.map((item) => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              colorVariants:
+                item.colorVariants?.map((variant) => {
+                  if (variant.id === colorId) {
                     return {
-                      ...sizeQty,
-                      quantity: Math.max(0, sizeQty.quantity - quantity),
+                      ...variant,
+                      sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                        if (sizeQty.size === size) {
+                          return {
+                            ...sizeQty,
+                            quantity: Math.max(0, sizeQty.quantity - quantity),
+                          };
+                        }
+                        return sizeQty;
+                      }),
                     };
                   }
-                  return sizeQty;
-                }),
-              };
-            }
-            return variant;
-          }) || [];
-
-        await StockService.updateStock(itemId, {
-          colorVariants: updatedColorVariants.map((variant) => ({
-            ...variant,
-            barcode: (variant as { barcode?: string }).barcode || "",
-          })),
+                  return variant;
+                }) || [],
+            };
+          }
+          return item;
         });
+      });
+
+      // Persist changes to database
+      try {
+        const item = clothingInventory.find((item) => item.id === itemId);
+        if (item) {
+          const updatedColorVariants =
+            item.colorVariants?.map((variant) => {
+              if (variant.id === colorId) {
+                return {
+                  ...variant,
+                  sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                    if (sizeQty.size === size) {
+                      return {
+                        ...sizeQty,
+                        quantity: Math.max(0, sizeQty.quantity - quantity),
+                      };
+                    }
+                    return sizeQty;
+                  }),
+                };
+              }
+              return variant;
+            }) || [];
+
+          await StockService.updateStock(itemId, {
+            colorVariants: updatedColorVariants.map((variant) => ({
+              ...variant,
+              barcode: (variant as { barcode?: string }).barcode || "",
+            })),
+          });
+        }
+      } catch (error) {
+        console.error("Error updating stock in database:", error);
+        // Optionally revert local state on error
+        // For now, we'll keep the optimistic update
       }
-    } catch (error) {
-      console.error("Error updating stock in database:", error);
-      // Optionally revert local state on error
-      // For now, we'll keep the optimistic update
-    }
-  }, [clothingInventory]);
+    },
+    [clothingInventory]
+  );
 
   // Function to restore inventory stock when item is removed from cart
-  const restoreInventoryStock = useCallback(async (
-    itemId: string,
-    colorId: string,
-    size: string,
-    quantity: number = 1
-  ) => {
-    // Update local state immediately for UI responsiveness
-    setClothingInventory((prevInventory) => {
-      return prevInventory.map((item) => {
-        if (item.id === itemId) {
-          return {
-            ...item,
-            colorVariants:
-              item.colorVariants?.map((variant) => {
-                if (variant.id === colorId) {
-                  return {
-                    ...variant,
-                    sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
-                      if (sizeQty.size === size) {
-                        return {
-                          ...sizeQty,
-                          quantity: sizeQty.quantity + quantity,
-                        };
-                      }
-                      return sizeQty;
-                    }),
-                  };
-                }
-                return variant;
-              }) || [],
-          };
-        }
-        return item;
-      });
-    });
-
-    // Persist changes to database
-    try {
-      const item = clothingInventory.find((item) => item.id === itemId);
-      if (item) {
-        const updatedColorVariants =
-          item.colorVariants?.map((variant) => {
-            if (variant.id === colorId) {
-              return {
-                ...variant,
-                sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
-                  if (sizeQty.size === size) {
+  const restoreInventoryStock = useCallback(
+    async (
+      itemId: string,
+      colorId: string,
+      size: string,
+      quantity: number = 1
+    ) => {
+      // Update local state immediately for UI responsiveness
+      setClothingInventory((prevInventory) => {
+        return prevInventory.map((item) => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              colorVariants:
+                item.colorVariants?.map((variant) => {
+                  if (variant.id === colorId) {
                     return {
-                      ...sizeQty,
-                      quantity: sizeQty.quantity + quantity,
+                      ...variant,
+                      sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                        if (sizeQty.size === size) {
+                          return {
+                            ...sizeQty,
+                            quantity: sizeQty.quantity + quantity,
+                          };
+                        }
+                        return sizeQty;
+                      }),
                     };
                   }
-                  return sizeQty;
-                }),
-              };
-            }
-            return variant;
-          }) || [];
-
-        await StockService.updateStock(itemId, {
-          colorVariants: updatedColorVariants.map((variant) => ({
-            ...variant,
-            barcode: (variant as { barcode?: string }).barcode || "",
-          })),
+                  return variant;
+                }) || [],
+            };
+          }
+          return item;
         });
+      });
+
+      // Persist changes to database
+      try {
+        const item = clothingInventory.find((item) => item.id === itemId);
+        if (item) {
+          const updatedColorVariants =
+            item.colorVariants?.map((variant) => {
+              if (variant.id === colorId) {
+                return {
+                  ...variant,
+                  sizeQuantities: variant.sizeQuantities.map((sizeQty) => {
+                    if (sizeQty.size === size) {
+                      return {
+                        ...sizeQty,
+                        quantity: sizeQty.quantity + quantity,
+                      };
+                    }
+                    return sizeQty;
+                  }),
+                };
+              }
+              return variant;
+            }) || [];
+
+          await StockService.updateStock(itemId, {
+            colorVariants: updatedColorVariants.map((variant) => ({
+              ...variant,
+              barcode: (variant as { barcode?: string }).barcode || "",
+            })),
+          });
+        }
+      } catch (error) {
+        console.error("Error updating stock in database:", error);
+        // Optionally revert local state on error
+        // For now, we'll keep the optimistic update
       }
-    } catch (error) {
-      console.error("Error updating stock in database:", error);
-      // Optionally revert local state on error
-      // For now, we'll keep the optimistic update
-    }
-  }, [clothingInventory]);
+    },
+    [clothingInventory]
+  );
 
   // Function to check available stock for a specific item, color, and size
-  const checkInventoryStock = useCallback((
-    itemId: string,
-    colorId: string,
-    size: string
-  ): number => {
-    const item = clothingInventory.find((item) => item.id === itemId);
-    if (!item) return 0;
+  const checkInventoryStock = useCallback(
+    (itemId: string, colorId: string, size: string): number => {
+      const item = clothingInventory.find((item) => item.id === itemId);
+      if (!item) return 0;
 
-    const colorVariant = item.colorVariants?.find(
-      (variant) => variant.id === colorId
-    );
-    if (!colorVariant) return 0;
+      const colorVariant = item.colorVariants?.find(
+        (variant) => variant.id === colorId
+      );
+      if (!colorVariant) return 0;
 
-    const sizeQuantity = colorVariant.sizeQuantities.find(
-      (sizeQty) => sizeQty.size === size
-    );
-    return sizeQuantity?.quantity || 0;
-  }, [clothingInventory]);
+      const sizeQuantity = colorVariant.sizeQuantities.find(
+        (sizeQty) => sizeQty.size === size
+      );
+      return sizeQuantity?.quantity || 0;
+    },
+    [clothingInventory]
+  );
 
   // Transform stock data to clothing inventory format
   const transformStockData = useCallback(
@@ -326,9 +351,12 @@ function OwnerHomeContent() {
             price: stock.unitPrice,
             stock: 0, // No stock since no variants
             colors: [],
-            image: stock.groupImage || `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
+            image:
+              stock.groupImage ||
+              `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
             category: "Clothing",
             isNew: true,
+            shop: stock.shop,
             wholesaleTiers: stock.wholesaleTiers || [],
             colorVariants: [], // Empty array - no variants available
           };
@@ -339,6 +367,7 @@ function OwnerHomeContent() {
           id: stock.id,
           name: stock.groupName,
           price: stock.unitPrice,
+          originalPrice: stock.originalPrice,
           stock: stock.colorVariants.reduce(
             (total, variant) =>
               total +
@@ -353,9 +382,12 @@ function OwnerHomeContent() {
               stock.colorVariants.map((variant) => variant.color.toLowerCase())
             ),
           ],
-          image: stock.groupImage || `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
+          image:
+            stock.groupImage ||
+            `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
           category: "Clothing",
           isNew: true,
+          shop: stock.shop,
           wholesaleTiers: stock.wholesaleTiers || [],
           colorVariants: stock.colorVariants.map((variant, index) => {
             console.log(
@@ -375,6 +407,26 @@ function OwnerHomeContent() {
     },
     []
   );
+
+  // Fetch shops
+  useEffect(() => {
+    const fetchShops = async () => {
+      setIsLoadingShops(true);
+      try {
+        const response = await fetch("/api/shops");
+        if (!response.ok) {
+          throw new Error("Failed to fetch shops");
+        }
+        const data = await response.json();
+        setShops(data.data || []);
+      } catch (error) {
+        console.error("Error fetching shops:", error);
+      } finally {
+        setIsLoadingShops(false);
+      }
+    };
+    fetchShops();
+  }, []);
 
   // Set up real-time inventory updates
   useEffect(() => {
@@ -531,11 +583,14 @@ function OwnerHomeContent() {
       id: "Jean7010",
       name: "Jean7010",
       price: 290,
+      originalPrice: 200,
       stock: 4,
       colors: ["red", "green", "blue"],
       image: "/api/placeholder/200/250",
       category: "Jeans",
       isNew: true,
+      shop: "default",
+      wholesaleTiers: [],
       colorVariants: [
         {
           id: "cv1",
@@ -621,11 +676,15 @@ function OwnerHomeContent() {
       id: "Jean8803",
       name: "Jean8803",
       price: 290,
+      originalPrice: 200,
       stock: 6,
       colors: ["red", "blue", "green"],
       image: "/api/placeholder/200/250",
       category: "Jeans",
       isNew: true,
+      shop: "default",
+      wholesaleTiers: [],
+      colorVariants: [],
     },
     {
       id: "Jean7677",
@@ -1236,13 +1295,18 @@ function OwnerHomeContent() {
     firstItemColorVariants: displayInventory[0]?.colorVariants,
   });
 
-  // Filter items based on search term
-  const filteredInventory = displayInventory.filter(
-    (item) =>
+  // Filter items based on search term and shop
+  const filteredInventory = displayInventory.filter((item) => {
+    const matchesSearch =
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      item.category.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesShop =
+      selectedShopFilter === "" || item.shop === selectedShopFilter;
+
+    return matchesSearch && matchesShop;
+  });
 
   const totalPages = Math.ceil(filteredInventory.length / itemsPerPage);
 
@@ -1287,13 +1351,13 @@ function OwnerHomeContent() {
         stockId: item.id,
         groupName: item.name,
         unitPrice: item.price,
-        originalPrice: item.price,
+        originalPrice: item.originalPrice,
         quantity: 1,
         selectedColor: selectedVariant.color,
         selectedSize: selectedSize,
         colorCode: selectedVariant.colorCode,
         image: item.image,
-        shop: "default",
+        shop: item.shop,
       });
 
       // Inventory reduction will be handled by CartContext through callbacks
@@ -1327,138 +1391,6 @@ function OwnerHomeContent() {
         {/* Main Content */}
         <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            {/* Quick Actions */}
-            <div className="bg-white overflow-hidden shadow rounded-lg mb-6">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                  Quick Actions
-                </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <Button
-                    variant="outline"
-                    className="flex items-center justify-center p-4 h-auto"
-                  >
-                    <Package className="h-6 w-6 mr-3" />
-                    <div className="text-left">
-                      <div className="font-medium">Manage Inventory</div>
-                      <div className="text-sm text-gray-500">
-                        Add, edit, or remove products
-                      </div>
-                    </div>
-                  </Button>
-
-                  <Link href="/owner/dashboard">
-                    <Button
-                      variant="outline"
-                      className="flex items-center justify-center p-4 h-auto w-full"
-                    >
-                      <BarChart3 className="h-6 w-6 mr-3" />
-                      <div className="text-left">
-                        <div className="font-medium">View Reports</div>
-                        <div className="text-sm text-gray-500">
-                          Sales and analytics
-                        </div>
-                      </div>
-                    </Button>
-                  </Link>
-
-                  <Button
-                    variant="outline"
-                    className="flex items-center justify-center p-4 h-auto"
-                  >
-                    <User className="h-6 w-6 mr-3" />
-                    <div className="text-left">
-                      <div className="font-medium">Manage Staff</div>
-                      <div className="text-sm text-gray-500">
-                        Employee management
-                      </div>
-                    </div>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <Package className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Total Products
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900">
-                          {isLoading ? "..." : displayInventory.length}
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <BarChart3 className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Today&apos;s Sales
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900">
-                          {formatPrice(0)}
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <User className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Active Customers
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900">0</dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <Store className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Store Status
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900">
-                          Active
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Clothing Inventory */}
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
@@ -1488,6 +1420,24 @@ function OwnerHomeContent() {
                           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                         />
                       </svg>
+                    </div>
+                    <div className="relative">
+                      <select
+                        value={selectedShopFilter}
+                        onChange={(e) => {
+                          setSelectedShopFilter(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        disabled={isLoadingShops}
+                        className="pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="">All Branches</option>
+                        {shops.map((shop) => (
+                          <option key={shop.id} value={shop.id}>
+                            {shop.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -1634,7 +1584,7 @@ function OwnerHomeContent() {
                         className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                       >
                         {/* Product Image */}
-                        <div className="relative aspect-[4/5] bg-gray-100">
+                        <div className="relative h-48 bg-gray-100">
                           {item.isNew && (
                             <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
                               New
@@ -1646,8 +1596,8 @@ function OwnerHomeContent() {
                             }`}
                             src={getCurrentImage(item as ClothingInventoryItem)}
                             alt={item.name}
-                            width={200}
-                            height={250}
+                            width={150}
+                            height={200}
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -1666,7 +1616,7 @@ function OwnerHomeContent() {
                             <span className="text-xs text-gray-600">
                               Stock:{" "}
                               <span className="font-medium text-green-600">
-                                {item.stock}
+                                {getDisplayStock(item as ClothingInventoryItem)}
                               </span>
                             </span>
                           </div>
@@ -1733,7 +1683,9 @@ function OwnerHomeContent() {
                             <div className="grid grid-cols-3 gap-1">
                               {(() => {
                                 const availableSizes = item.colorVariants
-                                  ? getAvailableSizes(item as ClothingInventoryItem)
+                                  ? getAvailableSizes(
+                                      item as ClothingInventoryItem
+                                    )
                                   : [];
                                 console.log(
                                   `Size rendering for ${item.id}: availableSizes=`,

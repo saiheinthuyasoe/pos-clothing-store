@@ -1,0 +1,1152 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Alert } from "@/components/ui/Alert";
+import { Sidebar } from "@/components/ui/Sidebar";
+import { TopNavBar } from "@/components/ui/TopNavBar";
+import { ExpenseCategory, SpendingMenu, Expense } from "@/types/expense";
+
+function ExpensesContent() {
+  const [activeMenuItem, setActiveMenuItem] = useState("expenses");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  const [spendingMenus, setSpendingMenus] = useState<SpendingMenu[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  // Form state
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedSpendingMenuId, setSelectedSpendingMenuId] = useState("");
+  const [note, setNote] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [amount, setAmount] = useState("");
+  const [selectedCurrency, setSelectedCurrency] = useState<"THB" | "MMK">(
+    "THB"
+  );
+
+  // Modal states
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSpendingMenuModal, setShowSpendingMenuModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newSpendingMenuName, setNewSpendingMenuName] = useState("");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  // Filter and pagination states
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterSpendingMenu, setFilterSpendingMenu] = useState("");
+  const [filterCurrency, setFilterCurrency] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [categoriesRes, spendingMenusRes, expensesRes] = await Promise.all([
+        fetch("/api/expenses?type=categories"),
+        fetch("/api/expenses?type=spendingMenus"),
+        fetch("/api/expenses"),
+      ]);
+
+      const categoriesData = await categoriesRes.json();
+      const spendingMenusData = await spendingMenusRes.json();
+      const expensesData = await expensesRes.json();
+
+      if (categoriesData.success) setCategories(categoriesData.data);
+      if (spendingMenusData.success) setSpendingMenus(spendingMenusData.data);
+      if (expensesData.success) setExpenses(expensesData.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      showAlert("error", "Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showAlert = (type: "success" | "error", message: string) => {
+    setAlert({ type, message });
+    setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      showAlert("error", "Please enter a category name");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "category", name: newCategoryName }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setCategories([data.data, ...categories]);
+        setNewCategoryName("");
+        setShowCategoryModal(false);
+        showAlert("success", "Category added successfully");
+      } else {
+        showAlert("error", "Failed to add category");
+      }
+    } catch (error) {
+      console.error("Error adding category:", error);
+      showAlert("error", "Failed to add category");
+    }
+  };
+
+  const handleAddSpendingMenu = async () => {
+    if (!newSpendingMenuName.trim()) {
+      showAlert("error", "Please enter a spending menu name");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "spendingMenu",
+          name: newSpendingMenuName,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSpendingMenus([data.data, ...spendingMenus]);
+        setNewSpendingMenuName("");
+        setShowSpendingMenuModal(false);
+        showAlert("success", "Spending menu added successfully");
+      } else {
+        showAlert("error", "Failed to add spending menu");
+      }
+    } catch (error) {
+      console.error("Error adding spending menu:", error);
+      showAlert("error", "Failed to add spending menu");
+    }
+  };
+
+  const handleAddExpense = async () => {
+    if (!selectedCategoryId || !selectedSpendingMenuId || !amount || !date) {
+      showAlert("error", "Please fill in all required fields");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryId: selectedCategoryId,
+          spendingMenuId: selectedSpendingMenuId,
+          note,
+          date,
+          amount: parseFloat(amount),
+          currency: selectedCurrency,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setExpenses([data.data, ...expenses]);
+        // Reset form
+        setSelectedCategoryId("");
+        setSelectedSpendingMenuId("");
+        setNote("");
+        setAmount("");
+        setDate(new Date().toISOString().split("T")[0]);
+        showAlert("success", "Expense added successfully");
+      } else {
+        showAlert("error", "Failed to add expense");
+      }
+    } catch (error) {
+      console.error("Error adding expense:", error);
+      showAlert("error", "Failed to add expense");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this category?")) return;
+
+    try {
+      const response = await fetch(`/api/expenses?type=category&id=${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setCategories(categories.filter((cat) => cat.id !== id));
+        showAlert("success", "Category deleted successfully");
+      } else {
+        showAlert("error", "Failed to delete category");
+      }
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      showAlert("error", "Failed to delete category");
+    }
+  };
+
+  const handleDeleteSpendingMenu = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this spending menu?")) return;
+
+    try {
+      const response = await fetch(`/api/expenses?type=spendingMenu&id=${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSpendingMenus(spendingMenus.filter((menu) => menu.id !== id));
+        showAlert("success", "Spending menu deleted successfully");
+      } else {
+        showAlert("error", "Failed to delete spending menu");
+      }
+    } catch (error) {
+      console.error("Error deleting spending menu:", error);
+      showAlert("error", "Failed to delete spending menu");
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this expense?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/expenses?id=${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setExpenses(expenses.filter((expense) => expense.id !== id));
+        showAlert("success", "Expense deleted successfully");
+      } else {
+        showAlert("error", "Failed to delete expense");
+      }
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      showAlert("error", "Failed to delete expense");
+    }
+  };
+
+  const handleEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateExpense = async () => {
+    if (!editingExpense) return;
+
+    if (
+      !editingExpense.categoryId ||
+      !editingExpense.spendingMenuId ||
+      !editingExpense.amount
+    ) {
+      showAlert("error", "Please fill in all required fields");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/expenses?id=${editingExpense.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryId: editingExpense.categoryId,
+          spendingMenuId: editingExpense.spendingMenuId,
+          note: editingExpense.note,
+          date: editingExpense.date,
+          amount: editingExpense.amount,
+          currency: editingExpense.currency,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchData();
+        setShowEditModal(false);
+        setEditingExpense(null);
+        showAlert("success", "Expense updated successfully");
+      } else {
+        showAlert("error", "Failed to update expense");
+      }
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      showAlert("error", "Failed to update expense");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number, curr: "Baht" | "MMK") => {
+    return (
+      new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount) +
+      " " +
+      curr
+    );
+  };
+
+  // Filter expenses
+  const filteredExpenses = expenses.filter((expense) => {
+    if (filterCategory && expense.categoryId !== filterCategory) return false;
+    if (filterSpendingMenu && expense.spendingMenuId !== filterSpendingMenu)
+      return false;
+    if (filterCurrency && expense.currency !== filterCurrency) return false;
+    if (filterDateFrom && new Date(expense.date) < new Date(filterDateFrom))
+      return false;
+    if (filterDateTo && new Date(expense.date) > new Date(filterDateTo))
+      return false;
+    return true;
+  });
+
+  // Paginate expenses
+  const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage);
+  const paginatedExpenses = filteredExpenses.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Calculate totals by currency
+  const totalsByCurrency = filteredExpenses.reduce(
+    (acc, expense) => {
+      if (expense.currency === "THB") {
+        acc.THB += expense.amount;
+      } else {
+        acc.MMK += expense.amount;
+      }
+      return acc;
+    },
+    { THB: 0, MMK: 0 }
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    filterCategory,
+    filterSpendingMenu,
+    filterCurrency,
+    filterDateFrom,
+    filterDateTo,
+  ]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <Sidebar
+        activeItem={activeMenuItem}
+        onItemClick={(item) => setActiveMenuItem(item.id)}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        className="h-screen"
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <TopNavBar />
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-6 max-w-7xl mx-auto">
+            {alert && (
+              <div className="mb-4">
+                <Alert type={alert.type} message={alert.message} />
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {/* Expense Form */}
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 className="text-xl font-semibold mb-4 text-gray-900">
+                  Add New Expense
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Category Selection */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-900">
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        title="category"
+                        value={selectedCategoryId}
+                        onChange={(e) => setSelectedCategoryId(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="" className="text-gray-500">
+                          Select Category
+                        </option>
+                        {categories.map((cat) => (
+                          <option
+                            key={cat.id}
+                            value={cat.id}
+                            className="text-gray-900"
+                          >
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        onClick={() => setShowCategoryModal(true)}
+                        variant="outline"
+                      >
+                        + Add
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Spending Menu Selection */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-900">
+                      Spending Menu <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        title="spendingMenu"
+                        value={selectedSpendingMenuId}
+                        onChange={(e) =>
+                          setSelectedSpendingMenuId(e.target.value)
+                        }
+                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="" className="text-gray-500">
+                          Select Spending Menu
+                        </option>
+                        {spendingMenus.map((menu) => (
+                          <option
+                            key={menu.id}
+                            value={menu.id}
+                            className="text-gray-900"
+                          >
+                            {menu.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        onClick={() => setShowSpendingMenuModal(true)}
+                        variant="outline"
+                      >
+                        + Add
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Date */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-900">
+                      Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      title="date"
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 text-gray-900 placeholder-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Amount and Currency */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-900">
+                      Amount <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-900 placeholder-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        title="currency"
+                        value={selectedCurrency}
+                        onChange={(e) =>
+                          setSelectedCurrency(e.target.value as "THB" | "MMK")
+                        }
+                        className="px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="THB" className="text-gray-900">
+                          THB
+                        </option>
+                        <option value="MMK" className="text-gray-900">
+                          MMK
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Note */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2 text-gray-900">
+                      Note
+                    </label>
+                    <textarea
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Enter any additional notes..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 text-gray-900 placeholder-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <Button
+                    onClick={handleAddExpense}
+                    disabled={loading}
+                    className="w-full md:w-auto"
+                  >
+                    {loading ? "Adding..." : "Add Expense"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Expense List */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold mb-4 text-gray-900">
+                  Expense History
+                </h2>
+
+                {/* Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Filter by Category
+                    </label>
+                    <select
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      <option value="" className="text-gray-900">
+                        All Categories
+                      </option>
+                      {categories.map((cat) => (
+                        <option
+                          key={cat.id}
+                          value={cat.id}
+                          className="text-gray-900"
+                        >
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Filter by Spending Menu
+                    </label>
+                    <select
+                      value={filterSpendingMenu}
+                      onChange={(e) => setFilterSpendingMenu(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      <option value="" className="text-gray-900">
+                        All Menus
+                      </option>
+                      {spendingMenus.map((menu) => (
+                        <option
+                          key={menu.id}
+                          value={menu.id}
+                          className="text-gray-900"
+                        >
+                          {menu.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Filter by Currency
+                    </label>
+                    <select
+                      value={filterCurrency}
+                      onChange={(e) => setFilterCurrency(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      <option value="" className="text-gray-900">
+                        All Currencies
+                      </option>
+                      <option value="THB" className="text-gray-900">
+                        THB (฿)
+                      </option>
+                      <option value="MMK" className="text-gray-900">
+                        MMK (Ks)
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date From
+                    </label>
+                    <Input
+                      type="date"
+                      value={filterDateFrom}
+                      onChange={(e) => setFilterDateFrom(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date To
+                    </label>
+                    <Input
+                      type="date"
+                      value={filterDateTo}
+                      onChange={(e) => setFilterDateTo(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                {(filterCategory ||
+                  filterSpendingMenu ||
+                  filterCurrency ||
+                  filterDateFrom ||
+                  filterDateTo) && (
+                  <div className="mb-4">
+                    <Button
+                      onClick={() => {
+                        setFilterCategory("");
+                        setFilterSpendingMenu("");
+                        setFilterCurrency("");
+                        setFilterDateFrom("");
+                        setFilterDateTo("");
+                      }}
+                      variant="outline"
+                      className="text-sm"
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                )}
+
+                {/* Total Amount Display */}
+                {filteredExpenses.length > 0 && (
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Total Amount:
+                      </h3>
+                      <div className="flex gap-6">
+                        {totalsByCurrency.THB > 0 && (
+                          <div className="text-right">
+                            <div className="text-sm text-gray-600">THB</div>
+                            <div className="text-xl font-bold text-blue-600">
+                              ฿{" "}
+                              {totalsByCurrency.THB.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {totalsByCurrency.MMK > 0 && (
+                          <div className="text-right">
+                            <div className="text-sm text-gray-600">MMK</div>
+                            <div className="text-xl font-bold text-green-600">
+                              Ks{" "}
+                              {totalsByCurrency.MMK.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-100 border-b">
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Category
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Spending Menu
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Amount
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Note
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExpenses.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="px-4 py-8 text-center text-gray-500"
+                          >
+                            {expenses.length === 0
+                              ? "No expenses recorded yet"
+                              : "No expenses match the selected filters"}
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedExpenses.map((expense) => (
+                          <tr
+                            key={expense.id}
+                            className="border-b hover:bg-gray-50"
+                          >
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {new Date(expense.date).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {expense.categoryName}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {expense.spendingMenuName}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                              {formatCurrency(expense.amount, expense.currency)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {expense.note || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditExpense(expense)}
+                                  className="text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteExpense(expense.id)
+                                  }
+                                  className="text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {filteredExpenses.length > 0 && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-gray-700">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                      {Math.min(
+                        currentPage * itemsPerPage,
+                        filteredExpenses.length
+                      )}{" "}
+                      of {filteredExpenses.length} expenses
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        variant="outline"
+                        className="text-sm"
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                          .filter((page) => {
+                            // Show first, last, current, and adjacent pages
+                            return (
+                              page === 1 ||
+                              page === totalPages ||
+                              Math.abs(page - currentPage) <= 1
+                            );
+                          })
+                          .map((page, index, array) => (
+                            <div key={page} className="flex items-center gap-1">
+                              {index > 0 && array[index - 1] !== page - 1 && (
+                                <span className="px-2 text-gray-500">...</span>
+                              )}
+                              <Button
+                                onClick={() => setCurrentPage(page)}
+                                variant={
+                                  currentPage === page ? "default" : "outline"
+                                }
+                                className="text-sm min-w-[2.5rem]"
+                              >
+                                {page}
+                              </Button>
+                            </div>
+                          ))}
+                      </div>
+                      <Button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        variant="outline"
+                        className="text-sm"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Category Management Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-900">
+                    Manage Categories
+                  </h2>
+                  <div className="space-y-2">
+                    {categories.map((cat) => (
+                      <div
+                        key={cat.id}
+                        className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                      >
+                        <span className="text-gray-900">{cat.name}</span>
+                        <button
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                    {categories.length === 0 && (
+                      <p className="text-gray-500 text-sm text-center py-4">
+                        No categories yet
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-900">
+                    Manage Spending Menus
+                  </h2>
+                  <div className="space-y-2">
+                    {spendingMenus.map((menu) => (
+                      <div
+                        key={menu.id}
+                        className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                      >
+                        <span className="text-gray-900">{menu.name}</span>
+                        <button
+                          onClick={() => handleDeleteSpendingMenu(menu.id)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                    {spendingMenus.length === 0 && (
+                      <p className="text-gray-500 text-sm text-center py-4">
+                        No spending menus yet
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Add Category Modal */}
+              {showCategoryModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">
+                      Add New Category
+                    </h3>
+                    <Input
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Enter category name"
+                      className="mb-4"
+                    />
+                    <div className="flex gap-2">
+                      <Button onClick={handleAddCategory} className="flex-1">
+                        Add
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowCategoryModal(false);
+                          setNewCategoryName("");
+                        }}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Add Spending Menu Modal */}
+              {showSpendingMenuModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">
+                      Add New Spending Menu
+                    </h3>
+                    <Input
+                      value={newSpendingMenuName}
+                      onChange={(e) => setNewSpendingMenuName(e.target.value)}
+                      placeholder="Enter spending menu name"
+                      className="mb-4"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleAddSpendingMenu}
+                        className="flex-1"
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowSpendingMenuModal(false);
+                          setNewSpendingMenuName("");
+                        }}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit Expense Modal */}
+              {showEditModal && editingExpense && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">
+                      Edit Expense
+                    </h3>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Category
+                        </label>
+                        <select
+                          value={editingExpense.categoryId}
+                          onChange={(e) =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              categoryId: e.target.value,
+                              categoryName:
+                                categories.find((c) => c.id === e.target.value)
+                                  ?.name || "",
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        >
+                          <option value="" className="text-gray-900">
+                            Select Category
+                          </option>
+                          {categories.map((cat) => (
+                            <option
+                              key={cat.id}
+                              value={cat.id}
+                              className="text-gray-900"
+                            >
+                              {cat.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Spending Menu
+                        </label>
+                        <select
+                          value={editingExpense.spendingMenuId}
+                          onChange={(e) =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              spendingMenuId: e.target.value,
+                              spendingMenuName:
+                                spendingMenus.find(
+                                  (m) => m.id === e.target.value
+                                )?.name || "",
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        >
+                          <option value="" className="text-gray-900">
+                            Select Spending Menu
+                          </option>
+                          {spendingMenus.map((menu) => (
+                            <option
+                              key={menu.id}
+                              value={menu.id}
+                              className="text-gray-900"
+                            >
+                              {menu.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Date
+                        </label>
+                        <Input
+                          type="date"
+                          value={
+                            editingExpense.date instanceof Date
+                              ? editingExpense.date.toISOString().split("T")[0]
+                              : new Date(editingExpense.date)
+                                  .toISOString()
+                                  .split("T")[0]
+                          }
+                          onChange={(e) =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              date: new Date(e.target.value),
+                            })
+                          }
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editingExpense.amount}
+                          onChange={(e) =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              amount: parseFloat(e.target.value),
+                            })
+                          }
+                          placeholder="Enter amount"
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Currency
+                        </label>
+                        <select
+                          value={editingExpense.currency}
+                          onChange={(e) =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              currency: e.target.value as "THB" | "MMK",
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        >
+                          <option value="THB" className="text-gray-900">
+                            THB (฿)
+                          </option>
+                          <option value="MMK" className="text-gray-900">
+                            MMK (Ks)
+                          </option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Note (Optional)
+                        </label>
+                        <Input
+                          value={editingExpense.note || ""}
+                          onChange={(e) =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              note: e.target.value,
+                            })
+                          }
+                          placeholder="Enter note"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-6">
+                      <Button
+                        onClick={handleUpdateExpense}
+                        disabled={loading}
+                        className="flex-1"
+                      >
+                        {loading ? "Updating..." : "Update"}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowEditModal(false);
+                          setEditingExpense(null);
+                        }}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function ExpensesPage() {
+  return (
+    <ProtectedRoute>
+      <ExpensesContent />
+    </ProtectedRoute>
+  );
+}

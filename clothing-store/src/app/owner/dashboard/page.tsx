@@ -1,58 +1,19 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { Sidebar } from "@/components/ui/Sidebar";
-import {
-  Store,
-  LogOut,
-  User,
-  Package,
-  BarChart3,
-  ChevronDown,
-  ShoppingCart,
-  Globe,
-} from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { TopNavBar } from "@/components/ui/TopNavBar";
+import { Store, Package, BarChart3, ShoppingCart, User } from "lucide-react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
 function OwnerDashboardContent() {
-  const { user, logout } = useAuth();
+  const { currency } = useCurrency();
   const [activeMenuItem, setActiveMenuItem] = useState("home");
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
-  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("English");
-  const [selectedCurrency, setSelectedCurrency] = useState("MMK");
-  const languageDropdownRef = useRef<HTMLDivElement>(null);
-  const currencyDropdownRef = useRef<HTMLDivElement>(null);
-  const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  const languages = [
-    { code: "en", name: "English", flag: "🇺🇸" },
-    { code: "my", name: "Burmese", flag: "🇲🇲" },
-  ];
-
-  const currencies = [
-    { code: "MMK", name: "Myanmar Kyat", symbol: "Ks" },
-    { code: "THB", name: "Thai Baht", symbol: "฿" },
-  ];
-
-  const handleLanguageChange = (language: string) => {
-    setSelectedLanguage(language);
-    setIsLanguageDropdownOpen(false);
-    // Here you can add actual language switching logic
-    console.log("Language changed to:", language);
-  };
-
-  const handleCurrencyChange = (currency: string) => {
-    setSelectedCurrency(currency);
-    setIsCurrencyDropdownOpen(false);
-    // Here you can add actual currency switching logic
-    console.log("Currency changed to:", currency);
-  };
 
   // Mock clothing inventory data - 60 items
   const clothingInventory = [
@@ -686,43 +647,6 @@ function OwnerDashboardContent() {
     setCurrentPage(1);
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        profileDropdownRef.current &&
-        !profileDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsProfileDropdownOpen(false);
-      }
-      if (
-        languageDropdownRef.current &&
-        !languageDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsLanguageDropdownOpen(false);
-      }
-      if (
-        currencyDropdownRef.current &&
-        !currencyDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsCurrencyDropdownOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
@@ -737,181 +661,7 @@ function OwnerDashboardContent() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-white shadow border-b border-gray-200">
-          <div className="px-4">
-            <div className="flex justify-between items-center py-6">
-              <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {user?.displayName || user?.email || "Owner"}
-                </h1>
-              </div>
-              <div className="flex items-center space-x-6">
-                {/* Date Display */}
-                <div className="text-sm text-gray-600">
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "short",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </div>
-
-                {/* Currency Selector */}
-                <div className="relative" ref={currencyDropdownRef}>
-                  <div
-                    className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
-                    onClick={() =>
-                      setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)
-                    }
-                  >
-                    <span className="text-sm font-medium text-gray-700">
-                      {
-                        currencies.find(
-                          (curr) => curr.code === selectedCurrency
-                        )?.symbol
-                      }{" "}
-                      {selectedCurrency}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-gray-600 transition-transform ${
-                        isCurrencyDropdownOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </div>
-
-                  {/* Currency Dropdown */}
-                  {isCurrencyDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                      <div className="py-2">
-                        {currencies.map((currency) => (
-                          <button
-                            key={currency.code}
-                            onClick={() => handleCurrencyChange(currency.code)}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-3 ${
-                              selectedCurrency === currency.code
-                                ? "bg-blue-50 text-blue-600"
-                                : "text-gray-700"
-                            }`}
-                          >
-                            <span className="text-lg">{currency.symbol}</span>
-                            <div>
-                              <div className="font-medium">{currency.code}</div>
-                              <div className="text-xs text-gray-500">
-                                {currency.name}
-                              </div>
-                            </div>
-                            {selectedCurrency === currency.code && (
-                              <span className="ml-auto text-blue-600">✓</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Language Selector */}
-                <div className="relative" ref={languageDropdownRef}>
-                  <div
-                    className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
-                    onClick={() =>
-                      setIsLanguageDropdownOpen(!isLanguageDropdownOpen)
-                    }
-                  >
-                    <Globe className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">
-                      {
-                        languages.find((lang) => lang.name === selectedLanguage)
-                          ?.flag
-                      }{" "}
-                      {selectedLanguage}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-gray-600 transition-transform ${
-                        isLanguageDropdownOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </div>
-
-                  {/* Language Dropdown */}
-                  {isLanguageDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                      <div className="py-2">
-                        {languages.map((language) => (
-                          <button
-                            key={language.code}
-                            onClick={() => handleLanguageChange(language.name)}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-3 ${
-                              selectedLanguage === language.name
-                                ? "bg-blue-50 text-blue-600"
-                                : "text-gray-700"
-                            }`}
-                          >
-                            <span className="text-lg">{language.flag}</span>
-                            <span>{language.name}</span>
-                            {selectedLanguage === language.name && (
-                              <span className="ml-auto text-blue-600">✓</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Shopping Cart */}
-                <div className="relative cursor-pointer">
-                  <ShoppingCart className="h-6 w-6 text-gray-700 hover:text-gray-900" />
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    0
-                  </span>
-                </div>
-
-                {/* User Profile Dropdown */}
-                <div className="relative" ref={profileDropdownRef}>
-                  <button
-                    onClick={() =>
-                      setIsProfileDropdownOpen(!isProfileDropdownOpen)
-                    }
-                    className="flex items-center space-x-2 focus:outline-none"
-                  >
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center hover:from-blue-500 hover:to-blue-700 transition-colors">
-                      <span className="text-white text-xl font-medium">
-                        {(user?.displayName || user?.email || "U")
-                          .charAt(0)
-                          .toUpperCase()}
-                      </span>
-                    </div>
-                    <ChevronDown
-                      className={`h-4 w-4 text-gray-500 transition-transform ${
-                        isProfileDropdownOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {isProfileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
-                      <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-900">
-                          {user?.displayName || "User"}
-                        </p>
-                        <p className="text-xs text-gray-500">{user?.email}</p>
-                      </div>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                      >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Logout
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <TopNavBar />
 
         {/* Main Content */}
         <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8">
@@ -937,10 +687,10 @@ function OwnerDashboardContent() {
                     <div className="ml-5 w-0 flex-1">
                       <dl>
                         <dt className="text-sm font-medium text-gray-500 truncate">
-                          Total Revenue
+                          Total Sales
                         </dt>
                         <dd className="text-2xl font-bold text-gray-900">
-                          {selectedCurrency === "MMK" ? "Ks" : "฿"} 0
+                          {currency === "MMK" ? "Ks" : "฿"} 0
                         </dd>
                         <dd className="text-sm text-green-600">
                           +0% from last month
@@ -1061,7 +811,7 @@ function OwnerDashboardContent() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium text-gray-900">
-                            {selectedCurrency === "MMK" ? "Ks" : "฿"}{" "}
+                            {currency === "MMK" ? "Ks" : "฿"}{" "}
                             {item.price.toLocaleString()}
                           </p>
                           <p className="text-xs text-gray-500">0 sold</p>

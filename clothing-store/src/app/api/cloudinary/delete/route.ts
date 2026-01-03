@@ -1,35 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteFromCloudinary, extractPublicId } from '@/lib/cloudinary';
+import { deleteFromR2 } from '@/lib/r2';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { publicId, url } = body;
+    const { key, url } = body;
 
-    if (!publicId && !url) {
+    if (!key && !url) {
       return NextResponse.json(
-        { error: 'Either publicId or url must be provided' },
+        { error: 'Either key or url must be provided' },
         { status: 400 }
       );
     }
 
-    // Extract public ID from URL if not provided directly
-    const imagePublicId = publicId || extractPublicId(url);
+    // Extract key from URL if not provided directly
+    let fileKey = key;
+    if (!fileKey && url) {
+      // Extract key from R2 URL (everything after the domain)
+      try {
+        const urlObj = new URL(url);
+        fileKey = urlObj.pathname.substring(1); // Remove leading slash
+      } catch (e) {
+        return NextResponse.json(
+          { error: 'Invalid URL format' },
+          { status: 400 }
+        );
+      }
+    }
 
-    if (!imagePublicId) {
+    if (!fileKey) {
       return NextResponse.json(
-        { error: 'Could not determine public ID for deletion' },
+        { error: 'Could not determine file key for deletion' },
         { status: 400 }
       );
     }
 
-    // Delete from Cloudinary
-    const result = await deleteFromCloudinary(imagePublicId);
+    // Delete from R2
+    await deleteFromR2(fileKey);
 
     return NextResponse.json({
       success: true,
-      result: result.result,
-      publicId: imagePublicId,
+      key: fileKey,
     });
 
   } catch (error) {

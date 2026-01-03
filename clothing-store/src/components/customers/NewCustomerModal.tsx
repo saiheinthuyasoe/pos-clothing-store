@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { X, User, Phone, MapPin, Upload, Tag } from 'lucide-react';
-import { CreateCustomerRequest, Customer } from '@/types/customer';
+import { useState, useEffect } from "react";
+import { X, User, Phone, MapPin, Upload, Tag } from "lucide-react";
+import { CreateCustomerRequest, Customer } from "@/types/customer";
 
 interface NewCustomerModalProps {
   isOpen: boolean;
@@ -11,17 +11,22 @@ interface NewCustomerModalProps {
   customer?: Customer; // Optional customer for editing
 }
 
-export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }: NewCustomerModalProps) {
+export default function NewCustomerModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  customer,
+}: NewCustomerModalProps) {
   const [formData, setFormData] = useState<CreateCustomerRequest>({
-    email: '',
-    displayName: '',
-    customerType: 'retailer',
-    phone: '',
-    address: '',
-    secondaryPhone: '',
-    township: '',
-    city: '',
-    customerImage: ''
+    email: "",
+    displayName: "",
+    customerType: "retailer",
+    phone: "",
+    address: "",
+    secondaryPhone: "",
+    township: "",
+    city: "",
+    customerImage: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -33,16 +38,16 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
     if (customer) {
       setFormData({
         email: customer.email,
-        displayName: customer.displayName || '',
-        customerType: customer.customerType || 'retailer',
-        phone: customer.phone || '',
-        address: customer.address || '',
-        secondaryPhone: customer.secondaryPhone || '',
-        township: customer.township || '',
-        city: customer.city || '',
-        customerImage: customer.customerImage || ''
+        displayName: customer.displayName || "",
+        customerType: customer.customerType || "retailer",
+        phone: customer.phone || "",
+        address: customer.address || "",
+        secondaryPhone: customer.secondaryPhone || "",
+        township: customer.township || "",
+        city: customer.city || "",
+        customerImage: customer.customerImage || "",
       });
-      
+
       // Set image preview if customer has an image
       if (customer.customerImage) {
         setImagePreview(customer.customerImage);
@@ -50,15 +55,15 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
     } else {
       // Reset form for new customer
       setFormData({
-        email: '',
-        displayName: '',
-        customerType: 'retailer',
-        phone: '',
-        address: '',
-        secondaryPhone: '',
-        township: '',
-        city: '',
-        customerImage: ''
+        email: "",
+        displayName: "",
+        customerType: "retailer",
+        phone: "",
+        address: "",
+        secondaryPhone: "",
+        township: "",
+        city: "",
+        customerImage: "",
       });
       setImagePreview(null);
       setSelectedFile(null);
@@ -68,59 +73,63 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       const customerData = { ...formData };
-      
+
       // Upload image to Cloudinary if a file is selected
       if (selectedFile) {
         setIsUploading(true);
         const uploadFormData = new FormData();
-        uploadFormData.append('file', selectedFile);
-        uploadFormData.append('type', 'customer');
-        
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
+        uploadFormData.append("file", selectedFile);
+        uploadFormData.append("type", "customer");
+
+        const uploadResponse = await fetch("/api/upload", {
+          method: "POST",
           body: uploadFormData,
         });
-        
+
         if (uploadResponse.ok) {
           const uploadResult = await uploadResponse.json();
-          customerData.customerImage = uploadResult.data.secure_url;
+          customerData.customerImage = uploadResult.data.url;
         } else {
-          throw new Error('Failed to upload image');
+          throw new Error("Failed to upload image");
         }
         setIsUploading(false);
       }
-      
+
       await onSubmit(customerData);
       setFormData({
-        email: '',
-        displayName: '',
-        customerType: 'retailer',
-        phone: '',
-        address: '',
-        secondaryPhone: '',
-        township: '',
-        city: '',
-        customerImage: ''
+        email: "",
+        displayName: "",
+        customerType: "retailer",
+        phone: "",
+        address: "",
+        secondaryPhone: "",
+        township: "",
+        city: "",
+        customerImage: "",
       });
       setSelectedFile(null);
       setImagePreview(null);
       onClose();
     } catch (error) {
-      console.error('Error creating customer:', error);
+      console.error("Error creating customer:", error);
       setIsUploading(false);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -128,21 +137,27 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
     const file = e.target.files?.[0];
     if (file) {
       // Validate file type
-      const validTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/gif', 'image/webp'];
+      const validTypes = [
+        "image/png",
+        "image/jpg",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+      ];
       if (!validTypes.includes(file.type)) {
-        alert('Please select a valid image file (PNG, JPG, JPEG, GIF, WebP)');
+        alert("Please select a valid image file (PNG, JPG, JPEG, GIF, WebP)");
         return;
       }
 
       // Validate file size (5MB limit)
       const maxSize = 5 * 1024 * 1024; // 5MB in bytes
       if (file.size > maxSize) {
-        alert('File size must be less than 5MB');
+        alert("File size must be less than 5MB");
         return;
       }
 
       setSelectedFile(file);
-      
+
       // Create preview only
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -168,7 +183,7 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-gray-600" />
               <h2 className="text-xl font-semibold text-gray-900">
-                {customer ? 'Edit Customer' : 'New Customer Entry'}
+                {customer ? "Edit Customer" : "New Customer Entry"}
               </h2>
             </div>
             <button
@@ -190,8 +205,8 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
                 {imagePreview ? (
                   <div className="relative inline-block">
                     <img
-                      src={imagePreview} 
-                      alt="Customer preview" 
+                      src={imagePreview}
+                      alt="Customer preview"
                       className="w-24 h-24 object-cover rounded-full mx-auto mb-2 border-2 border-gray-200"
                     />
                     <button
@@ -202,12 +217,16 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
                     >
                       <X className="h-3 w-3" />
                     </button>
-                    <p className="text-sm text-gray-600 mt-2">{selectedFile?.name}</p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      {selectedFile?.name}
+                    </p>
                   </div>
                 ) : (
                   <>
                     <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500 mb-2">Drag & drop image here.</p>
+                    <p className="text-sm text-gray-500 mb-2">
+                      Drag & drop image here.
+                    </p>
                     <input
                       type="file"
                       id="customerImage"
@@ -222,7 +241,9 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
                       <Upload className="h-3 w-3 mr-1" />
                       Select File
                     </label>
-                    <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG, GIF, WebP up to 5MB</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      PNG, JPG, JPEG, GIF, WebP up to 5MB
+                    </p>
                   </>
                 )}
               </div>
@@ -232,7 +253,10 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
               {/* Row 1: Name and Customer Type */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="displayName"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Name *
                   </label>
                   <div className="relative">
@@ -251,7 +275,10 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
                 </div>
 
                 <div>
-                  <label htmlFor="customerType" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="customerType"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Customer Type *
                   </label>
                   <div className="relative">
@@ -278,7 +305,10 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
               {/* Row 2: Phone Numbers */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="phone"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Primary Phone Number *
                   </label>
                   <div className="relative">
@@ -297,7 +327,10 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
                 </div>
 
                 <div>
-                  <label htmlFor="secondaryPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="secondaryPhone"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Phone Number (Optional)
                   </label>
                   <div className="relative">
@@ -317,7 +350,10 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
 
               {/* Row 3: Full Address */}
               <div>
-                <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="address"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Full Address
                 </label>
                 <div className="relative">
@@ -337,7 +373,10 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
               {/* Row 4: Township and City */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="township" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="township"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Township
                   </label>
                   <div className="relative">
@@ -355,7 +394,10 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
                 </div>
 
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="city"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     City
                   </label>
                   <div className="relative">
@@ -390,7 +432,15 @@ export default function NewCustomerModal({ isOpen, onClose, onSubmit, customer }
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <User className="h-4 w-4 mr-1" />
-                {isUploading ? 'Uploading Image...' : isSubmitting ? (customer ? 'Updating...' : 'Creating...') : (customer ? 'Update Customer' : 'Save Customer')}
+                {isUploading
+                  ? "Uploading Image..."
+                  : isSubmitting
+                  ? customer
+                    ? "Updating..."
+                    : "Creating..."
+                  : customer
+                  ? "Update Customer"
+                  : "Save Customer"}
               </button>
             </div>
           </form>

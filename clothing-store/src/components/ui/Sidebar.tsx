@@ -90,26 +90,7 @@ const menuItems: MenuItem[] = [
     id: "expenses",
     label: "Expenses",
     icon: "Receipt",
-    children: [
-      {
-        id: "details",
-        label: "Details",
-        icon: "FileText",
-        href: "/owner/expenses/details",
-      },
-      {
-        id: "approvals",
-        label: "Approvals",
-        icon: "CheckCircle",
-        href: "/owner/approvals",
-      },
-      {
-        id: "headings",
-        label: "Headings",
-        icon: "Hash",
-        href: "/owner/headings",
-      },
-    ],
+    href: "/owner/expenses",
   },
   {
     id: "barcode",
@@ -226,7 +207,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [logoError, setLogoError] = useState<boolean>(false);
-  
+
   // Use settings context for business name and logo
   const { businessSettings, isLoading } = useSettings();
   const businessName = businessSettings?.businessName;
@@ -344,9 +325,9 @@ export function Sidebar({
         {isCollapsed ? (
           <div className="flex flex-col items-center space-y-2">
             {businessLogo && !logoError ? (
-              <img 
-                src={businessLogo} 
-                alt="Business Logo" 
+              <img
+                src={businessLogo}
+                alt="Business Logo"
                 className="w-8 h-8 object-cover rounded"
                 onError={() => setLogoError(true)}
               />
@@ -357,9 +338,9 @@ export function Sidebar({
         ) : (
           <div className="flex items-center">
             {businessLogo && !logoError ? (
-              <img 
-                src={businessLogo} 
-                alt="Business Logo" 
+              <img
+                src={businessLogo}
+                alt="Business Logo"
                 className="w-8 h-8 object-cover rounded mr-3"
                 onError={() => setLogoError(true)}
               />
@@ -368,7 +349,7 @@ export function Sidebar({
             )}
             <div className="flex-1">
               <h1 className="text-lg font-bold text-gray-900">
-                {isLoading ? "Loading..." : (businessName || "Business Name")}
+                {isLoading ? "Loading..." : businessName || "Business Name"}
               </h1>
               <p className="text-xs text-gray-500">Owner Dashboard</p>
             </div>
@@ -381,8 +362,8 @@ export function Sidebar({
         <button
           onClick={onToggleCollapse}
           className="absolute top-6 w-6 h-6 bg-white border border-gray-200 hover:bg-gray-50 text-purple-600 rounded-full flex items-center justify-center transition-colors shadow-md z-20"
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={{right: '-12px'}}
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          style={{ right: "-12px" }}
         >
           {isCollapsed ? (
             <ChevronRight className="w-3 h-3" />
