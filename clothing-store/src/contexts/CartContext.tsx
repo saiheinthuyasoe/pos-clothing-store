@@ -1,16 +1,27 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Cart, CartItem, CartContextType, SelectedCustomer } from '@/types/cart';
-import { useAuth } from '@/contexts/AuthContext';
-import { CartService } from '@/services/cartService';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import {
+  Cart,
+  CartItem,
+  CartContextType,
+  SelectedCustomer,
+} from "@/types/cart";
+import { useAuth } from "@/contexts/AuthContext";
+import { CartService } from "@/services/cartService";
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function useCart() {
   const context = useContext(CartContext);
   if (context === undefined) {
-    throw new Error('useCart must be used within a CartProvider');
+    throw new Error("useCart must be used within a CartProvider");
   }
   return context;
 }
@@ -25,25 +36,37 @@ export function CartProvider({ children }: CartProviderProps) {
     items: [],
     totalItems: 0,
     totalAmount: 0,
-    currency: 'THB',
-    selectedCustomer: null
+    currency: "THB",
+    selectedCustomer: null,
   });
   const [isLoadingCart, setIsLoadingCart] = useState(false);
 
   const [inventoryCallbacks, setInventoryCallbacks] = useState<{
-    reduceStock: (stockId: string, color: string, size: string, quantity: number) => Promise<void> | void;
-    restoreStock: (stockId: string, color: string, size: string, quantity: number) => Promise<void> | void;
+    reduceStock: (
+      stockId: string,
+      color: string,
+      size: string,
+      quantity: number
+    ) => Promise<void> | void;
+    restoreStock: (
+      stockId: string,
+      color: string,
+      size: string,
+      quantity: number
+    ) => Promise<void> | void;
     checkStock: (stockId: string, color: string, size: string) => number;
   } | null>(null);
-  
+
   // Queue for inventory updates to be processed asynchronously
-  const [inventoryUpdateQueue, setInventoryUpdateQueue] = useState<Array<{
-    type: 'reduce' | 'restore';
-    stockId: string;
-    color: string;
-    size: string;
-    quantity: number;
-  }>>([]);
+  const [inventoryUpdateQueue, setInventoryUpdateQueue] = useState<
+    Array<{
+      type: "reduce" | "restore";
+      stockId: string;
+      color: string;
+      size: string;
+      quantity: number;
+    }>
+  >([]);
 
   // Load cart from database when user is authenticated, fallback to localStorage
   useEffect(() => {
@@ -57,7 +80,7 @@ export function CartProvider({ children }: CartProviderProps) {
             setCart(dbCart);
           } else {
             // No cart in database, check localStorage for migration
-            const savedCart = localStorage.getItem('shopping-cart');
+            const savedCart = localStorage.getItem("shopping-cart");
             if (savedCart) {
               try {
                 const parsedCart = JSON.parse(savedCart);
@@ -65,22 +88,22 @@ export function CartProvider({ children }: CartProviderProps) {
                 // Save to database for future use
                 await CartService.saveCart(user.uid, parsedCart);
                 // Clear localStorage after migration
-                localStorage.removeItem('shopping-cart');
+                localStorage.removeItem("shopping-cart");
               } catch (error) {
-                console.error('Error migrating cart from localStorage:', error);
+                console.error("Error migrating cart from localStorage:", error);
               }
             }
           }
         } catch (error) {
-          console.error('Error loading cart from database:', error);
+          console.error("Error loading cart from database:", error);
           // Fallback to localStorage
-          const savedCart = localStorage.getItem('shopping-cart');
+          const savedCart = localStorage.getItem("shopping-cart");
           if (savedCart) {
             try {
               const parsedCart = JSON.parse(savedCart);
               setCart(parsedCart);
             } catch (error) {
-              console.error('Error loading cart from localStorage:', error);
+              console.error("Error loading cart from localStorage:", error);
             }
           }
         } finally {
@@ -88,13 +111,13 @@ export function CartProvider({ children }: CartProviderProps) {
         }
       } else {
         // User not authenticated, use localStorage
-        const savedCart = localStorage.getItem('shopping-cart');
+        const savedCart = localStorage.getItem("shopping-cart");
         if (savedCart) {
           try {
             const parsedCart = JSON.parse(savedCart);
             setCart(parsedCart);
           } catch (error) {
-            console.error('Error loading cart from localStorage:', error);
+            console.error("Error loading cart from localStorage:", error);
           }
         }
       }
@@ -111,13 +134,13 @@ export function CartProvider({ children }: CartProviderProps) {
         try {
           await CartService.saveCart(user.uid, cart);
         } catch (error) {
-          console.error('Error saving cart to database:', error);
+          console.error("Error saving cart to database:", error);
           // Fallback to localStorage
-          localStorage.setItem('shopping-cart', JSON.stringify(cart));
+          localStorage.setItem("shopping-cart", JSON.stringify(cart));
         }
       } else if (!user?.uid) {
         // User not authenticated, save to localStorage
-        localStorage.setItem('shopping-cart', JSON.stringify(cart));
+        localStorage.setItem("shopping-cart", JSON.stringify(cart));
       }
     };
 
@@ -128,18 +151,28 @@ export function CartProvider({ children }: CartProviderProps) {
   useEffect(() => {
     const processQueue = async () => {
       if (inventoryUpdateQueue.length > 0 && inventoryCallbacks) {
-        const promises = inventoryUpdateQueue.map(async update => {
+        const promises = inventoryUpdateQueue.map(async (update) => {
           try {
-            if (update.type === 'reduce') {
-              await inventoryCallbacks.reduceStock(update.stockId, update.color, update.size, update.quantity);
+            if (update.type === "reduce") {
+              await inventoryCallbacks.reduceStock(
+                update.stockId,
+                update.color,
+                update.size,
+                update.quantity
+              );
             } else {
-              await inventoryCallbacks.restoreStock(update.stockId, update.color, update.size, update.quantity);
+              await inventoryCallbacks.restoreStock(
+                update.stockId,
+                update.color,
+                update.size,
+                update.quantity
+              );
             }
           } catch (error) {
-            console.error('Error processing inventory update:', error, update);
+            console.error("Error processing inventory update:", error, update);
           }
         });
-        
+
         await Promise.all(promises);
         // Clear the queue after processing
         setInventoryUpdateQueue([]);
@@ -150,51 +183,59 @@ export function CartProvider({ children }: CartProviderProps) {
   }, [inventoryUpdateQueue, inventoryCallbacks]);
 
   // Helper function to queue inventory updates
-  const queueInventoryUpdate = useCallback((
-    type: 'reduce' | 'restore',
-    stockId: string,
-    color: string,
-    size: string,
-    quantity: number
-  ) => {
-    setInventoryUpdateQueue(prev => [...prev, { type, stockId, color, size, quantity }]);
-  }, []);
+  const queueInventoryUpdate = useCallback(
+    (
+      type: "reduce" | "restore",
+      stockId: string,
+      color: string,
+      size: string,
+      quantity: number
+    ) => {
+      setInventoryUpdateQueue((prev) => [
+        ...prev,
+        { type, stockId, color, size, quantity },
+      ]);
+    },
+    []
+  );
 
-  const addToCart = (newItem: Omit<CartItem, 'id'>) => {
+  const addToCart = (newItem: Omit<CartItem, "id">) => {
     // Check available stock before adding
     if (inventoryCallbacks?.checkStock) {
       const stockInDatabase = inventoryCallbacks.checkStock(
         newItem.stockId,
-        newItem.selectedColor || '',
-        newItem.selectedSize || ''
+        newItem.selectedColor || "",
+        newItem.selectedSize || ""
       );
-      
+
       // Find existing item in cart to calculate total quantity after addition
       const existingItem = cart.items.find(
-        item => 
-          item.stockId === newItem.stockId && 
-          item.selectedColor === newItem.selectedColor && 
+        (item) =>
+          item.stockId === newItem.stockId &&
+          item.selectedColor === newItem.selectedColor &&
           item.selectedSize === newItem.selectedSize
       );
-      
+
       const currentCartQuantity = existingItem?.quantity || 0;
       const totalQuantityAfterAdd = currentCartQuantity + newItem.quantity;
-      
+
       // Total available = stock in database + current quantity in cart
       const totalAvailable = stockInDatabase + currentCartQuantity;
-      
+
       if (totalQuantityAfterAdd > totalAvailable) {
         const availableToAdd = totalAvailable - currentCartQuantity;
-        alert(`Cannot add ${newItem.quantity} items. Only ${availableToAdd} available to add (${stockInDatabase} in stock + ${currentCartQuantity} already in cart).`);
+        alert(
+          `Cannot add ${newItem.quantity} items. Only ${availableToAdd} available to add (${stockInDatabase} in stock + ${currentCartQuantity} already in cart).`
+        );
         return;
       }
     }
 
-    setCart(prevCart => {
+    setCart((prevCart) => {
       const existingItemIndex = prevCart.items.findIndex(
-        item => 
-          item.stockId === newItem.stockId && 
-          item.selectedColor === newItem.selectedColor && 
+        (item) =>
+          item.stockId === newItem.stockId &&
+          item.selectedColor === newItem.selectedColor &&
           item.selectedSize === newItem.selectedSize
       );
 
@@ -211,56 +252,70 @@ export function CartProvider({ children }: CartProviderProps) {
         // Add new item
         const cartItem: CartItem = {
           ...newItem,
-          id: `${newItem.stockId}-${newItem.selectedColor || 'default'}-${newItem.selectedSize || 'default'}-${Date.now()}`
+          id: `${newItem.stockId}-${newItem.selectedColor || "default"}-${
+            newItem.selectedSize || "default"
+          }-${Date.now()}`,
         };
         updatedItems = [...prevCart.items, cartItem];
       }
 
-      const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const totalItems = updatedItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0
+      );
+      const totalAmount = updatedItems.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0
+      );
 
       return {
         ...prevCart,
         items: updatedItems,
         totalItems,
-        totalAmount
+        totalAmount,
       };
     });
 
     // Queue inventory reduction for the added item
     queueInventoryUpdate(
-      'reduce',
+      "reduce",
       newItem.stockId,
-      newItem.selectedColor || '',
-      newItem.selectedSize || '',
+      newItem.selectedColor || "",
+      newItem.selectedSize || "",
       newItem.quantity
     );
   };
 
   const removeFromCart = (itemId: string) => {
-    setCart(prevCart => {
-      const itemToRemove = prevCart.items.find(item => item.id === itemId);
-      
+    setCart((prevCart) => {
+      const itemToRemove = prevCart.items.find((item) => item.id === itemId);
+
       // Queue inventory restoration
       if (itemToRemove) {
         queueInventoryUpdate(
-          'restore',
+          "restore",
           itemToRemove.stockId,
-          itemToRemove.selectedColor || '',
-          itemToRemove.selectedSize || '',
+          itemToRemove.selectedColor || "",
+          itemToRemove.selectedSize || "",
           itemToRemove.quantity
         );
       }
 
-      const updatedItems = prevCart.items.filter(item => item.id !== itemId);
-      const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const updatedItems = prevCart.items.filter((item) => item.id !== itemId);
+      const totalItems = updatedItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0
+      );
+      const totalAmount = updatedItems.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0
+      );
 
       return {
         ...prevCart,
         items: updatedItems,
         totalItems,
-        totalAmount
+        totalAmount,
       };
     });
   };
@@ -272,78 +327,86 @@ export function CartProvider({ children }: CartProviderProps) {
     }
 
     // Find the current item to validate stock
-    const currentItem = cart.items.find(item => item.id === itemId);
+    const currentItem = cart.items.find((item) => item.id === itemId);
     if (!currentItem) return;
 
     const quantityDifference = quantity - currentItem.quantity;
-    
+
     // If quantity is being increased, check stock availability
     if (quantityDifference > 0 && inventoryCallbacks?.checkStock) {
       const stockInDatabase = inventoryCallbacks.checkStock(
         currentItem.stockId,
-        currentItem.selectedColor || '',
-        currentItem.selectedSize || ''
+        currentItem.selectedColor || "",
+        currentItem.selectedSize || ""
       );
-      
+
       // Total available = stock in database + current quantity in cart
       const totalAvailable = stockInDatabase + currentItem.quantity;
-      
+
       if (quantity > totalAvailable) {
-        alert(`Cannot set quantity to ${quantity}. Only ${totalAvailable} available in total (${stockInDatabase} in stock + ${currentItem.quantity} already in cart).`);
+        alert(
+          `Cannot set quantity to ${quantity}. Only ${totalAvailable} available in total (${stockInDatabase} in stock + ${currentItem.quantity} already in cart).`
+        );
         return;
       }
     }
 
-    setCart(prevCart => {
-      const currentItem = prevCart.items.find(item => item.id === itemId);
-      
+    setCart((prevCart) => {
+      const currentItem = prevCart.items.find((item) => item.id === itemId);
+
       if (currentItem) {
         const quantityDifference = quantity - currentItem.quantity;
-        
+
         if (quantityDifference > 0) {
           // Quantity increased - queue inventory reduction
           queueInventoryUpdate(
-            'reduce',
+            "reduce",
             currentItem.stockId,
-            currentItem.selectedColor || '',
-            currentItem.selectedSize || '',
+            currentItem.selectedColor || "",
+            currentItem.selectedSize || "",
             quantityDifference
           );
         } else if (quantityDifference < 0) {
           // Quantity decreased - queue inventory restoration
           queueInventoryUpdate(
-            'restore',
+            "restore",
             currentItem.stockId,
-            currentItem.selectedColor || '',
-            currentItem.selectedSize || '',
+            currentItem.selectedColor || "",
+            currentItem.selectedSize || "",
             Math.abs(quantityDifference)
           );
         }
       }
 
-      const updatedItems = prevCart.items.map(item =>
+      const updatedItems = prevCart.items.map((item) =>
         item.id === itemId ? { ...item, quantity } : item
       );
-      const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const totalItems = updatedItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0
+      );
+      const totalAmount = updatedItems.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0
+      );
 
       return {
         ...prevCart,
         items: updatedItems,
         totalItems,
-        totalAmount
+        totalAmount,
       };
     });
   };
 
   const clearCart = () => {
     // Queue inventory restoration for all items
-    cart.items.forEach(item => {
+    cart.items.forEach((item) => {
       queueInventoryUpdate(
-        'restore',
+        "restore",
         item.stockId,
-        item.selectedColor || '',
-        item.selectedSize || '',
+        item.selectedColor || "",
+        item.selectedSize || "",
         item.quantity
       );
     });
@@ -353,7 +416,7 @@ export function CartProvider({ children }: CartProviderProps) {
       totalItems: 0,
       totalAmount: 0,
       currency: cart.currency,
-      selectedCustomer: null
+      selectedCustomer: null,
     });
   };
 
@@ -364,7 +427,7 @@ export function CartProvider({ children }: CartProviderProps) {
       totalItems: 0,
       totalAmount: 0,
       currency: cart.currency,
-      selectedCustomer: null
+      selectedCustomer: null,
     });
   };
 
@@ -377,157 +440,274 @@ export function CartProvider({ children }: CartProviderProps) {
   };
 
   // Helper function to calculate discounted price
-  const calculateDiscountedPrice = (originalPrice: number, groupDiscount?: number, variantDiscount?: number) => {
+  const calculateDiscountedPrice = (
+    originalPrice: number,
+    groupDiscount?: number,
+    variantDiscount?: number
+  ) => {
     // Sum all discounts first, then apply the total discount
     const totalDiscountPercent = (groupDiscount || 0) + (variantDiscount || 0);
-    
+
     // Apply the total discount to the original price
     const discountedPrice = originalPrice * (1 - totalDiscountPercent / 100);
-    
+
     return discountedPrice;
   };
 
   // Apply discount to all items in a specific group
   const applyGroupDiscount = (groupName: string, discountPercent: number) => {
-    setCart(prevCart => {
-      const updatedItems = prevCart.items.map(item => {
+    setCart((prevCart) => {
+      const updatedItems = prevCart.items.map((item) => {
         if (item.groupName === groupName) {
           const newGroupDiscount = discountPercent;
           const discountedPrice = calculateDiscountedPrice(
-            item.originalPrice, 
-            newGroupDiscount, 
+            item.unitPrice,
+            newGroupDiscount,
             item.variantDiscount
           );
-          
+
           return {
             ...item,
             groupDiscount: newGroupDiscount,
             discountedPrice,
-            unitPrice: discountedPrice
+            // Keep unitPrice unchanged
           };
         }
         return item;
       });
 
-      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const totalAmount = updatedItems.reduce((sum, item) => {
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
+        return sum + price * item.quantity;
+      }, 0);
 
       return {
         ...prevCart,
         items: updatedItems,
-        totalAmount
+        totalAmount,
       };
     });
   };
 
   // Apply discount to a specific variant (individual item)
   const applyVariantDiscount = (itemId: string, discountPercent: number) => {
-    setCart(prevCart => {
-      const updatedItems = prevCart.items.map(item => {
+    setCart((prevCart) => {
+      const updatedItems = prevCart.items.map((item) => {
         if (item.id === itemId) {
           const newVariantDiscount = discountPercent;
           const discountedPrice = calculateDiscountedPrice(
-            item.originalPrice, 
-            item.groupDiscount, 
+            item.unitPrice,
+            item.groupDiscount,
             newVariantDiscount
           );
-          
+
           return {
             ...item,
             variantDiscount: newVariantDiscount,
             discountedPrice,
-            unitPrice: discountedPrice
+            // Keep unitPrice unchanged
           };
         }
         return item;
       });
 
-      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const totalAmount = updatedItems.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0
+      );
 
       return {
         ...prevCart,
         items: updatedItems,
-        totalAmount
+        totalAmount,
       };
     });
   };
 
   // Remove group discount
   const removeGroupDiscount = (groupName: string) => {
-    setCart(prevCart => {
-      const updatedItems = prevCart.items.map(item => {
+    setCart((prevCart) => {
+      const updatedItems = prevCart.items.map((item) => {
         if (item.groupName === groupName) {
-          const discountedPrice = calculateDiscountedPrice(
-            item.originalPrice, 
-            0, // Remove group discount
-            item.variantDiscount
-          );
-          
+          // If there's a variant discount, recalculate with just that
+          // Otherwise, set discountedPrice to undefined (use unitPrice)
+          const discountedPrice =
+            item.variantDiscount && item.variantDiscount > 0
+              ? calculateDiscountedPrice(
+                  item.unitPrice,
+                  0, // Remove group discount
+                  item.variantDiscount
+                )
+              : undefined;
+
           return {
             ...item,
             groupDiscount: 0,
             discountedPrice,
-            unitPrice: discountedPrice
+            // Keep unitPrice unchanged
           };
         }
         return item;
       });
 
-      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const totalAmount = updatedItems.reduce((sum, item) => {
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
+        return sum + price * item.quantity;
+      }, 0);
 
       return {
         ...prevCart,
         items: updatedItems,
-        totalAmount
+        totalAmount,
       };
     });
   };
 
   // Remove variant discount
   const removeVariantDiscount = (itemId: string) => {
-    setCart(prevCart => {
-      const updatedItems = prevCart.items.map(item => {
+    setCart((prevCart) => {
+      const updatedItems = prevCart.items.map((item) => {
         if (item.id === itemId) {
-          const discountedPrice = calculateDiscountedPrice(
-            item.originalPrice, 
-            item.groupDiscount, 
-            0 // Remove variant discount
-          );
-          
+          // If there's a group discount, recalculate with just that
+          // Otherwise, set discountedPrice to undefined (use unitPrice)
+          const discountedPrice =
+            item.groupDiscount && item.groupDiscount > 0
+              ? calculateDiscountedPrice(
+                  item.unitPrice,
+                  item.groupDiscount,
+                  0 // Remove variant discount
+                )
+              : undefined;
+
           return {
             ...item,
             variantDiscount: 0,
             discountedPrice,
-            unitPrice: discountedPrice
+            // Keep unitPrice unchanged
           };
         }
         return item;
       });
 
-      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const totalAmount = updatedItems.reduce((sum, item) => {
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
+        return sum + price * item.quantity;
+      }, 0);
 
       return {
         ...prevCart,
         items: updatedItems,
-        totalAmount
+        totalAmount,
       };
     });
   };
 
-  const memoizedSetInventoryCallbacks = useCallback((callbacks: {
-    reduceStock: (stockId: string, color: string, size: string, quantity: number) => Promise<void> | void;
-    restoreStock: (stockId: string, color: string, size: string, quantity: number) => Promise<void> | void;
-    checkStock: (stockId: string, color: string, size: string) => number;
-  }) => {
-    setInventoryCallbacks(callbacks);
-  }, []);
+  // Apply wholesale pricing to all items in a group
+  const applyWholesalePricing = (
+    groupName: string,
+    wholesalePricePerItem: number
+  ) => {
+    setCart((prevCart) => {
+      const updatedItems = prevCart.items.map((item) => {
+        if (item.groupName === groupName) {
+          return {
+            ...item,
+            groupDiscount: 0, // Clear discount flags
+            variantDiscount: 0,
+            discountedPrice: wholesalePricePerItem,
+            isWholesalePricing: true, // Mark as wholesale pricing
+            // Keep unitPrice as original - don't change it
+          };
+        }
+        return item;
+      });
+
+      const totalAmount = updatedItems.reduce((sum, item) => {
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
+        return sum + price * item.quantity;
+      }, 0);
+
+      return {
+        ...prevCart,
+        items: updatedItems,
+        totalAmount,
+      };
+    });
+  };
+
+  // Remove wholesale pricing from all items in a group
+  const removeWholesalePricing = (groupName: string) => {
+    setCart((prevCart) => {
+      const updatedItems = prevCart.items.map((item) => {
+        if (item.groupName === groupName && item.isWholesalePricing) {
+          return {
+            ...item,
+            discountedPrice: undefined, // Remove wholesale pricing
+            isWholesalePricing: false,
+          };
+        }
+        return item;
+      });
+
+      const totalAmount = updatedItems.reduce((sum, item) => {
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
+        return sum + price * item.quantity;
+      }, 0);
+
+      return {
+        ...prevCart,
+        items: updatedItems,
+        totalAmount,
+      };
+    });
+  };
+
+  const memoizedSetInventoryCallbacks = useCallback(
+    (callbacks: {
+      reduceStock: (
+        stockId: string,
+        color: string,
+        size: string,
+        quantity: number
+      ) => Promise<void> | void;
+      restoreStock: (
+        stockId: string,
+        color: string,
+        size: string,
+        quantity: number
+      ) => Promise<void> | void;
+      checkStock: (stockId: string, color: string, size: string) => number;
+    }) => {
+      setInventoryCallbacks(callbacks);
+    },
+    []
+  );
 
   // Customer management functions
-  const setSelectedCustomer = useCallback((customer: SelectedCustomer | null) => {
-    setCart(prevCart => ({
-      ...prevCart,
-      selectedCustomer: customer
-    }));
-  }, []);
+  const setSelectedCustomer = useCallback(
+    (customer: SelectedCustomer | null) => {
+      setCart((prevCart) => ({
+        ...prevCart,
+        selectedCustomer: customer,
+      }));
+    },
+    []
+  );
 
   const getSelectedCustomer = useCallback((): SelectedCustomer | null => {
     return cart.selectedCustomer || null;
@@ -548,12 +728,10 @@ export function CartProvider({ children }: CartProviderProps) {
     applyVariantDiscount,
     removeGroupDiscount,
     removeVariantDiscount,
-    setInventoryCallbacks: memoizedSetInventoryCallbacks
+    applyWholesalePricing,
+    removeWholesalePricing,
+    setInventoryCallbacks: memoizedSetInventoryCallbacks,
   };
 
-  return (
-    <CartContext.Provider value={value}>
-      {children}
-    </CartContext.Provider>
-  );
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

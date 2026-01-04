@@ -140,6 +140,7 @@ export const addExpense = async (data: CreateExpenseData): Promise<Expense> => {
       spendingMenuId: data.spendingMenuId,
       spendingMenuName: spendingMenuDoc.data().name,
       note: data.note,
+      imageUrl: data.imageUrl || "",
       date: Timestamp.fromDate(data.date),
       amount: data.amount,
       currency: data.currency,
@@ -182,6 +183,7 @@ export const getExpenses = async (): Promise<Expense[]> => {
         spendingMenuId: data.spendingMenuId,
         spendingMenuName: data.spendingMenuName,
         note: data.note,
+        imageUrl: data.imageUrl || "",
         date: data.date?.toDate() || new Date(),
         amount: data.amount,
         currency: data.currency,
@@ -212,6 +214,7 @@ export const getExpenseById = async (id: string): Promise<Expense | null> => {
       spendingMenuId: data.spendingMenuId,
       spendingMenuName: data.spendingMenuName,
       note: data.note,
+      imageUrl: data.imageUrl || "",
       date: data.date?.toDate() || new Date(),
       amount: data.amount,
       currency: data.currency,
@@ -254,6 +257,7 @@ export const updateExpense = async (
     }
 
     if (data.note !== undefined) updateData.note = data.note;
+    if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
     if (data.date) updateData.date = Timestamp.fromDate(data.date);
     if (data.amount !== undefined) updateData.amount = data.amount;
     if (data.currency) updateData.currency = data.currency;

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import { ExpenseCategory, SpendingMenu, Expense } from "@/types/expense";
 
 function ExpensesContent() {
@@ -27,6 +28,7 @@ function ExpensesContent() {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedSpendingMenuId, setSelectedSpendingMenuId] = useState("");
   const [note, setNote] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [amount, setAmount] = useState("");
   const [selectedCurrency, setSelectedCurrency] = useState<"THB" | "MMK">(
@@ -157,6 +159,7 @@ function ExpensesContent() {
           categoryId: selectedCategoryId,
           spendingMenuId: selectedSpendingMenuId,
           note,
+          imageUrl,
           date,
           amount: parseFloat(amount),
           currency: selectedCurrency,
@@ -170,6 +173,7 @@ function ExpensesContent() {
         setSelectedCategoryId("");
         setSelectedSpendingMenuId("");
         setNote("");
+        setImageUrl("");
         setAmount("");
         setDate(new Date().toISOString().split("T")[0]);
         showAlert("success", "Expense added successfully");
@@ -515,6 +519,18 @@ function ExpensesContent() {
                       className="w-full px-3 py-2 border border-gray-300 text-gray-900 placeholder-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
+
+                  {/* Image Upload */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2 text-gray-900">
+                      Expense Image (Optional)
+                    </label>
+                    <ImageUpload
+                      value={imageUrl}
+                      onChange={setImageUrl}
+                      onRemove={() => setImageUrl("")}
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-4">
@@ -695,6 +711,9 @@ function ExpensesContent() {
                     <thead>
                       <tr className="bg-gray-100 border-b">
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
+                          Image
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
                           Date
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
@@ -718,7 +737,7 @@ function ExpensesContent() {
                       {filteredExpenses.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="px-4 py-8 text-center text-gray-500"
                           >
                             {expenses.length === 0
@@ -732,6 +751,24 @@ function ExpensesContent() {
                             key={expense.id}
                             className="border-b hover:bg-gray-50"
                           >
+                            <td className="px-4 py-3 text-sm">
+                              {expense.imageUrl ? (
+                                <a
+                                  href={expense.imageUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block"
+                                >
+                                  <img
+                                    src={expense.imageUrl}
+                                    alt="Expense"
+                                    className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                  />
+                                </a>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-900">
                               {new Date(expense.date).toLocaleDateString()}
                             </td>
@@ -832,90 +869,70 @@ function ExpensesContent() {
                 )}
               </div>
 
-              {/* Category Management Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-900">
-                    Manage Categories
-                  </h2>
-                  <div className="space-y-2">
-                    {categories.map((cat) => (
-                      <div
-                        key={cat.id}
-                        className="flex justify-between items-center p-2 bg-gray-50 rounded"
-                      >
-                        <span className="text-gray-900">{cat.name}</span>
-                        <button
-                          onClick={() => handleDeleteCategory(cat.id)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                    {categories.length === 0 && (
-                      <p className="text-gray-500 text-sm text-center py-4">
-                        No categories yet
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-900">
-                    Manage Spending Menus
-                  </h2>
-                  <div className="space-y-2">
-                    {spendingMenus.map((menu) => (
-                      <div
-                        key={menu.id}
-                        className="flex justify-between items-center p-2 bg-gray-50 rounded"
-                      >
-                        <span className="text-gray-900">{menu.name}</span>
-                        <button
-                          onClick={() => handleDeleteSpendingMenu(menu.id)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                    {spendingMenus.length === 0 && (
-                      <p className="text-gray-500 text-sm text-center py-4">
-                        No spending menus yet
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* Add Category Modal */}
               {showCategoryModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
                     <h3 className="text-lg font-semibold mb-4 text-gray-900">
-                      Add New Category
+                      Manage Categories
                     </h3>
-                    <Input
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="Enter category name"
-                      className="mb-4"
-                    />
-                    <div className="flex gap-2">
-                      <Button onClick={handleAddCategory} className="flex-1">
-                        Add
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setShowCategoryModal(false);
-                          setNewCategoryName("");
-                        }}
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
+
+                    {/* Existing Categories List */}
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        Existing Categories
+                      </h4>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {categories.map((cat) => (
+                          <div
+                            key={cat.id}
+                            className="flex justify-between items-center p-3 bg-gray-50 rounded hover:bg-gray-100"
+                          >
+                            <span className="text-gray-900 font-medium">
+                              {cat.name}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteCategory(cat.id)}
+                              className="text-red-500 hover:text-red-700 text-sm font-medium px-3 py-1 rounded hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ))}
+                        {categories.length === 0 && (
+                          <p className="text-gray-500 text-sm text-center py-4">
+                            No categories yet
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Add New Category Form */}
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        Add New Category
+                      </h4>
+                      <Input
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="Enter category name"
+                        className="mb-4"
+                      />
+                      <div className="flex gap-2">
+                        <Button onClick={handleAddCategory} className="flex-1">
+                          Add
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setShowCategoryModal(false);
+                            setNewCategoryName("");
+                          }}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Close
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -924,33 +941,70 @@ function ExpensesContent() {
               {/* Add Spending Menu Modal */}
               {showSpendingMenuModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
                     <h3 className="text-lg font-semibold mb-4 text-gray-900">
-                      Add New Spending Menu
+                      Manage Spending Menus
                     </h3>
-                    <Input
-                      value={newSpendingMenuName}
-                      onChange={(e) => setNewSpendingMenuName(e.target.value)}
-                      placeholder="Enter spending menu name"
-                      className="mb-4"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleAddSpendingMenu}
-                        className="flex-1"
-                      >
-                        Add
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setShowSpendingMenuModal(false);
-                          setNewSpendingMenuName("");
-                        }}
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
+
+                    {/* Existing Spending Menus List */}
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        Existing Spending Menus
+                      </h4>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {spendingMenus.map((menu) => (
+                          <div
+                            key={menu.id}
+                            className="flex justify-between items-center p-3 bg-gray-50 rounded hover:bg-gray-100"
+                          >
+                            <span className="text-gray-900 font-medium">
+                              {menu.name}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteSpendingMenu(menu.id)}
+                              className="text-red-500 hover:text-red-700 text-sm font-medium px-3 py-1 rounded hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ))}
+                        {spendingMenus.length === 0 && (
+                          <p className="text-gray-500 text-sm text-center py-4">
+                            No spending menus yet
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Add New Spending Menu Form */}
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        Add New Spending Menu
+                      </h4>
+                      <Input
+                        value={newSpendingMenuName}
+                        onChange={(e) => setNewSpendingMenuName(e.target.value)}
+                        placeholder="Enter spending menu name"
+                        className="mb-4"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleAddSpendingMenu}
+                          className="flex-1"
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setShowSpendingMenuModal(false);
+                            setNewSpendingMenuName("");
+                          }}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Close
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1109,6 +1163,27 @@ function ExpensesContent() {
                           }
                           placeholder="Enter note"
                           className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Expense Image (Optional)
+                        </label>
+                        <ImageUpload
+                          value={editingExpense.imageUrl || ""}
+                          onChange={(url) =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              imageUrl: url,
+                            })
+                          }
+                          onRemove={() =>
+                            setEditingExpense({
+                              ...editingExpense,
+                              imageUrl: "",
+                            })
+                          }
                         />
                       </div>
                     </div>

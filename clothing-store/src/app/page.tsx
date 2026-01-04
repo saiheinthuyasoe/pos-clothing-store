@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
-import ConfigNotification from '@/components/ui/ConfigNotification';
+import Link from "next/link";
+import { Button } from "@/components/ui/Button";
+import ConfigNotification from "@/components/ui/ConfigNotification";
 
 export default function Home() {
   return (
@@ -11,7 +11,9 @@ export default function Home() {
       <header className="border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-6">
           <div className="flex items-center py-4">
-            <h1 className="text-xl font-medium text-gray-900">ClothingStore POS</h1>
+            <h1 className="text-xl font-medium text-gray-900">
+              ClothingStore POS
+            </h1>
           </div>
         </div>
       </header>
@@ -34,34 +36,24 @@ export default function Home() {
 
         {/* Authentication Options */}
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 max-w-lg mx-auto">
-          {/* Customer Section */}
+          {/* Staff/Manager Section */}
           <div className="border border-gray-200 p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Customer
+              Staff / Manager
             </h3>
-            <div className="space-y-3">
-              <Link href="/auth/customer/login" className="block">
-                <Button className="w-full">
-                  Login
-                </Button>
-              </Link>
-              <Link href="/auth/customer/register" className="block">
-                <Button variant="outline" className="w-full">
-                  Register
-                </Button>
-              </Link>
-            </div>
+            <Link href="/auth/staff/login" className="block">
+              <Button className="w-full">Login</Button>
+            </Link>
+            <p className="mt-3 text-sm text-gray-500">
+              For managers and staff members
+            </p>
           </div>
 
           {/* Owner Section */}
           <div className="border border-gray-200 p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Owner
-            </h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Owner</h3>
             <Link href="/auth/owner/login" className="block">
-              <Button className="w-full">
-                Login
-              </Button>
+              <Button className="w-full">Login</Button>
             </Link>
             <p className="mt-3 text-sm text-gray-500">
               Admin-created accounts only

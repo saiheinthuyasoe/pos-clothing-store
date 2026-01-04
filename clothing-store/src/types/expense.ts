@@ -17,6 +17,7 @@ export interface Expense {
   spendingMenuId: string;
   spendingMenuName: string;
   note: string;
+  imageUrl?: string;
   date: Date;
   amount: number;
   currency: "Baht" | "MMK";
@@ -28,6 +29,7 @@ export interface CreateExpenseData {
   categoryId: string;
   spendingMenuId: string;
   note: string;
+  imageUrl?: string;
   date: Date;
   amount: number;
   currency: "Baht" | "MMK";

@@ -159,6 +159,12 @@ function OwnerHomeContent() {
     );
   };
 
+  // Helper function to get shop name by shop ID
+  const getShopName = (shopId: string) => {
+    const shop = shops.find((s) => s.id === shopId);
+    return shop?.name || "";
+  };
+
   // Function to reduce inventory stock when item is added to cart
   const reduceInventoryStock = useCallback(
     async (
@@ -1358,6 +1364,7 @@ function OwnerHomeContent() {
         colorCode: selectedVariant.colorCode,
         image: item.image,
         shop: item.shop,
+        wholesaleTiers: item.wholesaleTiers,
       });
 
       // Inventory reduction will be handled by CartContext through callbacks
@@ -1605,8 +1612,15 @@ function OwnerHomeContent() {
                         {/* Product Details */}
                         <div className="p-3">
                           <h4 className="font-medium text-gray-900 text-sm mb-1">
-                            {item.name}
+                            {item.name.length > 17
+                              ? `${item.name.substring(0, 17)}...`
+                              : item.name}
                           </h4>
+                          {item.shop && getShopName(item.shop) && (
+                            <div className="text-xs text-gray-500 mb-2">
+                              Branch: {getShopName(item.shop)}
+                            </div>
+                          )}
 
                           {/* Price and Stock */}
                           <div className="flex justify-between items-center mb-2">
@@ -1773,7 +1787,7 @@ function OwnerHomeContent() {
 
 export default function OwnerHomePage() {
   return (
-    <ProtectedRoute requiredRole="owner">
+    <ProtectedRoute>
       <OwnerHomeContent />
     </ProtectedRoute>
   );

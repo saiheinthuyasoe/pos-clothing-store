@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { UserRole } from '@/types/auth';
+import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/types/auth";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -20,27 +20,36 @@ export function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
-    console.log("ProtectedRoute useEffect - loading:", loading, "user:", user, "requiredRole:", requiredRole);
+    console.log(
+      "ProtectedRoute useEffect - loading:",
+      loading,
+      "user:",
+      user,
+      "requiredRole:",
+      requiredRole
+    );
     if (!loading) {
       if (!user) {
-        console.log("ProtectedRoute: No user, redirecting to login");
-        // User is not authenticated, redirect to appropriate login
-        const loginPath = requiredRole === 'owner' 
-          ? '/auth/owner/login' 
-          : '/auth/customer/login';
-        router.push(redirectTo || loginPath);
+        console.log("ProtectedRoute: No user, redirecting to home");
+        // User is not authenticated, redirect to home page
+        router.push(redirectTo || "/");
         return;
       }
 
       if (requiredRole && user.role !== requiredRole) {
-        console.log("ProtectedRoute: Role mismatch, user role:", user.role, "required:", requiredRole);
+        console.log(
+          "ProtectedRoute: Role mismatch, user role:",
+          user.role,
+          "required:",
+          requiredRole
+        );
         // User doesn't have the required role
-        if (user.role === 'customer') {
-          router.push('/customer/home');
-        } else if (user.role === 'owner') {
-          router.push('/owner/dashboard');
+        if (user.role === "customer") {
+          router.push("/customer/home");
+        } else if (user.role === "owner") {
+          router.push("/owner/dashboard");
         } else {
-          router.push('/');
+          router.push("/");
         }
         return;
       }

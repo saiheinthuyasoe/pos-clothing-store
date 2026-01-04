@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { MenuItem, NavigationProps } from "@/types/schemas";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/types/auth";
 
 const menuItems: MenuItem[] = [
   {
@@ -35,35 +37,41 @@ const menuItems: MenuItem[] = [
     label: "Home",
     icon: "Home",
     href: "/owner/home",
+    roles: ["owner", "manager", "staff"], // All roles can access
   },
   {
     id: "dashboard",
     label: "Dashboard",
     icon: "BarChart3",
     href: "/owner/dashboard",
+    roles: ["owner", "manager"], // Only owner and manager
   },
   {
     id: "sales",
     label: "Sales",
     icon: "TrendingUp",
+    roles: ["owner", "manager", "staff"],
     children: [
       {
         id: "transactions",
         label: "Transactions",
         icon: "CreditCard",
         href: "/owner/sales/transactions",
+        roles: ["owner", "manager", "staff"],
       },
       {
         id: "reports",
         label: "Reports",
         icon: "FileText",
         href: "/owner/reports",
+        roles: ["owner", "manager"], // No staff
       },
       {
         id: "payments",
         label: "Payments",
         icon: "CreditCard",
         href: "/owner/payments",
+        roles: ["owner", "manager", "staff"],
       },
     ],
   },
@@ -71,18 +79,21 @@ const menuItems: MenuItem[] = [
     id: "inventory",
     label: "Inventory",
     icon: "Package",
+    roles: ["owner", "manager"],
     children: [
       {
         id: "stocks",
         label: "Stocks",
         icon: "Package",
         href: "/owner/inventory/stocks",
+        roles: ["owner", "manager"],
       },
       {
         id: "customers",
         label: "Customers",
         icon: "Users",
         href: "/owner/customers",
+        roles: ["owner", "manager"],
       },
     ],
   },
@@ -91,29 +102,34 @@ const menuItems: MenuItem[] = [
     label: "Expenses",
     icon: "Receipt",
     href: "/owner/expenses",
+    roles: ["owner", "manager"], // Only owner and manager
   },
   {
     id: "barcode",
     label: "Barcode",
     icon: "QrCode",
+    roles: ["owner", "manager"],
     children: [
       {
         id: "label-print",
         label: "Label Print",
         icon: "Tag",
         href: "/owner/label-print",
+        roles: ["owner", "manager"],
       },
       {
         id: "new-stock",
         label: "New Stock",
         icon: "Plus",
         href: "/owner/new-stock",
+        roles: ["owner", "manager"],
       },
       {
         id: "print-settings",
         label: "Print Settings",
         icon: "Settings",
         href: "/owner/print-settings",
+        roles: ["owner", "manager"],
       },
     ],
   },
@@ -121,24 +137,28 @@ const menuItems: MenuItem[] = [
     id: "shops-branches",
     label: "Shops & Branches",
     icon: "Building2",
+    roles: ["owner"], // Only owner
     children: [
       {
         id: "manage-shops",
         label: "Manage Shops",
         icon: "Store",
         href: "/owner/shops/manage",
+        roles: ["owner"],
       },
       {
         id: "branch-settings",
         label: "Branch Settings",
         icon: "Settings",
         href: "/owner/shops/settings",
+        roles: ["owner"],
       },
       {
         id: "shop-reports",
         label: "Shop Reports",
         icon: "FileText",
         href: "/owner/shops/reports",
+        roles: ["owner"],
       },
     ],
   },
@@ -147,24 +167,28 @@ const menuItems: MenuItem[] = [
     label: "Exchange Sales",
     icon: "ShoppingCart",
     href: "/owner/exchange-sales",
+    roles: ["owner", "manager", "staff"],
   },
   {
     id: "tellers",
     label: "Tellers",
     icon: "UserCheck",
     href: "/owner/tellers",
+    roles: ["owner"], // Only owner can manage staff
   },
   {
     id: "settings",
     label: "Settings",
     icon: "Settings",
     href: "/owner/settings",
+    roles: ["owner"], // Only owner
   },
   {
     id: "privacy-policy",
     label: "Privacy Policy",
     icon: "Shield",
     href: "/owner/privacy-policy",
+    roles: ["owner", "manager", "staff"], // All roles
   },
 ];
 
@@ -212,6 +236,41 @@ export function Sidebar({
   const { businessSettings, isLoading } = useSettings();
   const businessName = businessSettings?.businessName;
   const businessLogo = businessSettings?.businessLogo;
+
+  // Get user role from auth context
+  const { user } = useAuth();
+  const userRole = user?.role || "staff"; // Default to staff if no role
+
+  // Filter menu items based on user role
+  const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
+    return items
+      .filter((item) => {
+        // If roles array exists, check if user role is included
+        if (item.roles && !item.roles.includes(userRole)) {
+          return false;
+        }
+        return true;
+      })
+      .map((item) => {
+        // If item has children, filter them recursively
+        if (item.children && item.children.length > 0) {
+          return {
+            ...item,
+            children: filterMenuItems(item.children),
+          };
+        }
+        return item;
+      })
+      .filter((item) => {
+        // Remove parent items that have no children after filtering
+        if (item.children && item.children.length === 0 && !item.href) {
+          return false;
+        }
+        return true;
+      });
+  };
+
+  const filteredMenuItems = filterMenuItems(menuItems);
 
   // Close all expanded items when sidebar is collapsed
   useEffect(() => {
@@ -384,7 +443,7 @@ export function Sidebar({
           }
         `}</style>
         <nav className="space-y-1">
-          {menuItems.map((item) => renderMenuItem(item))}
+          {filteredMenuItems.map((item) => renderMenuItem(item))}
         </nav>
       </div>
     </div>

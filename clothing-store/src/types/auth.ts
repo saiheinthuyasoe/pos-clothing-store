@@ -1,4 +1,4 @@
-export type UserRole = 'customer' | 'owner';
+export type UserRole = "customer" | "owner" | "manager" | "staff";
 
 export interface User {
   uid: string;
@@ -7,6 +7,8 @@ export interface User {
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
+  createdBy?: string; // ID of the owner who created this account
+  isActive?: boolean; // To enable/disable accounts
 }
 
 export interface AuthState {

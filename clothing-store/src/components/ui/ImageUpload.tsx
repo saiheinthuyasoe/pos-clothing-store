@@ -116,12 +116,11 @@ export function ImageUpload({
       {value ? (
         <div className="flex flex-col items-center">
           <div className="relative">
-            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-300">
-              <Image
+            <div className="relative max-w-xs rounded-lg overflow-hidden border border-gray-300">
+              <img
                 src={value}
                 alt="Uploaded image"
-                fill
-                className="object-cover"
+                className="max-h-64 w-auto object-contain"
               />
             </div>
             {!disabled && (

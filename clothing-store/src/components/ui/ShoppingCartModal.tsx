@@ -36,10 +36,12 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     applyVariantDiscount,
     removeGroupDiscount,
     removeVariantDiscount,
+    applyWholesalePricing,
+    removeWholesalePricing,
     setSelectedCustomer,
     getSelectedCustomer,
   } = useCart();
-  const { formatPrice } = useCurrency();
+  const { formatPrice, getCurrencySymbol } = useCurrency();
   const { taxRate } = useSettings();
   const [discountAmount, setDiscountAmount] = React.useState<string>("");
   const [cartDiscountPercent, setCartDiscountPercent] =
@@ -62,11 +64,57 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     "cart" | "group" | "variant"
   >("cart");
 
+  // Discount type state (percentage or amount)
+  const [discountType, setDiscountType] = React.useState<
+    "percentage" | "amount"
+  >("percentage");
+  const [groupDiscountType, setGroupDiscountType] = React.useState<
+    "percentage" | "amount"
+  >("percentage");
+  const [variantDiscountType, setVariantDiscountType] = React.useState<
+    "percentage" | "amount"
+  >("percentage");
+
+  // Search state for group and variant selection
+  const [groupSearchTerm, setGroupSearchTerm] = React.useState<string>("");
+  const [variantSearchTerm, setVariantSearchTerm] = React.useState<string>("");
+  const [showGroupDropdown, setShowGroupDropdown] =
+    React.useState<boolean>(false);
+  const [showVariantDropdown, setShowVariantDropdown] =
+    React.useState<boolean>(false);
+
   // Customer selection state
   const [isCustomerModalOpen, setIsCustomerModalOpen] = React.useState(false);
 
   // Payment clearance state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
+
+  // Refs for detecting clicks outside dropdowns
+  const groupDropdownRef = React.useRef<HTMLDivElement>(null);
+  const variantDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdowns when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        groupDropdownRef.current &&
+        !groupDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowGroupDropdown(false);
+      }
+      if (
+        variantDropdownRef.current &&
+        !variantDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowVariantDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Prevent background scrolling when modal is open and auto-open big view
   React.useEffect(() => {
@@ -157,47 +205,100 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   };
 
   const handleApplyDiscount = () => {
-    const discountPercent = parseFloat(discountAmount) || 0;
-    if (discountPercent >= 0 && discountPercent <= 100) {
-      // Store the cart discount percentage - it will be applied to subtotal after individual discounts
-      setCartDiscountPercent(discountPercent);
+    const value = parseFloat(discountAmount) || 0;
+    if (discountType === "percentage") {
+      if (value >= 0 && value <= 100) {
+        // Store the cart discount percentage - it will be applied to subtotal after individual discounts
+        setCartDiscountPercent(value);
+      } else {
+        alert("Please enter a valid discount percentage (0-100)");
+      }
     } else {
-      alert("Please enter a valid discount percentage (0-100)");
+      // Custom amount discount - convert to percentage based on subtotal
+      if (value >= 0) {
+        if (subtotal > 0) {
+          const percentEquivalent = (value / subtotal) * 100;
+          setCartDiscountPercent(percentEquivalent);
+        } else {
+          alert("Cart is empty or subtotal is 0");
+        }
+      } else {
+        alert("Please enter a valid discount amount (0 or greater)");
+      }
     }
   };
 
   // New discount handlers
   const handleApplyGroupDiscount = () => {
-    const discountPercent = parseFloat(groupDiscountAmount) || 0;
-    if (
-      discountPercent >= 0 &&
-      discountPercent <= 100 &&
-      selectedGroupForDiscount
-    ) {
-      applyGroupDiscount(selectedGroupForDiscount, discountPercent);
-      setGroupDiscountAmount("");
-      setSelectedGroupForDiscount("");
+    const value = parseFloat(groupDiscountAmount) || 0;
+    if (!selectedGroupForDiscount) {
+      alert("Please select a group");
+      return;
+    }
+
+    if (groupDiscountType === "percentage") {
+      if (value >= 0 && value <= 100) {
+        applyGroupDiscount(selectedGroupForDiscount, value);
+        setGroupDiscountAmount("");
+        setSelectedGroupForDiscount("");
+      } else {
+        alert("Please enter a valid discount percentage (0-100)");
+      }
     } else {
-      alert(
-        "Please select a group and enter a valid discount percentage (0-100)"
-      );
+      // Custom amount discount - convert to percentage based on group total
+      const groupTotal = cart.items
+        .filter((item) => item.groupName === selectedGroupForDiscount)
+        .reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+
+      if (value >= 0) {
+        if (groupTotal > 0) {
+          const percentEquivalent = (value / groupTotal) * 100;
+          applyGroupDiscount(selectedGroupForDiscount, percentEquivalent);
+          setGroupDiscountAmount("");
+          setSelectedGroupForDiscount("");
+        } else {
+          alert("Group total is 0");
+        }
+      } else {
+        alert("Please enter a valid discount amount (0 or greater)");
+      }
     }
   };
 
   const handleApplyVariantDiscount = () => {
-    const discountPercent = parseFloat(variantDiscountAmount) || 0;
-    if (
-      discountPercent >= 0 &&
-      discountPercent <= 100 &&
-      selectedVariantForDiscount
-    ) {
-      applyVariantDiscount(selectedVariantForDiscount, discountPercent);
-      setVariantDiscountAmount("");
-      setSelectedVariantForDiscount("");
+    const value = parseFloat(variantDiscountAmount) || 0;
+    if (!selectedVariantForDiscount) {
+      alert("Please select a variant");
+      return;
+    }
+
+    if (variantDiscountType === "percentage") {
+      if (value >= 0 && value <= 100) {
+        applyVariantDiscount(selectedVariantForDiscount, value);
+        setVariantDiscountAmount("");
+        setSelectedVariantForDiscount("");
+      } else {
+        alert("Please enter a valid discount percentage (0-100)");
+      }
     } else {
-      alert(
-        "Please select a variant and enter a valid discount percentage (0-100)"
+      // Custom amount discount - convert to percentage based on variant total
+      const variantItem = cart.items.find(
+        (item) => item.id === selectedVariantForDiscount
       );
+
+      if (variantItem && value >= 0) {
+        const variantTotal = variantItem.unitPrice * variantItem.quantity;
+        if (variantTotal > 0) {
+          const percentEquivalent = (value / variantTotal) * 100;
+          applyVariantDiscount(selectedVariantForDiscount, percentEquivalent);
+          setVariantDiscountAmount("");
+          setSelectedVariantForDiscount("");
+        } else {
+          alert("Variant total is 0");
+        }
+      } else {
+        alert("Please enter a valid discount amount (0 or greater)");
+      }
     }
   };
 
@@ -213,6 +314,17 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   const uniqueGroups = Array.from(
     new Set(cart.items.map((item) => item.groupName))
   );
+
+  // Filtered groups based on search
+  const filteredGroups = uniqueGroups.filter((group) =>
+    group.toLowerCase().includes(groupSearchTerm.toLowerCase())
+  );
+
+  // Filtered variants based on search
+  const filteredVariants = cart.items.filter((item) => {
+    const variantLabel = `${item.groupName} - ${item.selectedColor} / ${item.selectedSize}`;
+    return variantLabel.toLowerCase().includes(variantSearchTerm.toLowerCase());
+  });
 
   const handleCheckout = () => {
     if (cart.items.length === 0) {
@@ -297,6 +409,33 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     return total;
   }, 0);
 
+  // Calculate wholesale pricing savings (items with wholesale pricing but no group/variant discounts)
+  const wholesaleSavings = cart.items.reduce((total, item) => {
+    // Check if item has wholesale pricing applied (discounted price exists, is less than unit price, and no discount percentages)
+    if (
+      item.discountedPrice !== undefined &&
+      item.discountedPrice < item.unitPrice &&
+      (!item.groupDiscount || item.groupDiscount === 0) &&
+      (!item.variantDiscount || item.variantDiscount === 0)
+    ) {
+      const originalItemTotal = item.unitPrice * item.quantity;
+      const wholesaleItemTotal = item.discountedPrice * item.quantity;
+      const savings = originalItemTotal - wholesaleItemTotal;
+      console.log(
+        "Wholesale item:",
+        item.groupName,
+        "Original:",
+        originalItemTotal,
+        "Wholesale:",
+        wholesaleItemTotal,
+        "Savings:",
+        savings
+      );
+      return total + savings;
+    }
+    return total;
+  }, 0);
+
   // Calculate cart discount dynamically based on percentage and current subtotal (after individual discounts)
   const appliedDiscount = subtotal * (cartDiscountPercent / 100);
   const discount = appliedDiscount; // Cart-wide discount
@@ -310,26 +449,375 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
       style={{ zIndex: 99999 }}
     >
       {/* Backdrop with blur */}
-      <div className="absolute inset-0 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
 
-      {/* Modal */}
-      <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl border-l border-gray-200">
-        <div className="flex h-full flex-col">
+      {/* Full Screen Cart - Combined View */}
+      <div className="absolute inset-0 bg-white shadow-xl flex">
+        {/* Left Side - Cart Big View */}
+        <div className="flex-1 flex flex-col border-r border-gray-200">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="flex items-center space-x-3">
+              <Eye className="h-6 w-6 text-blue-600" />
+              <h2 className="text-xl font-bold text-gray-900">Cart Items</h2>
+              <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                {cart.totalItems} items
+              </span>
+            </div>
+          </div>
+
+          {/* Cart Items */}
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            {cart.items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <ShoppingCart className="h-16 w-16 mb-6 text-gray-300" />
+                <p className="text-xl font-medium">Your cart is empty</p>
+                <p className="text-sm">Add some items to see them here</p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {cart.items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Product Image */}
+                      <div className="flex-shrink-0">
+                        <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
+                          {item.image ? (
+                            <Image
+                              src={item.image}
+                              alt={item.groupName}
+                              width={80}
+                              height={80}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                              <span className="text-gray-400 text-xs">
+                                No Image
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Product Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-base font-semibold text-gray-900 truncate">
+                              #{index + 1}. {item.groupName}
+                            </h3>
+                            <p className="text-xs text-gray-600">
+                              Shop: {shopNames[item.shop] || item.shop}
+                            </p>
+                          </div>
+                          <button
+                            title="Remove item from cart"
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors ml-2"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {/* Left Column - Color, Size, Price */}
+                          <div className="space-y-2">
+                            {/* Color and Size */}
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs font-medium text-gray-700">
+                                  Color:
+                                </span>
+                                <div
+                                  className="w-5 h-5 rounded-full border border-gray-300"
+                                  style={{
+                                    backgroundColor:
+                                      item.colorCode || "#ef4444",
+                                  }}
+                                />
+                                <span className="text-xs font-medium text-gray-800">
+                                  {item.selectedColor}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs font-medium text-gray-700">
+                                  Size:
+                                </span>
+                                <span className="text-xs font-medium text-gray-800">
+                                  {item.selectedSize}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Uint Price */}
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-medium text-gray-700">
+                                Price:
+                              </span>
+                              <span className="text-xs font-bold text-gray-900">
+                                {formatPrice(item.unitPrice)}
+                              </span>
+                            </div>
+
+                            {/* Discounted Price (if any) */}
+                            {item.discountedPrice !== undefined &&
+                              item.discountedPrice !== item.unitPrice && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs font-medium text-gray-700">
+                                    After Discount:
+                                  </span>
+                                  <span className="text-xs font-bold text-green-600">
+                                    {formatPrice(item.discountedPrice)}
+                                  </span>
+                                </div>
+                              )}
+
+                            {/* Group Discount Badge */}
+                            {item.groupDiscount && item.groupDiscount > 0 ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">
+                                  Group: {item.groupDiscount}% OFF
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleRemoveGroupDiscount(item.groupName)
+                                  }
+                                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {/* Variant Discount Badge */}
+                            {item.variantDiscount &&
+                            item.variantDiscount > 0 ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-medium">
+                                  Variant: {item.variantDiscount}% OFF
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleRemoveVariantDiscount(item.id)
+                                  }
+                                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {/* Wholesale Pricing Badge */}
+                            {item.isWholesalePricing && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-medium">
+                                  WHOLESALE PRICING
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    removeWholesalePricing(item.groupName)
+                                  }
+                                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Wholesale Price Suggestion - Group Based */}
+                            {(() => {
+                              // Calculate total quantity for this group
+                              const groupItems = cart.items.filter(
+                                (cartItem) =>
+                                  cartItem.groupName === item.groupName
+                              );
+                              const totalGroupQuantity = groupItems.reduce(
+                                (sum, cartItem) => sum + cartItem.quantity,
+                                0
+                              );
+
+                              // Find matching wholesale tier based on group total
+                              const matchingTier = item.wholesaleTiers?.find(
+                                (tier) =>
+                                  tier.minQuantity === totalGroupQuantity
+                              );
+
+                              // Check if this is the first item in the group
+                              const isFirstInGroup =
+                                cart.items.findIndex(
+                                  (cartItem) =>
+                                    cartItem.groupName === item.groupName
+                                ) ===
+                                cart.items.findIndex(
+                                  (cartItem) => cartItem.id === item.id
+                                );
+
+                              if (
+                                matchingTier &&
+                                item.unitPrice !== matchingTier.price &&
+                                !item.isWholesalePricing // Don't show if wholesale is already applied
+                              ) {
+                                const wholesalePricePerItem =
+                                  matchingTier.price / matchingTier.minQuantity;
+
+                                return (
+                                  <div className="mt-2 p-2 bg-white-50 border border-gray-900 rounded-lg">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1">
+                                        <p className="text-xs font-medium text-gray-900 mb-1">
+                                          Wholesale Price Available for
+                                          Group!
+                                        </p>
+                                        
+                                        
+                                      </div>
+                                      {isFirstInGroup && (
+                                        <button
+                                          onClick={() => {
+                                            // Calculate current total using the actual price being charged
+                                            const currentTotal =
+                                              groupItems.reduce(
+                                                (sum, cartItem) => {
+                                                  const currentPrice =
+                                                    cartItem.discountedPrice !==
+                                                    undefined
+                                                      ? cartItem.discountedPrice
+                                                      : cartItem.unitPrice;
+                                                  return (
+                                                    sum +
+                                                    currentPrice *
+                                                      cartItem.quantity
+                                                  );
+                                                },
+                                                0
+                                              );
+                                            const wholesaleTotal =
+                                              matchingTier.price;
+                                            const savings =
+                                              currentTotal - wholesaleTotal;
+
+                                            if (
+                                              confirm(
+                                                `Apply wholesale pricing to all "${item.groupName}" items?\n\n` +
+                                                  `Current Total: ${formatPrice(
+                                                    currentTotal
+                                                  )}\n` +
+                                                  `Wholesale Total: ${formatPrice(
+                                                    wholesaleTotal
+                                                  )}\n` +
+                                                  `(${totalGroupQuantity} items = ${formatPrice(
+                                                    wholesalePricePerItem
+                                                  )}/item)\n\n` +
+                                                  `Total Savings: ${formatPrice(
+                                                    savings
+                                                  )}`
+                                              )
+                                            ) {
+                                              // Apply wholesale price directly to all items in the group
+                                              applyWholesalePricing(
+                                                item.groupName,
+                                                wholesalePricePerItem
+                                              );
+                                            }
+                                          }}
+                                          className="ml-2 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded transition-colors whitespace-nowrap"
+                                        >
+                                          Apply to Group
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+
+                          {/* Right Column - Quantity & Subtotal */}
+                          <div className="flex flex-col justify-between">
+                            {/* Quantity Controls */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-gray-700">
+                                Quantity:
+                              </span>
+                              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(
+                                      item.id,
+                                      Math.max(1, item.quantity - 1)
+                                    )
+                                  }
+                                  className="p-1 hover:bg-white rounded transition-colors"
+                                  title="Decrease quantity"
+                                >
+                                  <Minus className="h-3 w-3 text-gray-600" />
+                                </button>
+                                <span className="text-sm font-bold text-gray-900 min-w-[30px] text-center">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(item.id, item.quantity + 1)
+                                  }
+                                  className="p-1 hover:bg-white rounded transition-colors"
+                                  title="Increase quantity"
+                                >
+                                  <Plus className="h-3 w-3 text-gray-600" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Item Subtotal */}
+                            <div className="mt-2 bg-blue-50 p-2 rounded-lg">
+                              <div className="text-xs font-medium text-gray-700 mb-1">
+                                Item Total:
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="font-medium text-gray-700">
+                                  {item.quantity}
+                                </span>
+                                <span className="text-gray-500">×</span>
+                                <span className="font-semibold text-gray-900">
+                                  {formatPrice(
+                                    item.discountedPrice !== undefined
+                                      ? item.discountedPrice
+                                      : item.unitPrice
+                                  )}
+                                </span>
+                                <span className="text-gray-500">=</span>
+                                <span className="font-bold text-blue-600">
+                                  {formatPrice(
+                                    (item.discountedPrice !== undefined
+                                      ? item.discountedPrice
+                                      : item.unitPrice) * item.quantity
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side - Shopping Cart Summary */}
+        <div className="w-full max-w-md flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-lg font-semibold text-gray-900">
               Shopping Cart
             </h2>
             <div className="flex items-center space-x-2">
-              {cart.items.length > 0 && (
-                <button
-                  title="Open big view"
-                  onClick={() => setIsBigViewOpen(true)}
-                  className="rounded-full p-2 text-gray-400 hover:bg-blue-100 hover:text-blue-600 transition-colors"
-                >
-                  <Eye className="h-5 w-5" />
-                </button>
-              )}
               <button
                 title="Close cart"
                 onClick={onClose}
@@ -446,57 +934,132 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
 
                   {/* Cart-wide Discount */}
                   {discountMode === "cart" && (
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="number"
-                        placeholder="Enter discount percentage (0-100)"
-                        value={discountAmount}
-                        onChange={(e) => setDiscountAmount(e.target.value)}
-                        className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
-                      <button
-                        onClick={handleApplyDiscount}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
-                      >
-                        Apply
-                      </button>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          placeholder={
+                            discountType === "percentage"
+                              ? "Enter discount percentage (0-100)"
+                              : "Enter discount amount"
+                          }
+                          value={discountAmount}
+                          onChange={(e) => setDiscountAmount(e.target.value)}
+                          className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                          min="0"
+                          max={
+                            discountType === "percentage" ? "100" : undefined
+                          }
+                          step="0.1"
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setDiscountType("percentage")}
+                            className={`px-3 py-2 text-xs font-medium rounded ${
+                              discountType === "percentage"
+                                ? "bg-green-600 text-white"
+                                : "bg-white text-green-600 border border-green-300"
+                            }`}
+                          >
+                            %
+                          </button>
+                          <button
+                            onClick={() => setDiscountType("amount")}
+                            className={`px-3 py-2 text-xs font-medium rounded ${
+                              discountType === "amount"
+                                ? "bg-green-600 text-white"
+                                : "bg-white text-green-600 border border-green-300"
+                            }`}
+                          >
+                            {getCurrencySymbol()}
+                          </button>
+                        </div>
+                        <button
+                          onClick={handleApplyDiscount}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
+                        >
+                          Apply
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {/* Group Discount */}
                   {discountMode === "group" && (
                     <div className="space-y-2">
-                      <select
-                        title="Select a group for discount"
-                        value={selectedGroupForDiscount}
-                        onChange={(e) =>
-                          setSelectedGroupForDiscount(e.target.value)
-                        }
-                        className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      >
-                        <option value="">Select a group</option>
-                        {uniqueGroups.map((group) => (
-                          <option key={group} value={group}>
-                            {group}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative" ref={groupDropdownRef}>
+                        <input
+                          type="text"
+                          placeholder="Search group..."
+                          value={groupSearchTerm}
+                          onChange={(e) => {
+                            setGroupSearchTerm(e.target.value);
+                            setShowGroupDropdown(true);
+                          }}
+                          onFocus={() => setShowGroupDropdown(true)}
+                          className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        />
+                        {showGroupDropdown && filteredGroups.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {filteredGroups.map((group) => (
+                              <button
+                                key={group}
+                                onClick={() => {
+                                  setSelectedGroupForDiscount(group);
+                                  setGroupSearchTerm(group);
+                                  setShowGroupDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-gray-900 font-medium hover:bg-blue-50 focus:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                              >
+                                {group}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center space-x-2">
                         <input
                           type="number"
-                          placeholder="Discount %"
+                          placeholder={
+                            groupDiscountType === "percentage"
+                              ? "Discount %"
+                              : "Discount amount"
+                          }
                           value={groupDiscountAmount}
                           onChange={(e) =>
                             setGroupDiscountAmount(e.target.value)
                           }
                           className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                           min="0"
-                          max="100"
+                          max={
+                            groupDiscountType === "percentage"
+                              ? "100"
+                              : undefined
+                          }
                           step="0.1"
                         />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setGroupDiscountType("percentage")}
+                            className={`px-3 py-2 text-xs font-medium rounded ${
+                              groupDiscountType === "percentage"
+                                ? "bg-green-600 text-white"
+                                : "bg-white text-green-600 border border-green-300"
+                            }`}
+                          >
+                            %
+                          </button>
+                          <button
+                            onClick={() => setGroupDiscountType("amount")}
+                            className={`px-3 py-2 text-xs font-medium rounded ${
+                              groupDiscountType === "amount"
+                                ? "bg-green-600 text-white"
+                                : "bg-white text-green-600 border border-green-300"
+                            }`}
+                          >
+                            {getCurrencySymbol()}
+                          </button>
+                        </div>
                         <button
                           onClick={handleApplyGroupDiscount}
                           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
@@ -510,35 +1073,82 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                   {/* Variant Discount */}
                   {discountMode === "variant" && (
                     <div className="space-y-2">
-                      <select
-                        title="Select a variant for discount"
-                        value={selectedVariantForDiscount}
-                        onChange={(e) =>
-                          setSelectedVariantForDiscount(e.target.value)
-                        }
-                        className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      >
-                        <option value="">Select a variant</option>
-                        {cart.items.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.groupName} - {item.selectedColor} /{" "}
-                            {item.selectedSize}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative" ref={variantDropdownRef}>
+                        <input
+                          type="text"
+                          placeholder="Search variant..."
+                          value={variantSearchTerm}
+                          onChange={(e) => {
+                            setVariantSearchTerm(e.target.value);
+                            setShowVariantDropdown(true);
+                          }}
+                          onFocus={() => setShowVariantDropdown(true)}
+                          className="w-full px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        />
+                        {showVariantDropdown && filteredVariants.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {filteredVariants.map((item) => (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  setSelectedVariantForDiscount(item.id);
+                                  setVariantSearchTerm(
+                                    `${item.groupName} - ${item.selectedColor} / ${item.selectedSize}`
+                                  );
+                                  setShowVariantDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-gray-900 font-medium hover:bg-blue-50 focus:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                              >
+                                {item.groupName} - {item.selectedColor} /{" "}
+                                {item.selectedSize}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center space-x-2">
                         <input
                           type="number"
-                          placeholder="Discount %"
+                          placeholder={
+                            variantDiscountType === "percentage"
+                              ? "Discount %"
+                              : "Discount amount"
+                          }
                           value={variantDiscountAmount}
                           onChange={(e) =>
                             setVariantDiscountAmount(e.target.value)
                           }
                           className="flex-1 px-3 py-2 border-2 border-gray-400 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                           min="0"
-                          max="100"
+                          max={
+                            variantDiscountType === "percentage"
+                              ? "100"
+                              : undefined
+                          }
                           step="0.1"
                         />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setVariantDiscountType("percentage")}
+                            className={`px-3 py-2 text-xs font-medium rounded ${
+                              variantDiscountType === "percentage"
+                                ? "bg-green-600 text-white"
+                                : "bg-white text-green-600 border border-green-300"
+                            }`}
+                          >
+                            %
+                          </button>
+                          <button
+                            onClick={() => setVariantDiscountType("amount")}
+                            className={`px-3 py-2 text-xs font-medium rounded ${
+                              variantDiscountType === "amount"
+                                ? "bg-green-600 text-white"
+                                : "bg-white text-green-600 border border-green-300"
+                            }`}
+                          >
+                            {getCurrencySymbol()}
+                          </button>
+                        </div>
                         <button
                           onClick={handleApplyVariantDiscount}
                           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
@@ -558,6 +1168,21 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                       {formatPrice(originalSubtotal)}
                     </span>
                   </div>
+
+                  {/* Wholesale Pricing Display */}
+                  {wholesaleSavings > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-gray-800">
+                      <span className="flex items-center space-x-1">
+                        <span>Wholesale Pricing:</span>
+                        <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                          WHOLESALE
+                        </span>
+                      </span>
+                      <span className="font-bold text-red-600">
+                        -{formatPrice(wholesaleSavings)}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Group Discount Display */}
                   {groupDiscountSavings > 0 && (
@@ -649,290 +1274,6 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
           )}
         </div>
       </div>
-
-      {/* Cart Big View - Same Layer */}
-      {isBigViewOpen && (
-        <div className="absolute left-0 top-0 h-full w-full max-w-4xl bg-white shadow-xl border-r border-gray-200">
-          <div className="flex h-full flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <div className="flex items-center space-x-3">
-                <Eye className="h-6 w-6 text-blue-600" />
-                <h2 className="text-xl font-bold text-gray-900">
-                  Cart Big View
-                </h2>
-                <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
-                  {cart.totalItems} items
-                </span>
-              </div>
-              <button
-                title="Close big view"
-                onClick={() => setIsBigViewOpen(false)}
-                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              {cart.items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                  <ShoppingCart className="h-16 w-16 mb-6 text-gray-300" />
-                  <p className="text-xl font-medium">Your cart is empty</p>
-                  <p className="text-sm">Add some items to see them here</p>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {cart.items.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-center gap-4">
-                        {/* Product Image */}
-                        <div className="flex-shrink-0">
-                          <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
-                            {item.image ? (
-                              <Image
-                                src={item.image}
-                                alt={item.groupName}
-                                width={80}
-                                height={80}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                                <span className="text-gray-400 text-xs">
-                                  No Image
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Product Details */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-base font-semibold text-gray-900 truncate">
-                                #{index + 1}. {item.groupName}
-                              </h3>
-                              <p className="text-xs text-gray-600">
-                                Shop: {shopNames[item.shop] || item.shop}
-                              </p>
-                            </div>
-                            <button
-                              title="Remove item from cart"
-                              onClick={() => removeFromCart(item.id)}
-                              className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors ml-2"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                            {/* Left Column - Color, Size, Price */}
-                            <div className="space-y-2">
-                              {/* Color and Size */}
-                              <div className="flex items-center gap-4">
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs font-medium text-gray-700">
-                                    Color:
-                                  </span>
-                                  <div
-                                    className="w-5 h-5 rounded-full border border-gray-300"
-                                    style={{
-                                      backgroundColor:
-                                        item.colorCode || "#ef4444",
-                                    }}
-                                  />
-                                  <span className="text-xs font-medium text-gray-800">
-                                    {item.selectedColor}
-                                  </span>
-                                </div>
-                                {item.selectedSize && (
-                                  <div className="flex items-center space-x-1">
-                                    <span className="text-xs font-medium text-gray-700">
-                                      Size:
-                                    </span>
-                                    <span className="text-xs font-medium text-gray-800 bg-gray-200 px-1.5 py-0.5 rounded border">
-                                      {item.selectedSize}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Step-by-Step Discount Calculation */}
-                              {item.groupDiscount || item.variantDiscount ? (
-                                <div className="mb-2">
-                                  <div className="text-xs font-medium text-gray-700 mb-2">
-                                    Discount Calculation:
-                                  </div>
-                                  <div className="flex items-center gap-1 text-sm font-mono">
-                                    {/* Original Price */}
-                                    <span className="font-semibold text-gray-900">
-                                      {formatPrice(item.unitPrice)}
-                                    </span>
-
-                                    {/* Group Discount */}
-                                    {item.groupDiscount &&
-                                      item.groupDiscount > 0 && (
-                                        <>
-                                          <span className="text-red-600 font-medium">
-                                            -
-                                          </span>
-                                          <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium text-xs">
-                                            {item.groupDiscount}%(Group)
-                                          </span>
-                                        </>
-                                      )}
-
-                                    {/* Variant Discount */}
-                                    {item.variantDiscount &&
-                                      item.variantDiscount > 0 && (
-                                        <>
-                                          <span className="text-red-600 font-medium">
-                                            -
-                                          </span>
-                                          <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-medium text-xs">
-                                            {item.variantDiscount}%(Variant)
-                                          </span>
-                                        </>
-                                      )}
-
-                                    {/* Equals */}
-                                    <span className="text-blue-600 font-bold mx-1">
-                                      =
-                                    </span>
-
-                                    {/* Final Unit Price */}
-                                    <span className="font-bold text-blue-600">
-                                      {formatPrice(
-                                        item.discountedPrice || item.unitPrice
-                                      )}
-                                    </span>
-                                  </div>
-                                </div>
-                              ) : (
-                                /* Original Price Display for items without discounts */
-                                <div className="flex items-center gap-2 text-sm mb-1">
-                                  <span className="text-xs font-medium text-gray-600">
-                                    Price:
-                                  </span>
-                                  <span className="font-medium text-gray-700">
-                                    {formatPrice(item.unitPrice)}
-                                  </span>
-                                </div>
-                              )}
-
-                              {/* Final Total Calculation */}
-                              <div className="mt-2">
-                                <div className="text-xs font-medium text-gray-700 mb-1">
-                                  Total Calculation:
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <span className="font-medium text-gray-700">
-                                    {item.quantity}
-                                  </span>
-                                  <span className="text-gray-500">×</span>
-                                  <span className="font-semibold text-gray-900">
-                                    {formatPrice(
-                                      item.discountedPrice || item.unitPrice
-                                    )}
-                                  </span>
-                                  <span className="text-gray-500">=</span>
-                                  <span className="font-bold text-blue-600">
-                                    {formatPrice(
-                                      (item.discountedPrice || item.unitPrice) *
-                                        item.quantity
-                                    )}
-                                  </span>
-                                  {(item.groupDiscount ||
-                                    item.variantDiscount) &&
-                                    (() => {
-                                      const originalTotal =
-                                        item.unitPrice * item.quantity;
-                                      const discountedTotal =
-                                        (item.discountedPrice ||
-                                          item.unitPrice) * item.quantity;
-                                      const savedAmount =
-                                        originalTotal - discountedTotal;
-                                      return (
-                                        <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium ml-2">
-                                          Save Money {formatPrice(savedAmount)}
-                                        </span>
-                                      );
-                                    })()}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Right Column - Quantity Controls */}
-                            <div className="flex items-center justify-end">
-                              <div className="flex items-center space-x-2 rounded-lg p-1.5">
-                                <button
-                                  title="Decrease quantity"
-                                  onClick={() =>
-                                    handleQuantityChange(
-                                      item.id,
-                                      item.quantity - 1
-                                    )
-                                  }
-                                  className="w-8 h-8 rounded-full bg-white hover:bg-gray-200 flex items-center justify-center shadow-sm border border-gray-400 transition-colors text-gray-700 hover:text-gray-900"
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </button>
-                                <span className="w-10 text-center font-bold text-sm text-gray-900 bg-white px-2 py-1 rounded border border-gray-300">
-                                  {item.quantity}
-                                </span>
-                                <button
-                                  title="Increase quantity"
-                                  onClick={() =>
-                                    handleQuantityChange(
-                                      item.id,
-                                      item.quantity + 1
-                                    )
-                                  }
-                                  className="w-8 h-8 rounded-full bg-white hover:bg-gray-200 flex items-center justify-center shadow-sm border border-gray-400 transition-colors text-gray-700 hover:text-gray-900"
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Footer with summary */}
-            {cart.items.length > 0 && (
-              <div className="border-t border-gray-300 px-6 py-4 bg-gray-100">
-                <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-300 shadow-sm">
-                  <div className="text-sm font-medium text-gray-800">
-                    Total Items:{" "}
-                    <span className="font-bold text-gray-900">
-                      {cart.totalItems}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-gray-700">
-                      Cart Total
-                    </div>
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatPrice(cart.totalAmount)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Customer Selection Modal */}
       <CustomerSelectionModal

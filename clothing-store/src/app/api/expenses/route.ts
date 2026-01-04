@@ -62,7 +62,15 @@ export async function POST(request: NextRequest) {
       const spendingMenu = await addSpendingMenu(name);
       return NextResponse.json({ success: true, data: spendingMenu });
     } else {
-      const { categoryId, spendingMenuId, note, date, amount, currency } = body;
+      const {
+        categoryId,
+        spendingMenuId,
+        note,
+        imageUrl,
+        date,
+        amount,
+        currency,
+      } = body;
 
       if (!categoryId || !spendingMenuId || !date || !amount || !currency) {
         return NextResponse.json(
@@ -75,6 +83,7 @@ export async function POST(request: NextRequest) {
         categoryId,
         spendingMenuId,
         note: note || "",
+        imageUrl: imageUrl || "",
         date: new Date(date),
         amount: parseFloat(amount),
         currency,
@@ -135,12 +144,21 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { categoryId, spendingMenuId, note, date, amount, currency } = body;
+    const {
+      categoryId,
+      spendingMenuId,
+      note,
+      imageUrl,
+      date,
+      amount,
+      currency,
+    } = body;
 
     await updateExpense(id, {
       categoryId,
       spendingMenuId,
       note,
+      imageUrl,
       date: date ? new Date(date) : undefined,
       amount,
       currency,
