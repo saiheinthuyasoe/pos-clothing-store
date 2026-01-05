@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Sidebar } from "@/components/ui/Sidebar";
@@ -29,11 +29,12 @@ import { StockItem, StockGroupDisplay } from "@/types/stock";
 import { Shop } from "@/types/shop";
 import { StockDisplayService } from "@/services/stockDisplayService";
 import { SettingsService } from "@/services/settingsService";
+import { CategoryService } from "@/services/categoryService";
 import { WholesalePricingTiers } from "@/components/ui/WholesalePricingTiers";
 
 function InventoryStocksContent() {
   const router = useRouter();
-  const [activeItem, setActiveItem] = useState("inventory");
+  const [activeItem, setActiveItem] = useState("stocks");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
@@ -59,7 +60,65 @@ function InventoryStocksContent() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Currency state
-  const [defaultCurrency, setDefaultCurrency] = useState<'THB' | 'MMK'>('THB');
+  const [defaultCurrency, setDefaultCurrency] = useState<"THB" | "MMK">("THB");
+
+  // Search and pagination state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Filter state
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [selectedShop, setSelectedShop] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedStockStatus, setSelectedStockStatus] = useState<string>("all");
+  const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".filter-dropdown-container")) {
+        setShowFilterDropdown(false);
+      }
+    };
+
+    if (showFilterDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showFilterDropdown]);
+
+  // Load categories from Firebase
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const cats = await CategoryService.getCategories();
+        setCategories(cats);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+
+    // Subscribe to real-time category updates
+    const unsubscribe = CategoryService.subscribeToCategories((cats) => {
+      setCategories(cats);
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
 
   // Fetch stocks from API
   useEffect(() => {
@@ -72,7 +131,7 @@ function InventoryStocksContent() {
         const [stocksResponse, shopsResponse, settings] = await Promise.all([
           fetch("/api/stocks"),
           fetch("/api/shops"),
-          SettingsService.getBusinessSettings()
+          SettingsService.getBusinessSettings(),
         ]);
 
         if (!stocksResponse.ok) {
@@ -85,7 +144,7 @@ function InventoryStocksContent() {
 
         const [stocksData, shopsData] = await Promise.all([
           stocksResponse.json(),
-          shopsResponse.json()
+          shopsResponse.json(),
         ]);
 
         if (!stocksData.success || !stocksData.data) {
@@ -105,7 +164,7 @@ function InventoryStocksContent() {
         setShopLookup(lookup);
 
         // Set currency from settings
-        const currency = (settings?.defaultCurrency as 'THB' | 'MMK') || 'THB';
+        const currency = (settings?.defaultCurrency as "THB" | "MMK") || "THB";
         setDefaultCurrency(currency);
 
         // Transform API data using the display service with currency
@@ -125,14 +184,10 @@ function InventoryStocksContent() {
     fetchStocks();
   }, []);
 
-  // Search and pagination state
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  // Filter groups based on search term
-  const filteredGroups = stockGroups.filter(
-    (group) =>
+  // Filter groups based on search term and filters
+  const filteredGroups = stockGroups.filter((group) => {
+    // Search filter
+    const matchesSearch =
       group.groupName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       group.groupId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       group.variants.some(
@@ -142,8 +197,45 @@ function InventoryStocksContent() {
             size.size.toLowerCase().includes(searchTerm.toLowerCase())
           ) ||
           variant.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-  );
+      );
+
+    // Shop filter
+    const matchesShop = selectedShop === "all" || group.shop === selectedShop;
+
+    // Category filter
+    const matchesCategory =
+      selectedCategory === "all" ||
+      (group.category &&
+        group.category.toLowerCase() === selectedCategory.toLowerCase());
+
+    // Stock status filter
+    let matchesStockStatus = true;
+    if (selectedStockStatus === "in-stock") {
+      matchesStockStatus = group.totalQuantity > 0;
+    } else if (selectedStockStatus === "low-stock") {
+      matchesStockStatus = group.totalQuantity > 0 && group.totalQuantity <= 10;
+    } else if (selectedStockStatus === "out-of-stock") {
+      matchesStockStatus = group.totalQuantity === 0;
+    }
+
+    // Price range filter
+    let matchesPriceRange = true;
+    if (priceRange.min !== "" || priceRange.max !== "") {
+      const price = group.unitPrice ? parseFloat(group.unitPrice.toString()) : 0;
+      const minPrice = priceRange.min !== "" ? parseFloat(priceRange.min) : 0;
+      const maxPrice =
+        priceRange.max !== "" ? parseFloat(priceRange.max) : Infinity;
+      matchesPriceRange = price >= minPrice && price <= maxPrice;
+    }
+
+    return (
+      matchesSearch &&
+      matchesShop &&
+      matchesCategory &&
+      matchesStockStatus &&
+      matchesPriceRange
+    );
+  });
 
   const totalPages = Math.ceil(filteredGroups.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -164,6 +256,78 @@ function InventoryStocksContent() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedShop("all");
+    setSelectedCategory("all");
+    setSelectedStockStatus("all");
+    setPriceRange({ min: "", max: "" });
+    setCurrentPage(1);
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters =
+    selectedShop !== "all" ||
+    selectedCategory !== "all" ||
+    selectedStockStatus !== "all" ||
+    priceRange.min !== "" ||
+    priceRange.max !== "";
+
+  // Export to CSV
+  const exportToCSV = () => {
+    // Prepare CSV headers
+    const headers = [
+      "Group ID",
+      "Group Name",
+      "Shop",
+      "Color",
+      "Size",
+      "Quantity",
+      "Price",
+      "Barcode",
+      "Date Added",
+    ];
+
+    // Prepare CSV rows
+    const rows = filteredGroups.flatMap((group) =>
+      group.variants.flatMap((variant) =>
+        variant.sizes.map((size) => [
+          group.groupId,
+          group.groupName,
+          shopLookup.get(group.shop) || group.shop,
+          variant.color,
+          size.size,
+          size.quantity,
+          group.unitPrice || 0,
+          variant.barcode || "",
+          group.formattedReleaseDate || group.releaseDate || "",
+        ])
+      )
+    );
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(",")
+      ),
+    ].join("\n");
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `inventory-stocks-${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Handle edit navigation
@@ -189,7 +353,10 @@ function InventoryStocksContent() {
     setDeleteError(null);
 
     try {
-      console.log("Making DELETE request to:", `/api/stocks/${deletingGroup.groupId}`);
+      console.log(
+        "Making DELETE request to:",
+        `/api/stocks/${deletingGroup.groupId}`
+      );
       const response = await fetch(`/api/stocks/${deletingGroup.groupId}`, {
         method: "DELETE",
       });
@@ -265,20 +432,165 @@ function InventoryStocksContent() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
                     type="text"
-                    placeholder="Search by Group, Item ID, Barcode, Color, or Shop..."
+                    placeholder="Search by Group, Item ID, Barcode, Color..."
                     value={searchTerm}
                     onChange={handleSearchChange}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-80"
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-80 text-gray-900"
                   />
                 </div>
-                <Button variant="outline" className="flex items-center">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filter
-                </Button>
+
+                {/* Filter Dropdown */}
+                <div className="relative filter-dropdown-container">
+                  <Button
+                    variant="outline"
+                    className="flex items-center"
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filter
+                    {hasActiveFilters && (
+                      <span className="ml-2 px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                        {
+                          [
+                            selectedShop !== "all",
+                            selectedCategory !== "all",
+                            selectedStockStatus !== "all",
+                            priceRange.min !== "" || priceRange.max !== "",
+                          ].filter(Boolean).length
+                        }
+                      </span>
+                    )}
+                  </Button>
+
+                  {showFilterDropdown && (
+                    <div className="absolute z-50 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          Filters
+                        </h3>
+                        {hasActiveFilters && (
+                          <button
+                            onClick={clearFilters}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Shop Filter */}
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Shop
+                        </label>
+                        <select
+                          title="selectedShop"
+                          value={selectedShop}
+                          onChange={(e) => {
+                            setSelectedShop(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        >
+                          <option value="all">All Shops</option>
+                          {shops.map((shop) => (
+                            <option key={shop.id} value={shop.id}>
+                              {shop.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Category Filter */}
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Category
+                        </label>
+                        <select
+                          title="selectedCategory"
+                          value={selectedCategory}
+                          onChange={(e) => {
+                            setSelectedCategory(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        >
+                          <option value="all">All Categories</option>
+                          {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Stock Status Filter */}
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Stock Status
+                        </label>
+                        <select
+                          title="selectedStockStatus"
+                          value={selectedStockStatus}
+                          onChange={(e) => {
+                            setSelectedStockStatus(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="in-stock">In Stock</option>
+                          <option value="low-stock">Low Stock (≤10)</option>
+                          <option value="out-of-stock">Out of Stock</option>
+                        </select>
+                      </div>
+
+                      {/* Price Range Filter */}
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Price Range ({defaultCurrency})
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            placeholder="Min"
+                            value={priceRange.min}
+                            onChange={(e) => {
+                              setPriceRange({
+                                ...priceRange,
+                                min: e.target.value,
+                              });
+                              setCurrentPage(1);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                          />
+                          <span className="text-gray-500">-</span>
+                          <input
+                            type="number"
+                            placeholder="Max"
+                            value={priceRange.max}
+                            onChange={(e) => {
+                              setPriceRange({
+                                ...priceRange,
+                                max: e.target.value,
+                              });
+                              setCurrentPage(1);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center space-x-3">
-                <Button variant="outline" className="flex items-center">
+                <Button
+                  variant="outline"
+                  className="flex items-center"
+                  onClick={exportToCSV}
+                >
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
@@ -325,168 +637,268 @@ function InventoryStocksContent() {
                   </div>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
-                  {currentGroups.map((group) => (
-                    <div key={group.groupId} className="p-6">
-                      {/* Group Header */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-16 h-16 relative rounded-lg overflow-hidden bg-gray-100">
-                            <Image
-                              src={group.groupImage}
-                              alt={group.groupName}
-                              fill
-                              className="object-cover"
-                              sizes="64px"
-                            />
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-3">
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                {group.groupName}
-                              </h3>
-                              <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
-                                ID: {group.groupId}
-                              </span>
-                            </div>
-                            <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                              <span className="flex items-center">
-                                <Store className="h-4 w-4 mr-1" />
-                                {shopLookup.get(group.shop) || group.shop}
-                              </span>
-                              <span className="flex items-center">
-                                <Package className="h-4 w-4 mr-1" />
-                                {group.totalQuantity} items
-                              </span>
-                              <span className="flex items-center">
-                                <Palette className="h-4 w-4 mr-1" />
-                                {group.variants.length} colors
-                              </span>
-                              <span className="flex items-center">
-                                <Ruler className="h-4 w-4 mr-1" />
-                                {group.sizeSummary}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="text-right">
-                            <p className="text-lg font-semibold text-gray-900">
-                              {group.formattedPrice}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {group.formattedReleaseDate}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => handleEditGroup(group)}
-                              className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Edit stock group"
-                            >
-                              <Edit className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteGroup(group)}
-                              className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete stock group"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                toggleGroupExpansion(group.groupId)
-                              }
-                              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                              {expandedGroups.has(group.groupId) ? (
-                                <ChevronUp className="h-5 w-5" />
-                              ) : (
-                                <ChevronDown className="h-5 w-5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Variants Display */}
-                      {expandedGroups.has(group.groupId) && (
-                        <div className="mt-4 bg-gray-50 rounded-lg p-4">
-                          <h4 className="text-sm font-medium text-gray-700 mb-3">
-                            Color Variants
-                          </h4>
-                          <div className="space-y-3">
-                            {group.variants.map((variant, variantIndex) => (
-                              <div
-                                key={variantIndex}
-                                className="bg-white rounded-lg p-4 border border-gray-200"
-                              >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-12 h-12 relative rounded-lg overflow-hidden bg-gray-100 border-2 border-gray-300">
-                                      <Image
-                                        src={variant.image || group.groupImage}
-                                        alt={`${group.groupName} - ${variant.color}`}
-                                        fill
-                                        className="object-cover"
-                                        sizes="48px"
-                                      />
-                                    </div>
-                                    <div
-                                      className="w-6 h-6 rounded-full border-2 border-gray-300"
-                                      style={variant.colorStyle}
-                                    ></div>
-                                    <span className="font-medium text-gray-900">
-                                      {variant.color}
-                                    </span>
-                                    {variant.barcode && (
-                                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                        {variant.barcode}
-                                      </span>
-                                    )}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-300">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6"
+                        >
+                          Product
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Shop
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Category
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Stock Info
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Price
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Date
+                        </th>
+                        <th
+                          scope="col"
+                          className="relative py-3.5 pl-3 pr-4 sm:pr-6"
+                        >
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {currentGroups.map((group) => (
+                        <Fragment key={group.groupId}>
+                          <tr className="hover:bg-gray-50 transition-colors">
+                            {/* Product Column */}
+                            <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
+                              <div className="flex items-center space-x-3">
+                                <div className="h-12 w-12 flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                                  <Image
+                                    src={group.groupImage}
+                                    alt={group.groupName}
+                                    fill
+                                    className="object-cover"
+                                    sizes="48px"
+                                  />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-gray-900 truncate">
+                                    {group.groupName}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    ID: {group.groupId}
                                   </div>
                                 </div>
+                              </div>
+                            </td>
 
-                                {/* Size Grid */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                                  {variant.sizes.map((sizeInfo, sizeIndex) => (
-                                    <div
-                                      key={sizeIndex}
-                                      className="flex items-center justify-between p-2 bg-gray-50 rounded border"
-                                    >
-                                      <span className="text-sm font-medium text-gray-700">
-                                        {sizeInfo.size}
-                                      </span>
-                                      <span
-                                        className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                                          sizeInfo.quantity > 10
-                                            ? "bg-green-100 text-green-800"
-                                            : sizeInfo.quantity > 0
-                                            ? "bg-yellow-100 text-yellow-800"
-                                            : "bg-red-100 text-red-800"
-                                        }`}
-                                      >
-                                        {sizeInfo.quantity}
-                                      </span>
-                                    </div>
-                                  ))}
+                            {/* Shop Column */}
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                              <div className="flex items-center">
+                                <Store className="h-4 w-4 mr-1.5 text-gray-400" />
+                                <span className="text-gray-900 font-medium">
+                                  {shopLookup.get(group.shop) || group.shop}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Category Column */}
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                              {group.category ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {group.category}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">-</span>
+                              )}
+                            </td>
+
+                            {/* Stock Info Column */}
+                            <td className="whitespace-nowrap px-3 py-4 text-sm">
+                              <div className="space-y-1">
+                                <div className="flex items-center text-gray-900">
+                                  <Package className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                                  <span className="font-semibold">
+                                    {group.totalQuantity}
+                                  </span>
+                                  <span className="ml-1 text-gray-500">
+                                    items
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-3 text-xs text-gray-500">
+                                  <span className="flex items-center">
+                                    <Palette className="h-3 w-3 mr-1" />
+                                    {group.variants.length} colors
+                                  </span>
+                                  <span className="flex items-center">
+                                    <Ruler className="h-3 w-3 mr-1" />
+                                    {group.sizeSummary}
+                                  </span>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                            </td>
 
-                      {/* Wholesale Pricing Tiers */}
-                      <div className="mt-4">
-                        <WholesalePricingTiers
-                          wholesaleTiers={group.wholesaleTiers}
-                          title="Wholesale Pricing Tiers"
-                          defaultExpanded={false}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                            {/* Price Column */}
+                            <td className="whitespace-nowrap px-3 py-4 text-sm">
+                              <div className="font-semibold text-gray-900">
+                                {group.formattedPrice}
+                              </div>
+                            </td>
+
+                            {/* Date Column */}
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                              {group.formattedReleaseDate}
+                            </td>
+
+                            {/* Actions Column */}
+                            <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                              <div className="flex items-center justify-end space-x-2">
+                                <button
+                                  onClick={() => handleEditGroup(group)}
+                                  className="text-blue-600 hover:text-blue-900 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteGroup(group)}
+                                  className="text-red-600 hover:text-red-900 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    toggleGroupExpansion(group.groupId)
+                                  }
+                                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                  title={
+                                    expandedGroups.has(group.groupId)
+                                      ? "Collapse"
+                                      : "Expand"
+                                  }
+                                >
+                                  {expandedGroups.has(group.groupId) ? (
+                                    <ChevronUp className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4" />
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Expandable Variants Row */}
+                          {expandedGroups.has(group.groupId) && (
+                            <tr className="bg-gray-50">
+                              <td colSpan={6} className="px-4 py-4 sm:px-6">
+                                <div className="space-y-4">
+                                  {/* Color Variants */}
+                                  <div>
+                                    <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+                                      Color Variants
+                                    </h4>
+                                    <div className="space-y-3">
+                                      {group.variants.map(
+                                        (variant, variantIndex) => (
+                                          <div
+                                            key={variantIndex}
+                                            className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm"
+                                          >
+                                            <div className="flex items-center space-x-3 mb-3">
+                                              <div className="h-10 w-10 relative rounded-md overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
+                                                <Image
+                                                  src={
+                                                    variant.image ||
+                                                    group.groupImage
+                                                  }
+                                                  alt={`${group.groupName} - ${variant.color}`}
+                                                  fill
+                                                  className="object-cover"
+                                                  sizes="40px"
+                                                />
+                                              </div>
+                                              <div
+                                                className="w-5 h-5 rounded-full border-2 border-gray-300 flex-shrink-0"
+                                                style={variant.colorStyle}
+                                              ></div>
+                                              <span className="font-medium text-gray-900 text-sm">
+                                                {variant.color}
+                                              </span>
+                                              {variant.barcode && (
+                                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                                  {variant.barcode}
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            {/* Size Grid */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+                                              {variant.sizes.map(
+                                                (sizeInfo, sizeIndex) => (
+                                                  <div
+                                                    key={sizeIndex}
+                                                    className="flex items-center justify-between px-2.5 py-1.5 bg-gray-50 rounded-md border border-gray-200"
+                                                  >
+                                                    <span className="text-xs font-medium text-gray-700">
+                                                      {sizeInfo.size}
+                                                    </span>
+                                                    <span
+                                                      className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                                                        sizeInfo.quantity > 10
+                                                          ? "bg-green-100 text-green-700"
+                                                          : sizeInfo.quantity >
+                                                            0
+                                                          ? "bg-yellow-100 text-yellow-700"
+                                                          : "bg-red-100 text-red-700"
+                                                      }`}
+                                                    >
+                                                      {sizeInfo.quantity}
+                                                    </span>
+                                                  </div>
+                                                )
+                                              )}
+                                            </div>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Wholesale Pricing */}
+                                  <WholesalePricingTiers
+                                    wholesaleTiers={group.wholesaleTiers}
+                                    title="Wholesale Pricing Tiers"
+                                    defaultExpanded={false}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
@@ -520,7 +932,7 @@ function InventoryStocksContent() {
                         setRowsPerPage(Number(e.target.value));
                         setCurrentPage(1);
                       }}
-                      className="border border-gray-300 rounded px-2 py-1 text-sm"
+                      className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
                     >
                       <option value={10}>10</option>
                       <option value={25}>25</option>

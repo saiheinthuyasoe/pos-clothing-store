@@ -36,6 +36,7 @@ export interface AuthContextType {
   signInWithGoogle: (role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  setUser: (user: User | null) => void;
 }
 
 export interface FirebaseUser {

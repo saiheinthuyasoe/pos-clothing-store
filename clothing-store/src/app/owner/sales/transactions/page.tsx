@@ -4,7 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { transactionService, Transaction } from "@/services/transactionService";
+import { ShopService } from "@/services/shopService";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import {
@@ -21,14 +23,19 @@ import {
   AlertTriangle,
   MoreVertical,
   ChevronDown,
+  CheckCircle,
+  Truck,
 } from "lucide-react";
 
 export default function TransactionsPage() {
   const { user } = useAuth();
   const { formatPrice } = useCurrency();
+  const { businessSettings } = useSettings();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
+  const [filterBranch, setFilterBranch] = useState<string>(""); // Will be set from settings
   const [filterStatus, setFilterStatus] = useState<
     | "all"
     | "completed"
@@ -38,7 +45,7 @@ export default function TransactionsPage() {
     | "partially_refunded"
   >("all");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<
-    "all" | "cash" | "scan" | "wallet"
+    "all" | "cash" | "scan" | "wallet" | "cod"
   >("all");
   const [dateRange, setDateRange] = useState<
     "today" | "7d" | "30d" | "90d" | "all"
@@ -55,6 +62,9 @@ export default function TransactionsPage() {
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
   const [refundItems, setRefundItems] = useState<{ [key: string]: number }>({});
+  const [selectedTransactions, setSelectedTransactions] = useState<string[]>(
+    []
+  );
 
   // Dropdown state
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -66,7 +76,25 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     loadTransactions();
+
+    // Load shops
+    const fetchShops = async () => {
+      try {
+        const shopsData = await ShopService.getAllShops();
+        setShops(shopsData || []);
+      } catch (error) {
+        console.error("Error fetching shops:", error);
+      }
+    };
+    fetchShops();
   }, []);
+
+  // Set initial branch filter from settings
+  useEffect(() => {
+    if (businessSettings?.currentBranch && filterBranch === "") {
+      setFilterBranch(businessSettings.currentBranch);
+    }
+  }, [businessSettings, filterBranch]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -89,9 +117,19 @@ export default function TransactionsPage() {
       }
     };
 
+    const handleScroll = () => {
+      if (openDropdown) {
+        setOpenDropdown(null);
+        setDropdownPosition(null);
+      }
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", handleScroll, true);
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
     };
   }, [openDropdown]);
 
@@ -125,6 +163,12 @@ export default function TransactionsPage() {
       filterPaymentMethod === "all" ||
       transaction.paymentMethod === filterPaymentMethod;
 
+    // Branch filter - show all if "all" selected, otherwise filter by branch name
+    const matchesBranch =
+      filterBranch === "all" ||
+      !filterBranch ||
+      transaction.branchName === filterBranch;
+
     // Date range filtering
     let matchesDateRange = true;
     if (dateRange !== "all") {
@@ -156,7 +200,11 @@ export default function TransactionsPage() {
     }
 
     return (
-      matchesSearch && matchesStatus && matchesPaymentMethod && matchesDateRange
+      matchesSearch &&
+      matchesStatus &&
+      matchesPaymentMethod &&
+      matchesDateRange &&
+      matchesBranch
     );
   });
 
@@ -243,13 +291,15 @@ export default function TransactionsPage() {
   const getPaymentMethodIcon = (method: string) => {
     switch (method) {
       case "cash":
-        return <CreditCard className="h-4 w-4" />;
+        return <CreditCard className="h-4 w-4 text-gray-900" />;
       case "scan":
-        return <Smartphone className="h-4 w-4" />;
+        return <Smartphone className="h-4 w-4 text-gray-900" />;
       case "wallet":
-        return <Wallet className="h-4 w-4" />;
+        return <Wallet className="h-4 w-4 text-gray-900" />;
+      case "cod":
+        return <Truck className="h-4 w-4 text-gray-900" />;
       default:
-        return <CreditCard className="h-4 w-4" />;
+        return <CreditCard className="h-4 w-4 text-gray-900" />;
     }
   };
 
@@ -329,6 +379,36 @@ export default function TransactionsPage() {
     setShowViewDetailsModal(true);
     setOpenDropdown(null); // Close dropdown
     setDropdownPosition(null); // Reset position
+  };
+
+  const handleApproveClick = async (transaction: Transaction) => {
+    if (!transaction.id) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to approve this COD transaction?\n\nTransaction ID: ${
+        transaction.transactionId
+      }\nTotal: ${formatPrice(transaction.total)}`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await transactionService.approveTransaction(
+        transaction.id,
+        user?.email || "Admin"
+      );
+      alert("Transaction approved successfully!");
+      loadTransactions(); // Reload transactions
+    } catch (error) {
+      console.error("Error approving transaction:", error);
+      alert(
+        `Failed to approve transaction: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+    setOpenDropdown(null);
+    setDropdownPosition(null);
   };
 
   const handleRefundSubmit = async () => {
@@ -465,9 +545,132 @@ export default function TransactionsPage() {
     }
   };
 
+  // Toggle selection for a transaction
+  const toggleSelectTransaction = (transactionId: string) => {
+    setSelectedTransactions((prev) =>
+      prev.includes(transactionId)
+        ? prev.filter((id) => id !== transactionId)
+        : [...prev, transactionId]
+    );
+  };
+
+  // Select/deselect all COD transactions
+  const toggleSelectAll = () => {
+    const codTransactions = filteredTransactions.filter(
+      (t) => t.paymentMethod === "cod" && t.status === "pending"
+    );
+    if (selectedTransactions.length === codTransactions.length) {
+      setSelectedTransactions([]);
+    } else {
+      setSelectedTransactions(codTransactions.map((t) => t.id!));
+    }
+  };
+
+  // Bulk approve selected COD transactions
+  const handleBulkApprove = async () => {
+    if (selectedTransactions.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to approve ${selectedTransactions.length} COD transaction(s)?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const transactionId of selectedTransactions) {
+        try {
+          await transactionService.approveTransaction(
+            transactionId,
+            user?.email || "Admin"
+          );
+          successCount++;
+        } catch (error) {
+          console.error(`Error approving transaction ${transactionId}:`, error);
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        alert(
+          `Successfully approved ${successCount} transaction(s).${
+            failCount > 0
+              ? `\nFailed to approve ${failCount} transaction(s).`
+              : ""
+          }`
+        );
+        setSelectedTransactions([]);
+        loadTransactions();
+      } else {
+        alert("Failed to approve any transactions. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error in bulk approve:", error);
+      alert("An error occurred during bulk approval.");
+    }
+  };
+
+  // Bulk cancel selected COD transactions
+  const handleBulkCancel = async () => {
+    if (selectedTransactions.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel ${selectedTransactions.length} COD transaction(s)?\n\nThis will restore inventory for all items.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const transactionId of selectedTransactions) {
+        try {
+          const transaction = transactions.find((t) => t.id === transactionId);
+          if (transaction) {
+            await transactionService.cancelTransaction(
+              transactionId,
+              transaction,
+              "Bulk cancelled by owner",
+              user?.email || "Unknown user"
+            );
+            successCount++;
+          }
+        } catch (error) {
+          console.error(
+            `Error cancelling transaction ${transactionId}:`,
+            error
+          );
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        alert(
+          `Successfully cancelled ${successCount} transaction(s).${
+            failCount > 0
+              ? `\nFailed to cancel ${failCount} transaction(s).`
+              : ""
+          }`
+        );
+        setSelectedTransactions([]);
+        loadTransactions();
+      } else {
+        alert("Failed to cancel any transactions. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error in bulk cancel:", error);
+      alert("An error occurred during bulk cancellation.");
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar
+        activeItem="transactions"
+        onItemClick={() => {}}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isCartModalOpen={isCartModalOpen}
@@ -535,6 +738,39 @@ export default function TransactionsPage() {
               </div>
             </div>
 
+            {/* Bulk Actions Bar */}
+            {selectedTransactions.length > 0 && (
+              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-blue-900">
+                    {selectedTransactions.length} transaction(s) selected
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleBulkApprove}
+                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve Selected
+                  </button>
+                  <button
+                    onClick={handleBulkCancel}
+                    className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel Checkout Selected
+                  </button>
+                  <button
+                    onClick={() => setSelectedTransactions([])}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Filters and Search */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -546,7 +782,7 @@ export default function TransactionsPage() {
                     placeholder="Search transactions..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
 
@@ -565,7 +801,7 @@ export default function TransactionsPage() {
                         | "partially_refunded"
                     )
                   }
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Status</option>
                   <option value="completed">Completed</option>
@@ -581,15 +817,36 @@ export default function TransactionsPage() {
                   value={filterPaymentMethod}
                   onChange={(e) =>
                     setFilterPaymentMethod(
-                      e.target.value as "all" | "cash" | "scan" | "wallet"
+                      e.target.value as
+                        | "all"
+                        | "cash"
+                        | "scan"
+                        | "wallet"
+                        | "cod"
                     )
                   }
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Payment Methods</option>
                   <option value="cash">Cash</option>
                   <option value="scan">Scan Payment</option>
                   <option value="wallet">Wallet</option>
+                  <option value="cod">COD</option>
+                </select>
+
+                {/* Branch Filter */}
+                <select
+                  aria-label="Filter by branch"
+                  value={filterBranch}
+                  onChange={(e) => setFilterBranch(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="all">All Branches</option>
+                  {shops.map((shop) => (
+                    <option key={shop.id} value={shop.name}>
+                      {shop.name}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Date Range Filter */}
@@ -601,7 +858,7 @@ export default function TransactionsPage() {
                       e.target.value as "today" | "7d" | "30d" | "90d" | "all"
                     )
                   }
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="today">Today</option>
                   <option value="7d">Last 7 Days</option>
@@ -635,6 +892,34 @@ export default function TransactionsPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={
+                              filteredTransactions.filter(
+                                (t) =>
+                                  t.paymentMethod === "cod" &&
+                                  t.status === "pending"
+                              ).length > 0 &&
+                              selectedTransactions.length ===
+                                filteredTransactions.filter(
+                                  (t) =>
+                                    t.paymentMethod === "cod" &&
+                                    t.status === "pending"
+                                ).length
+                            }
+                            onChange={toggleSelectAll}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                            disabled={
+                              filteredTransactions.filter(
+                                (t) =>
+                                  t.paymentMethod === "cod" &&
+                                  t.status === "pending"
+                              ).length === 0
+                            }
+                            aria-label="Select all COD transactions"
+                          />
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Transaction ID
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -645,6 +930,9 @@ export default function TransactionsPage() {
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Total
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Profit
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Tax
@@ -662,7 +950,7 @@ export default function TransactionsPage() {
                           Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Date
+                          Date & Time
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
@@ -682,12 +970,31 @@ export default function TransactionsPage() {
 
                         return (
                           <tr key={transaction.id} className={rowClass}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {transaction.paymentMethod === "cod" &&
+                              transaction.status === "pending" ? (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTransactions.includes(
+                                    transaction.id!
+                                  )}
+                                  onChange={() =>
+                                    toggleSelectTransaction(transaction.id!)
+                                  }
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                                  aria-label={`Select transaction ${transaction.transactionId}`}
+                                />
+                              ) : (
+                                <div className="h-4 w-4"></div>
+                              )}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {transaction.transactionId}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                {transaction.customer?.displayName || "Guest"}
+                                {transaction.customer?.displayName ||
+                                  "Walk-in customer"}
                               </div>
                               <div className="text-sm text-gray-500">
                                 {transaction.customer?.email}
@@ -764,6 +1071,70 @@ export default function TransactionsPage() {
                                       </div>
                                     </div>
                                   </div>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              {(() => {
+                                // Calculate profit: (selling price - original price) * quantity for each item
+                                const totalProfit = transaction.items.reduce(
+                                  (sum, item) => {
+                                    const sellingPrice =
+                                      item.discountedPrice || item.unitPrice;
+                                    const profit =
+                                      (sellingPrice - item.originalPrice) *
+                                      item.quantity;
+                                    return sum + profit;
+                                  },
+                                  0
+                                );
+
+                                // Calculate profit lost from refunds
+                                const refundedProfit =
+                                  transaction.refunds?.reduce(
+                                    (refundTotal, refund) => {
+                                      return (
+                                        refundTotal +
+                                        refund.items.reduce(
+                                          (refundItemTotal, refundItem) => {
+                                            const originalItem =
+                                              transaction.items[
+                                                refundItem.itemIndex
+                                              ];
+                                            if (originalItem) {
+                                              const itemSellingPrice =
+                                                originalItem.discountedPrice ||
+                                                originalItem.unitPrice;
+                                              const refundedItemProfit =
+                                                (itemSellingPrice -
+                                                  originalItem.originalPrice) *
+                                                refundItem.quantity;
+                                              return (
+                                                refundItemTotal +
+                                                refundedItemProfit
+                                              );
+                                            }
+                                            return refundItemTotal;
+                                          },
+                                          0
+                                        )
+                                      );
+                                    },
+                                    0
+                                  ) || 0;
+
+                                const netProfit = totalProfit - refundedProfit;
+                                const isProfitable = netProfit >= 0;
+                                return (
+                                  <span
+                                    className={
+                                      isProfitable
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }
+                                  >
+                                    {formatPrice(netProfit)}
+                                  </span>
                                 );
                               })()}
                             </td>
@@ -1267,7 +1638,7 @@ export default function TransactionsPage() {
                               </span>
                               <span className="text-sm font-medium text-gray-900">
                                 {selectedTransaction.customer?.displayName ||
-                                  "Guest"}
+                                  "Walk-in customer"}
                               </span>
                             </div>
                             {selectedTransaction.customer?.email && (
@@ -1579,6 +1950,26 @@ export default function TransactionsPage() {
                       const transaction = transactions.find(
                         (t) => t.id === openDropdown
                       );
+
+                      // Show Approve for pending COD transactions
+                      if (
+                        transaction?.status === "pending" &&
+                        transaction?.paymentMethod === "cod"
+                      ) {
+                        return (
+                          <button
+                            onClick={() => {
+                              if (transaction) handleApproveClick(transaction);
+                            }}
+                            className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-3" />
+                            Approve
+                          </button>
+                        );
+                      }
+
+                      // Show Refund for completed and partially refunded transactions
                       return (
                         (transaction?.status === "completed" ||
                           transaction?.status === "partially_refunded") && (

@@ -23,6 +23,7 @@ export interface ColorVariant {
 export interface StockItem {
   id: string;
   groupName: string;
+  category?: string;
   unitPrice: number;
   originalPrice: number;
   releaseDate: string;
@@ -38,6 +39,7 @@ export interface StockItem {
 
 export interface CreateStockRequest {
   groupName: string;
+  category?: string;
   unitPrice: number;
   originalPrice: number;
   releaseDate: string;
@@ -80,6 +82,7 @@ export interface StockVariantDisplay {
 export interface StockGroupDisplay {
   groupId: string;
   groupName: string;
+  category?: string;
   unitPrice: number;
   originalPrice: number;
   releaseDate: string;

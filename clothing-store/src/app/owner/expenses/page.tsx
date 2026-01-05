@@ -302,14 +302,15 @@ function ExpensesContent() {
     }
   };
 
-  const formatCurrency = (amount: number, curr: "Baht" | "MMK") => {
+  const formatCurrency = (amount: number, curr: "THB" | "MMK") => {
+    const symbol = curr === "THB" ? "฿" : "Ks";
     return (
+      symbol +
+      " " +
       new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(amount) +
-      " " +
-      curr
+      }).format(amount)
     );
   };
 
@@ -338,7 +339,7 @@ function ExpensesContent() {
     (acc, expense) => {
       if (expense.currency === "THB") {
         acc.THB += expense.amount;
-      } else {
+      } else if (expense.currency === "MMK") {
         acc.MMK += expense.amount;
       }
       return acc;
@@ -557,6 +558,7 @@ function ExpensesContent() {
                       Filter by Category
                     </label>
                     <select
+                      title="category"
                       value={filterCategory}
                       onChange={(e) => setFilterCategory(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
@@ -581,6 +583,7 @@ function ExpensesContent() {
                       Filter by Spending Menu
                     </label>
                     <select
+                      title="spendingMenu"
                       value={filterSpendingMenu}
                       onChange={(e) => setFilterSpendingMenu(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
@@ -605,6 +608,7 @@ function ExpensesContent() {
                       Filter by Currency
                     </label>
                     <select
+                      title="currency"
                       value={filterCurrency}
                       onChange={(e) => setFilterCurrency(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
@@ -847,7 +851,7 @@ function ExpensesContent() {
                               <Button
                                 onClick={() => setCurrentPage(page)}
                                 variant={
-                                  currentPage === page ? "default" : "outline"
+                                  currentPage === page ? "primary" : "outline"
                                 }
                                 className="text-sm min-w-[2.5rem]"
                               >
@@ -1024,6 +1028,7 @@ function ExpensesContent() {
                           Category
                         </label>
                         <select
+                          title="category"
                           value={editingExpense.categoryId}
                           onChange={(e) =>
                             setEditingExpense({
@@ -1056,6 +1061,7 @@ function ExpensesContent() {
                           Spending Menu
                         </label>
                         <select
+                          title="spendingMenu"
                           value={editingExpense.spendingMenuId}
                           onChange={(e) =>
                             setEditingExpense({
@@ -1131,6 +1137,7 @@ function ExpensesContent() {
                           Currency
                         </label>
                         <select
+                          title="currency"
                           value={editingExpense.currency}
                           onChange={(e) =>
                             setEditingExpense({

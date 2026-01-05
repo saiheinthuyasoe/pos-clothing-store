@@ -11,11 +11,13 @@ import { loginSchema, LoginFormData } from "@/types/schemas";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
+import { authService } from "@/services/authService";
 
 export function StaffLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login, error, clearError, user } = useAuth();
+  const [localError, setLocalError] = useState<string | null>(null);
+  const { user, setUser } = useAuth();
   const router = useRouter();
 
   // Handle redirect when user is authenticated
@@ -41,27 +43,36 @@ export function StaffLogin() {
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
-    clearError();
+    setLocalError(null);
 
     try {
-      // Try to login as manager first (suppress error display)
+      // Try to login as manager first (directly via authService to avoid context error)
+      // Suppress console errors for the manager attempt
+      const originalConsoleError = console.error;
+      console.error = () => {}; // Temporarily suppress console.error
+
       try {
-        await login(data, "manager");
+        const userData = await authService.login(data, "manager");
+        console.error = originalConsoleError; // Restore console.error
+        setUser(userData);
         router.push("/owner/home");
         return;
       } catch (managerError) {
-        // Manager login failed, clear the error before trying staff
-        clearError();
+        console.error = originalConsoleError; // Restore console.error
+        // Manager login failed, silently continue to try staff
       }
 
-      // Try to login as staff (this error will be shown if it fails)
+      // Try to login as staff
       try {
-        await login(data, "staff");
+        const userData = await authService.login(data, "staff");
+        setUser(userData);
         router.push("/owner/home");
         return;
       } catch (staffError) {
-        // Both failed - the error is already set by login(), just log it
-        console.error("Staff login error:", staffError);
+        // Both failed - show error
+        const errorMessage =
+          staffError instanceof Error ? staffError.message : "Login failed";
+        setLocalError(errorMessage);
       }
     } finally {
       setIsLoading(false);
@@ -84,7 +95,13 @@ export function StaffLogin() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          {error && <Alert type="error" message={error} onClose={clearError} />}
+          {localError && (
+            <Alert
+              type="error"
+              message={localError}
+              onClose={() => setLocalError(null)}
+            />
+          )}
 
           <div className="border border-gray-300 p-4 mb-4">
             <p className="text-sm text-gray-700">

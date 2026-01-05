@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { LogOut, ChevronDown, ShoppingCart, Globe } from "lucide-react";
+import { useSettings } from "@/contexts/SettingsContext";
+import { LogOut, ChevronDown, ShoppingCart, Globe, Store } from "lucide-react";
 import { ShoppingCartModal } from "./ShoppingCartModal";
 
 interface TopNavBarProps {
@@ -14,7 +15,13 @@ interface TopNavBarProps {
 export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
   const { user, logout } = useAuth();
   const { getCartItemCount } = useCart();
-  const { selectedCurrency, setSelectedCurrency, defaultCurrency, getCurrencySymbol } = useCurrency();
+  const {
+    selectedCurrency,
+    setSelectedCurrency,
+    defaultCurrency,
+    getCurrencySymbol,
+  } = useCurrency();
+  const { businessSettings } = useSettings();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
@@ -103,9 +110,17 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
               })}
             </div>
 
+            {/* Current Branch/Shop Display */}
+            <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg">
+              <Store className="w-4 h-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">
+                {businessSettings?.currentBranch || "Main Branch"}
+              </span>
+            </div>
+
             {/* Main Currency Title */}
-            <div className="flex items-center space-x-1 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <span className="text-sm font-semibold text-blue-800">
+            <div className="flex items-center space-x-1 px-3 py-2 bg-white  border-gray-300 rounded-lg">
+              <span className="text-sm font-semibold text-gray-800">
                 Main Currency:
               </span>
               <span className="text-sm font-bold text-blue-900">
@@ -229,7 +244,7 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                 className="flex items-center space-x-2 focus:outline-none"
               >
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center hover:from-blue-500 hover:to-blue-700 transition-colors">
+                <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center hover:from-blue-500 hover:to-blue-700 transition-colors">
                   <span className="text-white text-xl font-medium">
                     {(user?.displayName || user?.email || "U")
                       .charAt(0)

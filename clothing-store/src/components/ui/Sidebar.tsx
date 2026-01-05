@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Home,
@@ -63,14 +63,14 @@ const menuItems: MenuItem[] = [
         id: "reports",
         label: "Reports",
         icon: "FileText",
-        href: "/owner/reports",
+        href: "/owner/sales/reports",
         roles: ["owner", "manager"], // No staff
       },
       {
         id: "payments",
         label: "Payments",
         icon: "CreditCard",
-        href: "/owner/payments",
+        href: "/owner/sales/payments",
         roles: ["owner", "manager", "staff"],
       },
     ],
@@ -92,7 +92,7 @@ const menuItems: MenuItem[] = [
         id: "customers",
         label: "Customers",
         icon: "Users",
-        href: "/owner/customers",
+        href: "/owner/inventory/customers",
         roles: ["owner", "manager"],
       },
     ],
@@ -114,21 +114,21 @@ const menuItems: MenuItem[] = [
         id: "label-print",
         label: "Label Print",
         icon: "Tag",
-        href: "/owner/label-print",
+        href: "/owner/barcode/label-print",
         roles: ["owner", "manager"],
       },
       {
         id: "new-stock",
         label: "New Stock",
         icon: "Plus",
-        href: "/owner/new-stock",
+        href: "/owner/barcode/new-stock",
         roles: ["owner", "manager"],
       },
       {
         id: "print-settings",
         label: "Print Settings",
         icon: "Settings",
-        href: "/owner/print-settings",
+        href: "/owner/barcode/print-settings",
         roles: ["owner", "manager"],
       },
     ],
@@ -147,13 +147,6 @@ const menuItems: MenuItem[] = [
         roles: ["owner"],
       },
       {
-        id: "branch-settings",
-        label: "Branch Settings",
-        icon: "Settings",
-        href: "/owner/shops/settings",
-        roles: ["owner"],
-      },
-      {
         id: "shop-reports",
         label: "Shop Reports",
         icon: "FileText",
@@ -163,17 +156,10 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    id: "exchange-sales",
-    label: "Exchange Sales",
-    icon: "ShoppingCart",
-    href: "/owner/exchange-sales",
-    roles: ["owner", "manager", "staff"],
-  },
-  {
-    id: "tellers",
-    label: "Tellers",
+    id: "staff",
+    label: "Staff",
     icon: "UserCheck",
-    href: "/owner/tellers",
+    href: "/owner/staff",
     roles: ["owner"], // Only owner can manage staff
   },
   {
@@ -230,6 +216,7 @@ export function Sidebar({
   isCartModalOpen = false,
 }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [manuallyCollapsed, setManuallyCollapsed] = useState<string[]>([]);
   const [logoError, setLogoError] = useState<boolean>(false);
 
   // Use settings context for business name and logo
@@ -272,19 +259,66 @@ export function Sidebar({
 
   const filteredMenuItems = filterMenuItems(menuItems);
 
+  // Auto-expand parent menus when their child is active
+  useEffect(() => {
+    const findParentAndExpand = (
+      items: MenuItem[],
+      targetId: string,
+      parentId?: string
+    ): string | null => {
+      for (const item of items) {
+        if (item.id === targetId) {
+          return parentId || null;
+        }
+        if (item.children && item.children.length > 0) {
+          const foundParent = findParentAndExpand(
+            item.children,
+            targetId,
+            item.id
+          );
+          if (foundParent) {
+            return foundParent;
+          }
+        }
+      }
+      return null;
+    };
+
+    if (activeItem && !isCollapsed) {
+      const parentId = findParentAndExpand(filteredMenuItems, activeItem);
+      if (
+        parentId &&
+        !expandedItems.includes(parentId) &&
+        !manuallyCollapsed.includes(parentId)
+      ) {
+        setExpandedItems((prev) => [...prev, parentId]);
+      }
+    }
+  }, [activeItem, isCollapsed, filteredMenuItems, manuallyCollapsed]);
+
   // Close all expanded items when sidebar is collapsed
   useEffect(() => {
     if (isCollapsed) {
       setExpandedItems([]);
+      setManuallyCollapsed([]);
     }
   }, [isCollapsed]);
 
   const toggleExpanded = (itemId: string) => {
-    setExpandedItems((prev) =>
-      prev.includes(itemId)
-        ? prev.filter((id) => id !== itemId)
-        : [...prev, itemId]
-    );
+    setExpandedItems((prev) => {
+      const isCurrentlyExpanded = prev.includes(itemId);
+      if (isCurrentlyExpanded) {
+        // User is manually collapsing - track it
+        setManuallyCollapsed((collapsed) => [...collapsed, itemId]);
+        return prev.filter((id) => id !== itemId);
+      } else {
+        // User is manually expanding - remove from manually collapsed
+        setManuallyCollapsed((collapsed) =>
+          collapsed.filter((id) => id !== itemId)
+        );
+        return [...prev, itemId];
+      }
+    });
   };
 
   const renderIcon = (iconName: string, className: string = "") => {
@@ -292,63 +326,102 @@ export function Sidebar({
     return IconComponent ? <IconComponent className={className} /> : null;
   };
 
+  // Helper function to recursively check if any descendant is active
+  const hasActiveDescendant = (item: MenuItem): boolean => {
+    if (!item.children || item.children.length === 0) {
+      return false;
+    }
+
+    const checkChildren = (children: MenuItem[]): boolean => {
+      return children.some((child) => {
+        if (child.id === activeItem) {
+          return true;
+        }
+        if (child.children && child.children.length > 0) {
+          return checkChildren(child.children);
+        }
+        return false;
+      });
+    };
+
+    return checkChildren(item.children);
+  };
+
   const renderMenuItem = (item: MenuItem, level: number = 0) => {
     const isExpanded = expandedItems.includes(item.id);
     const isActive = activeItem === item.id;
     const hasChildren = item.children && item.children.length > 0;
 
+    // Check if any descendant is active (for parent highlighting)
+    const hasActiveChild = hasActiveDescendant(item);
+
+    const isActiveOrHasActiveChild = isActive || hasActiveChild;
+
     const itemClasses = `
       flex items-center w-full text-sm text-gray-700 hover:bg-gray-100 transition-colors
       ${isCollapsed ? "px-2 py-3 justify-center" : "px-3 py-2"}
-      ${isActive ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700" : ""}
+      ${
+        isActiveOrHasActiveChild
+          ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
+          : ""
+      }
       ${level > 0 && !isCollapsed ? "pl-8" : ""}
     `;
+
+    const iconClasses = isCollapsed
+      ? `w-5 h-5 mx-auto ${isActiveOrHasActiveChild ? "text-blue-700" : ""}`
+      : `w-4 h-4 mr-3 flex-shrink-0 ${
+          isActiveOrHasActiveChild ? "text-blue-700" : ""
+        }`;
 
     const handleMainClick = () => {
       if (item.href) {
         onItemClick?.(item);
       } else if (hasChildren) {
+        // Only toggle expand/collapse, don't change active item
         toggleExpanded(item.id);
-        onItemClick?.(item);
       }
     };
 
     return (
       <div key={item.id}>
         {item.href ? (
-          <Link
-            href={item.href}
-            onClick={() => onItemClick?.(item)}
-            className={itemClasses}
-            title={isCollapsed ? item.label : undefined}
-          >
-            {renderIcon(
-              item.icon,
-              isCollapsed ? "w-5 h-5 mx-auto" : "w-4 h-4 mr-3 flex-shrink-0"
-            )}
-            {!isCollapsed && (
-              <span className="flex-1 text-left">{item.label}</span>
-            )}
+          <div className="relative">
+            <Link
+              href={item.href}
+              onClick={() => onItemClick?.(item)}
+              className={itemClasses}
+              title={isCollapsed ? item.label : undefined}
+            >
+              {renderIcon(item.icon, iconClasses)}
+              {!isCollapsed && (
+                <span className="flex-1 text-left">{item.label}</span>
+              )}
+            </Link>
             {!isCollapsed && hasChildren && (
-              <div className="ml-2">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleExpanded(item.id);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 rounded"
+              >
                 {isExpanded ? (
                   <ChevronDown className="w-3 h-3" />
                 ) : (
                   <ChevronRight className="w-3 h-3" />
                 )}
-              </div>
+              </button>
             )}
-          </Link>
+          </div>
         ) : (
           <button
             onClick={handleMainClick}
             className={itemClasses}
             title={isCollapsed ? item.label : undefined}
           >
-            {renderIcon(
-              item.icon,
-              isCollapsed ? "w-5 h-5 mx-auto" : "w-4 h-4 mr-3 flex-shrink-0"
-            )}
+            {renderIcon(item.icon, iconClasses)}
             {!isCollapsed && (
               <span className="flex-1 text-left">{item.label}</span>
             )}

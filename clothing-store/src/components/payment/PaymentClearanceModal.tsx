@@ -1,8 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, User, CreditCard, Smartphone, Wallet, QrCode, Eye } from "lucide-react";
+import {
+  X,
+  User,
+  CreditCard,
+  Smartphone,
+  Wallet,
+  QrCode,
+  Eye,
+  Truck,
+} from "lucide-react";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { SelectedCustomer } from "@/types/cart";
 import { CartItem } from "@/types/cart";
 import { transactionService } from "@/services/transactionService";
@@ -26,7 +36,7 @@ interface PaymentClearanceModalProps {
   currency: string;
 }
 
-type PaymentMethod = "cash" | "scan" | "wallet";
+type PaymentMethod = "cash" | "scan" | "wallet" | "cod";
 
 export function PaymentClearanceModal({
   isOpen,
@@ -48,6 +58,7 @@ export function PaymentClearanceModal({
   const [calculatorDisplay, setCalculatorDisplay] = useState<string>("0");
   const [isCalculatorMode, setIsCalculatorMode] = useState<boolean>(false);
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -56,13 +67,21 @@ export function PaymentClearanceModal({
       setCalculatorDisplay("0");
       setIsCalculatorMode(false);
       setSelectedPaymentMethod("cash");
+      setIsProcessing(false);
     }
   }, [isOpen]);
 
   // Calculate change in selling currency
-  const totalInSellingCurrency = selectedCurrency === defaultCurrency 
-    ? total 
-    : SettingsService.convertPrice(total, defaultCurrency, selectedCurrency, currencyRate, defaultCurrency);
+  const totalInSellingCurrency =
+    selectedCurrency === defaultCurrency
+      ? total
+      : SettingsService.convertPrice(
+          total,
+          defaultCurrency,
+          selectedCurrency,
+          currencyRate,
+          defaultCurrency
+        );
   const change = amountPaid - totalInSellingCurrency;
 
   const handleCalculatorInput = (value: string) => {
@@ -112,13 +131,23 @@ export function PaymentClearanceModal({
   };
 
   const handlePayNow = async () => {
-    if (selectedPaymentMethod === "cash" && amountPaid < totalInSellingCurrency) {
+    if (
+      selectedPaymentMethod === "cash" &&
+      amountPaid < totalInSellingCurrency
+    ) {
       alert("Insufficient payment amount");
       return;
     }
 
+    if (isProcessing) {
+      return; // Prevent duplicate submissions
+    }
+
+    setIsProcessing(true);
+
     try {
-      const transactionId = `TXN-${Date.now()}`;
+      // Generate sequential transaction ID (TXN-0000000000001 format)
+      const transactionId = await transactionService.generateTransactionId();
       const paymentData = {
         customer,
         items,
@@ -159,6 +188,14 @@ export function PaymentClearanceModal({
         currentExchangeRate = sellingTotal / total;
       }
 
+      // Determine transaction status based on payment method
+      const transactionStatus =
+        selectedPaymentMethod === "cod" ? "pending" : "completed";
+
+      // Get current branch from settings
+      const settings = await SettingsService.getBusinessSettings();
+      const currentBranch = settings?.currentBranch || "Main Branch";
+
       // Record transaction in database
       const recordedTransactionId = await transactionService.recordTransaction({
         transactionId,
@@ -172,8 +209,8 @@ export function PaymentClearanceModal({
         change: selectedPaymentMethod === "cash" ? change : 0,
         paymentMethod: selectedPaymentMethod,
         timestamp: new Date().toISOString(),
-        status: "completed",
-        branchName: "Main Branch", // Default branch name
+        status: transactionStatus,
+        branchName: currentBranch,
         sellingCurrency: selectedCurrency,
         exchangeRate: currentExchangeRate,
         sellingTotal: sellingTotal,
@@ -190,7 +227,9 @@ export function PaymentClearanceModal({
         change: selectedPaymentMethod === "cash" ? change : 0,
         discount,
       });
+      setIsProcessing(false);
     } catch (error) {
+      setIsProcessing(false);
       console.error("Error recording transaction:", error);
       console.error("Error details:", {
         message: error instanceof Error ? error.message : "Unknown error",
@@ -235,7 +274,9 @@ export function PaymentClearanceModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b-2 border-gray-300/50 bg-white/50 backdrop-blur-sm flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <h2 className="text-xl font-bold text-gray-900">Payment Clearance</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              Payment Clearance
+            </h2>
             {selectedCurrency !== defaultCurrency && (
               <button
                 title="View detailed currency information"
@@ -359,7 +400,7 @@ export function PaymentClearanceModal({
                 Payment Method
               </h3>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {/* Cash Payment */}
                 <button
                   onClick={() => setSelectedPaymentMethod("cash")}
@@ -397,6 +438,19 @@ export function PaymentClearanceModal({
                 >
                   <Wallet className="h-5 w-5" />
                   <span className="text-xs font-medium">Wallet</span>
+                </button>
+
+                {/* COD (Cash On Delivery) */}
+                <button
+                  onClick={() => setSelectedPaymentMethod("cod")}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors flex flex-col items-center space-y-1 ${
+                    selectedPaymentMethod === "cod"
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 hover:border-gray-300 text-gray-700"
+                  }`}
+                >
+                  <Truck className="h-5 w-5" />
+                  <span className="text-xs font-medium">COD</span>
                 </button>
               </div>
             </div>
@@ -502,14 +556,20 @@ export function PaymentClearanceModal({
             {/* Pay Now Button */}
             <button
               onClick={handlePayNow}
-              disabled={selectedPaymentMethod === "cash" && amountPaid < totalInSellingCurrency}
+              disabled={
+                isProcessing ||
+                (selectedPaymentMethod === "cash" &&
+                  amountPaid < totalInSellingCurrency)
+              }
               className={`w-full p-2 rounded font-medium text-white transition-colors ${
-                  selectedPaymentMethod === "cash" && amountPaid < totalInSellingCurrency
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700"
-                }`}
+                isProcessing ||
+                (selectedPaymentMethod === "cash" &&
+                  amountPaid < totalInSellingCurrency)
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
             >
-              Pay Now
+              {isProcessing ? "Processing..." : "Pay Now"}
             </button>
           </div>
         </div>
@@ -521,7 +581,9 @@ export function PaymentClearanceModal({
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
             {/* Detail Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Currency Details</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Currency Details
+              </h3>
               <button
                 title="Close Modal"
                 onClick={() => setShowDetailModal(false)}
@@ -535,14 +597,22 @@ export function PaymentClearanceModal({
             <div className="p-4 space-y-4">
               {/* Items with dual currency */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Items</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  Items
+                </h4>
                 <div className="space-y-2">
                   {items.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start p-2 bg-gray-50 rounded">
+                    <div
+                      key={index}
+                      className="flex justify-between items-start p-2 bg-gray-50 rounded"
+                    >
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.groupName}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {item.groupName}
+                        </p>
                         <p className="text-xs text-gray-600">
-                          {item.selectedColor} • {item.selectedSize} • Qty: {item.quantity}
+                          {item.selectedColor} • {item.selectedSize} • Qty:{" "}
+                          {item.quantity}
                         </p>
                       </div>
                       <div className="text-right">
@@ -550,7 +620,10 @@ export function PaymentClearanceModal({
                           {formatPrice(item.unitPrice * item.quantity)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {formatPrice(item.unitPrice * item.quantity, defaultCurrency)}
+                          {formatPrice(
+                            item.unitPrice * item.quantity,
+                            defaultCurrency
+                          )}
                         </p>
                       </div>
                     </div>
@@ -561,7 +634,9 @@ export function PaymentClearanceModal({
               {/* Total with dual currency */}
               <div className="border-t border-gray-200 pt-3">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">Total</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Total
+                  </span>
                   <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">
                       {formatPrice(totalInSellingCurrency, selectedCurrency)}
@@ -574,7 +649,9 @@ export function PaymentClearanceModal({
 
                 {/* Paid with dual currency */}
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">Paid</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Paid
+                  </span>
                   <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">
                       {formatPrice(amountPaid, selectedCurrency)}
@@ -596,9 +673,15 @@ export function PaymentClearanceModal({
 
                 {/* Change with dual currency */}
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">Change</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Change
+                  </span>
                   <div className="text-right">
-                    <p className={`text-sm font-medium ${change >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <p
+                      className={`text-sm font-medium ${
+                        change >= 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
                       {formatPrice(change, selectedCurrency)}
                     </p>
                     <p className="text-xs text-gray-500">
@@ -619,7 +702,9 @@ export function PaymentClearanceModal({
 
               {/* Currency Information */}
               <div className="border-t border-gray-200 pt-3">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Currency Information</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  Currency Information
+                </h4>
                 <div className="space-y-1 text-xs text-gray-600">
                   <p>Selling Currency: {selectedCurrency}</p>
                   <p>Main Currency: {defaultCurrency}</p>

@@ -53,12 +53,17 @@ function CustomerPageContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
   const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
-  
+
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(
+    null
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -114,15 +119,15 @@ function CustomerPageContent() {
     const handleClickOutside = (event: MouseEvent) => {
       if (openDropdown) {
         const target = event.target as Element;
-        
+
         // Check if click is on the dropdown button
-        const isDropdownButton = Object.values(buttonRefs.current).some(button => 
-          button && button.contains(target)
+        const isDropdownButton = Object.values(buttonRefs.current).some(
+          (button) => button && button.contains(target)
         );
-        
+
         // Check if click is inside the dropdown menu
-        const isInsideDropdown = target.closest('[data-dropdown-menu]');
-        
+        const isInsideDropdown = target.closest("[data-dropdown-menu]");
+
         // Close dropdown only if click is outside both button and dropdown
         if (!isDropdownButton && !isInsideDropdown) {
           setOpenDropdown(null);
@@ -131,9 +136,9 @@ function CustomerPageContent() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [openDropdown]);
 
@@ -148,7 +153,7 @@ function CustomerPageContent() {
         const rect = button.getBoundingClientRect();
         setDropdownPosition({
           top: rect.bottom + window.scrollY + 4,
-          right: window.innerWidth - rect.right + window.scrollX
+          right: window.innerWidth - rect.right + window.scrollX,
         });
       }
       setOpenDropdown(customerId);
@@ -188,13 +193,15 @@ function CustomerPageContent() {
 
     try {
       const response = await fetch(`/api/customers/${deletingCustomer.uid}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
-      
+
       if (response.ok) {
         // Show success message
         setSuccessMessage(
-          `Customer "${deletingCustomer.displayName || deletingCustomer.email}" has been deleted successfully.`
+          `Customer "${
+            deletingCustomer.displayName || deletingCustomer.email
+          }" has been deleted successfully.`
         );
 
         // Refresh the customer list
@@ -206,11 +213,11 @@ function CustomerPageContent() {
         // Auto-hide success message after 5 seconds
         setTimeout(() => setSuccessMessage(null), 5000);
       } else {
-        setDeleteError('Failed to delete customer');
+        setDeleteError("Failed to delete customer");
       }
     } catch (err) {
-      setDeleteError('Failed to delete customer');
-      console.error('Error deleting customer:', err);
+      setDeleteError("Failed to delete customer");
+      console.error("Error deleting customer:", err);
     } finally {
       setIsDeleting(false);
     }
@@ -249,7 +256,7 @@ function CustomerPageContent() {
               customer.uid === editingCustomer.uid ? result.data : customer
             )
           );
-          
+
           // Refresh stats to ensure accuracy
           await fetchStats();
         }
@@ -288,7 +295,7 @@ function CustomerPageContent() {
           }));
         }
       }
-      
+
       // Reset editing state
       setEditingCustomer(null);
     } catch (error) {
@@ -305,8 +312,6 @@ function CustomerPageContent() {
       customer.phone?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-
-
   // Format date
   const formatDate = (date: Date | string) => {
     const d = typeof date === "string" ? new Date(date) : date;
@@ -320,7 +325,7 @@ function CustomerPageContent() {
   return (
     <ProtectedRoute requiredRole="owner">
       <div className="flex h-screen bg-gray-50">
-        <Sidebar />
+        <Sidebar activeItem="customers" onItemClick={() => {}} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopNavBar />
 
@@ -526,16 +531,25 @@ function CustomerPageContent() {
                                     <img
                                       className="h-15 w-15 rounded-full object-cover"
                                       src={customer.customerImage}
-                                      alt={customer.displayName || customer.email}
+                                      alt={
+                                        customer.displayName || customer.email
+                                      }
                                       onError={(e) => {
                                         // Fallback to default avatar if image fails to load
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        target.nextElementSibling?.classList.remove('hidden');
+                                        const target =
+                                          e.target as HTMLImageElement;
+                                        target.style.display = "none";
+                                        target.nextElementSibling?.classList.remove(
+                                          "hidden"
+                                        );
                                       }}
                                     />
                                   ) : null}
-                                  <div className={`h-15 w-15 rounded-full bg-gray-200 flex items-center justify-center ${customer.customerImage ? 'hidden' : ''}`}>
+                                  <div
+                                    className={`h-15 w-15 rounded-full bg-gray-200 flex items-center justify-center ${
+                                      customer.customerImage ? "hidden" : ""
+                                    }`}
+                                  >
                                     <User className="h-6 w-6 text-gray-500" />
                                   </div>
                                 </div>
@@ -591,13 +605,14 @@ function CustomerPageContent() {
                                   ref={(el) => {
                                     buttonRefs.current[customer.uid] = el;
                                   }}
-                                  onClick={() => handleDropdownToggle(customer.uid)}
+                                  onClick={() =>
+                                    handleDropdownToggle(customer.uid)
+                                  }
                                   className="p-2 hover:bg-gray-100 rounded-md transition-colors"
                                   aria-label="Customer actions"
                                 >
                                   <MoreVertical className="h-4 w-4 text-gray-500" />
                                 </button>
-
                               </div>
                             </td>
                           </tr>
@@ -613,40 +628,47 @@ function CustomerPageContent() {
       </div>
 
       {/* Portal-based dropdown */}
-      {openDropdown && dropdownPosition && typeof window !== 'undefined' && createPortal(
-        <div 
-          data-dropdown-menu
-          className="fixed w-48 bg-white rounded-md shadow-xl border border-gray-200 z-[9999]"
-          style={{
-            top: `${dropdownPosition.top}px`,
-            right: `${dropdownPosition.right}px`
-          }}
-        >
-          <div className="py-1">
-            <button
-              onClick={() => {
-                const customer = customers.find(c => c.uid === openDropdown);
-                if (customer) handleEditCustomer(customer);
-              }}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Customer
-            </button>
-            <button
-              onClick={() => {
-                const customer = customers.find(c => c.uid === openDropdown);
-                if (customer) handleDeleteCustomer(customer);
-              }}
-              className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Customer
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
+      {openDropdown &&
+        dropdownPosition &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div
+            data-dropdown-menu
+            className="fixed w-48 bg-white rounded-md shadow-xl border border-gray-200 z-[9999]"
+            style={{
+              top: `${dropdownPosition.top}px`,
+              right: `${dropdownPosition.right}px`,
+            }}
+          >
+            <div className="py-1">
+              <button
+                onClick={() => {
+                  const customer = customers.find(
+                    (c) => c.uid === openDropdown
+                  );
+                  if (customer) handleEditCustomer(customer);
+                }}
+                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Customer
+              </button>
+              <button
+                onClick={() => {
+                  const customer = customers.find(
+                    (c) => c.uid === openDropdown
+                  );
+                  if (customer) handleDeleteCustomer(customer);
+                }}
+                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Customer
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Success Message */}
       {successMessage && (

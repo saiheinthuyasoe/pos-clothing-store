@@ -26,6 +26,19 @@ import { Shop, ShopListResponse } from "@/types/shop";
 import { SettingsService } from "@/services/settingsService";
 import { CategoryService } from "@/services/categoryService";
 
+// Type declaration for BarcodeDetector API
+interface BarcodeDetector {
+  detect(image: HTMLVideoElement): Promise<{ rawValue: string }[]>;
+}
+
+declare global {
+  interface Window {
+    BarcodeDetector?: {
+      new (): BarcodeDetector;
+    };
+  }
+}
+
 function EditStockContent() {
   const router = useRouter();
   const params = useParams();
@@ -110,7 +123,7 @@ function EditStockContent() {
       // Populate form with existing data
       setGroupImage(stock.groupImage || "");
       setGroupName(stock.groupName || "");
-      setCategory((stock as any).category || "");
+      setCategory(stock.category || "");
       setUnitPrice(stock.unitPrice?.toString() || "");
       setOriginalPrice(stock.originalPrice?.toString() || "");
       setReleaseDate(stock.releaseDate || "");
@@ -468,7 +481,7 @@ function EditStockContent() {
       // Check if the browser supports the Barcode Detection API
       if ("BarcodeDetector" in window) {
         // Use the native Barcode Detection API if available
-        const barcodeDetector = new (window as any).BarcodeDetector();
+        const barcodeDetector = new window.BarcodeDetector!();
 
         // Request camera access
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -605,6 +618,7 @@ function EditStockContent() {
       // First, update the current stock
       const stockData: CreateStockRequest = {
         groupName: groupName.trim(),
+        category: category || undefined,
         unitPrice: parseFloat(unitPrice),
         originalPrice: parseFloat(originalPrice),
         releaseDate,
@@ -796,6 +810,7 @@ function EditStockContent() {
                     </label>
                     <div className="flex gap-2">
                       <select
+                        title="Category"
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
@@ -1300,15 +1315,24 @@ function EditStockContent() {
                     >
                       <span className="text-gray-900 text-sm">{cat}</span>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (
                             confirm(
                               `Are you sure you want to delete "${cat}" category?`
                             )
                           ) {
-                            setCategories(categories.filter((c) => c !== cat));
-                            if (category === cat) {
-                              setCategory("");
+                            try {
+                              const updatedCategories =
+                                await CategoryService.deleteCategory(cat);
+                              setCategories(updatedCategories);
+                              if (category === cat) {
+                                setCategory("");
+                              }
+                            } catch (error) {
+                              console.error("Error deleting category:", error);
+                              alert(
+                                "Failed to delete category. Please try again."
+                              );
                             }
                           }
                         }}
@@ -1333,15 +1357,24 @@ function EditStockContent() {
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 placeholder="Enter category name"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                onKeyDown={(e) => {
+                onKeyDown={async (e) => {
                   if (e.key === "Enter") {
                     if (
                       newCategoryName.trim() &&
                       !categories.includes(newCategoryName.trim())
                     ) {
-                      setCategories([...categories, newCategoryName.trim()]);
-                      setCategory(newCategoryName.trim());
-                      setNewCategoryName("");
+                      try {
+                        const updatedCategories =
+                          await CategoryService.addCategory(
+                            newCategoryName.trim()
+                          );
+                        setCategories(updatedCategories);
+                        setCategory(newCategoryName.trim());
+                        setNewCategoryName("");
+                      } catch (error) {
+                        console.error("Error adding category:", error);
+                        alert("Failed to add category. Please try again.");
+                      }
                     }
                   }
                 }}
@@ -1350,14 +1383,23 @@ function EditStockContent() {
 
             <div className="flex gap-2">
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (
                     newCategoryName.trim() &&
                     !categories.includes(newCategoryName.trim())
                   ) {
-                    setCategories([...categories, newCategoryName.trim()]);
-                    setCategory(newCategoryName.trim());
-                    setNewCategoryName("");
+                    try {
+                      const updatedCategories =
+                        await CategoryService.addCategory(
+                          newCategoryName.trim()
+                        );
+                      setCategories(updatedCategories);
+                      setCategory(newCategoryName.trim());
+                      setNewCategoryName("");
+                    } catch (error) {
+                      console.error("Error adding category:", error);
+                      alert("Failed to add category. Please try again.");
+                    }
                   }
                 }}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"

@@ -20,7 +20,7 @@ export interface Expense {
   imageUrl?: string;
   date: Date;
   amount: number;
-  currency: "Baht" | "MMK";
+  currency: "THB" | "MMK";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,5 +32,5 @@ export interface CreateExpenseData {
   imageUrl?: string;
   date: Date;
   amount: number;
-  currency: "Baht" | "MMK";
+  currency: "THB" | "MMK";
 }

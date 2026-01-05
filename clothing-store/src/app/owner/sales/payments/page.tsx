@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { transactionService, Transaction } from "@/services/transactionService";
+import { ShopService } from "@/services/shopService";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import {
@@ -20,6 +22,7 @@ import {
   XCircle,
   Clock,
   AlertCircle,
+  Truck,
 } from "lucide-react";
 
 interface PaymentStats {
@@ -33,15 +36,19 @@ interface PaymentStats {
   cashPayments: { count: number; amount: number };
   scanPayments: { count: number; amount: number };
   walletPayments: { count: number; amount: number };
+  codPayments: { count: number; amount: number };
 }
 
 function PaymentsPageContent() {
   const { formatPrice } = useCurrency();
+  const { businessSettings } = useSettings();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
+  const [filterBranch, setFilterBranch] = useState<string>("");
   const [filterMethod, setFilterMethod] = useState<
-    "all" | "cash" | "scan" | "wallet"
+    "all" | "cash" | "scan" | "wallet" | "cod"
   >("all");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "completed" | "pending" | "failed"
@@ -89,13 +96,39 @@ function PaymentsPageContent() {
         filteredData = data.filter((t) => new Date(t.timestamp) >= startDate);
       }
 
+      // Filter by branch
+      if (filterBranch && filterBranch !== "all") {
+        filteredData = filteredData.filter(
+          (t) => t.branchName === filterBranch
+        );
+      }
+
       setTransactions(filteredData);
     } catch (error) {
       console.error("Error loading payments:", error);
     } finally {
       setLoading(false);
     }
-  }, [dateRange]);
+  }, [dateRange, filterBranch]);
+
+  // Load shops and set initial branch filter
+  useEffect(() => {
+    const fetchShops = async () => {
+      try {
+        const shopsData = await ShopService.getAllShops();
+        setShops(shopsData || []);
+      } catch (error) {
+        console.error("Error fetching shops:", error);
+      }
+    };
+    fetchShops();
+  }, []);
+
+  useEffect(() => {
+    if (businessSettings?.currentBranch && filterBranch === "") {
+      setFilterBranch(businessSettings.currentBranch);
+    }
+  }, [businessSettings, filterBranch]);
 
   useEffect(() => {
     loadPayments();
@@ -119,6 +152,7 @@ function PaymentsPageContent() {
       cashPayments: { count: 0, amount: 0 },
       scanPayments: { count: 0, amount: 0 },
       walletPayments: { count: 0, amount: 0 },
+      codPayments: { count: 0, amount: 0 },
     };
 
     transactions.forEach((transaction) => {
@@ -131,10 +165,12 @@ function PaymentsPageContent() {
       const netAmount = Math.max(0, transaction.total - totalRefunded);
 
       // Only add to total sales if transaction is completed, partially_refunded, or refunded
+      // Exclude pending COD transactions
       if (
-        transaction.status === "completed" ||
-        transaction.status === "partially_refunded" ||
-        transaction.status === "refunded"
+        (transaction.status === "completed" ||
+          transaction.status === "partially_refunded" ||
+          transaction.status === "refunded") &&
+        transaction.paymentMethod !== "cod"
       ) {
         stats.totalAmount += netAmount;
 
@@ -220,6 +256,10 @@ function PaymentsPageContent() {
             stats.walletPayments.count++;
             stats.walletPayments.amount += netAmount;
             break;
+          case "cod":
+            stats.codPayments.count++;
+            stats.codPayments.amount += netAmount;
+            break;
         }
       }
     });
@@ -264,6 +304,8 @@ function PaymentsPageContent() {
         return <Smartphone className="h-5 w-5" />;
       case "wallet":
         return <Wallet className="h-5 w-5" />;
+      case "cod":
+        return <Truck className="h-5 w-5" />;
       default:
         return <CreditCard className="h-5 w-5" />;
     }
@@ -301,6 +343,8 @@ function PaymentsPageContent() {
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar
+        activeItem="payments"
+        onItemClick={() => {}}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isCartModalOpen={isCartModalOpen}
@@ -707,7 +751,12 @@ function PaymentsPageContent() {
                   value={filterMethod}
                   onChange={(e) =>
                     setFilterMethod(
-                      e.target.value as "all" | "cash" | "scan" | "wallet"
+                      e.target.value as
+                        | "all"
+                        | "cash"
+                        | "scan"
+                        | "wallet"
+                        | "cod"
                     )
                   }
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -716,11 +765,26 @@ function PaymentsPageContent() {
                   <option value="cash">Cash</option>
                   <option value="scan">Scan Payment</option>
                   <option value="wallet">Wallet</option>
+                  <option value="cod">COD</option>
                 </select>
 
                 <select
                   title="Filter by Status"
                   value={filterStatus}
+                  aria-label="Filter by branch"
+                  value={filterBranch}
+                  onChange={(e) => setFilterBranch(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Branches</option>
+                  {shops.map((shop) => (
+                    <option key={shop.id} value={shop.name}>
+                      {shop.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
                   onChange={(e) =>
                     setFilterStatus(
                       e.target.value as
@@ -795,7 +859,8 @@ function PaymentsPageContent() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {transaction.customer?.displayName || "Guest"}
+                              {transaction.customer?.displayName ||
+                                "Walk-in customer"}
                             </div>
                             <div className="text-sm text-gray-500">
                               {transaction.customer?.email}

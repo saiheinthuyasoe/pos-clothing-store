@@ -1,13 +1,11 @@
 import {
   collection,
-  addDoc,
   getDocs,
   doc,
   updateDoc,
   deleteDoc,
   query,
   where,
-  orderBy,
   Timestamp,
   getDoc,
   setDoc,
@@ -29,6 +27,13 @@ export const createStaffAccount = async (
   data: CreateStaffData
 ): Promise<User> => {
   try {
+    if (!auth) {
+      throw new Error("Auth not initialized");
+    }
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     // Create Firebase Auth account
     const userCredential = await createUserWithEmailAndPassword(
       auth,
@@ -53,7 +58,6 @@ export const createStaffAccount = async (
     await setDoc(doc(db, USERS_COLLECTION, userId), userData);
 
     return {
-      id: userId, // Add id field for frontend compatibility
       uid: userId,
       email: data.email,
       displayName: data.displayName,
@@ -63,17 +67,26 @@ export const createStaffAccount = async (
       updatedAt: new Date(),
       createdBy: auth.currentUser?.uid || "",
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating staff account:", error);
-    if (error.code === "auth/email-already-in-use") {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "auth/email-already-in-use"
+    ) {
       throw new Error("Email is already in use");
     }
     throw error;
   }
 };
 
-export const getAllStaff = async (): Promise<any[]> => {
+export const getAllStaff = async (): Promise<User[]> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     // Query without orderBy to avoid composite index requirement
     const q = query(
       collection(db, USERS_COLLECTION),
@@ -113,7 +126,11 @@ export const updateStaff = async (
   updates: Partial<User>
 ): Promise<void> => {
   try {
-    const updateData: any = {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
+    const updateData: Record<string, unknown> = {
       updatedAt: Timestamp.now(),
     };
 
@@ -131,6 +148,10 @@ export const updateStaff = async (
 
 export const deleteStaff = async (uid: string): Promise<void> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     // Get the user document
     const docRef = doc(db, USERS_COLLECTION, uid);
     const docSnap = await getDoc(docRef);

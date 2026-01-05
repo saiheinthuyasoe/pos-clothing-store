@@ -86,6 +86,7 @@ export function CustomerSelectionModal({
             <h2 className="text-xl font-bold text-gray-900">Select Customer</h2>
           </div>
           <button
+            title="Close"
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >

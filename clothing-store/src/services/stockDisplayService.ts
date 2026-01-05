@@ -10,7 +10,10 @@ export class StockDisplayService {
   /**
    * Transform stock items into grouped display format
    */
-  static transformStocksForDisplay(stocks: StockItem[], currency: 'THB' | 'MMK' = 'THB'): StockGroupDisplay[] {
+  static transformStocksForDisplay(
+    stocks: StockItem[],
+    currency: "THB" | "MMK" = "THB"
+  ): StockGroupDisplay[] {
     return stocks.map((stock) => {
       // Transform variants with calculated totals
       const variants: StockVariantDisplay[] = stock.colorVariants.map(
@@ -51,6 +54,7 @@ export class StockDisplayService {
       return {
         groupId: stock.id,
         groupName: stock.groupName,
+        category: stock.category,
         unitPrice: stock.unitPrice,
         originalPrice: stock.originalPrice,
         releaseDate: stock.releaseDate,
@@ -85,7 +89,7 @@ export class StockDisplayService {
   /**
    * Format price for display
    */
-  static formatPrice(price: number, currency: 'THB' | 'MMK' = 'THB'): string {
+  static formatPrice(price: number, currency: "THB" | "MMK" = "THB"): string {
     return SettingsService.formatPrice(price, currency);
   }
 

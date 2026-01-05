@@ -4,7 +4,7 @@ This guide explains how to set up Firebase Admin SDK to enable full user deletio
 
 ## Why is this needed?
 
-When you delete a staff member from the `/owner/tellers` page, the system needs to delete the user from:
+When you delete a staff member from the `/owner/staff` page, the system needs to delete the user from:
 
 1. **Firestore Database** (user profile data) - ✅ Works without setup
 2. **Firebase Authentication** (login credentials) - ⚠️ Requires Firebase Admin SDK
@@ -54,7 +54,7 @@ npm run dev
 
 To verify the setup is working:
 
-1. Go to `/owner/tellers` page
+1. Go to `/owner/staff` page
 2. Create a test staff account
 3. Delete the test account
 4. Check the browser console - you should see:

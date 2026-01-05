@@ -11,8 +11,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 
 function OwnerDashboardContent() {
-  const { currency } = useCurrency();
-  const [activeMenuItem, setActiveMenuItem] = useState("home");
+  const { selectedCurrency } = useCurrency();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Mock clothing inventory data - 60 items
@@ -651,8 +650,8 @@ function OwnerDashboardContent() {
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <Sidebar
-        activeItem={activeMenuItem}
-        onItemClick={(item) => setActiveMenuItem(item.id)}
+        activeItem="dashboard"
+        onItemClick={() => {}}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         className="h-screen"
@@ -690,7 +689,7 @@ function OwnerDashboardContent() {
                           Total Sales
                         </dt>
                         <dd className="text-2xl font-bold text-gray-900">
-                          {currency === "MMK" ? "Ks" : "฿"} 0
+                          {selectedCurrency === "MMK" ? "Ks" : "฿"} 0
                         </dd>
                         <dd className="text-sm text-green-600">
                           +0% from last month
@@ -811,7 +810,7 @@ function OwnerDashboardContent() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium text-gray-900">
-                            {currency === "MMK" ? "Ks" : "฿"}{" "}
+                            {selectedCurrency === "MMK" ? "Ks" : "฿"}{" "}
                             {item.price.toLocaleString()}
                           </p>
                           <p className="text-xs text-gray-500">0 sold</p>

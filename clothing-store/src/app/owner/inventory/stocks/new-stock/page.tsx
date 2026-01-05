@@ -25,6 +25,19 @@ import { Shop, ShopListResponse } from "@/types/shop";
 import { SettingsService } from "@/services/settingsService";
 import { CategoryService } from "@/services/categoryService";
 
+// Declare BarcodeDetector interface
+interface BarcodeDetector {
+  detect(image: HTMLVideoElement): Promise<Array<{ rawValue: string }>>;
+}
+
+declare global {
+  interface Window {
+    BarcodeDetector?: {
+      new (): BarcodeDetector;
+    };
+  }
+}
+
 function NewStockContent() {
   const router = useRouter();
   const [activeItem, setActiveItem] = useState("inventory");
@@ -406,9 +419,9 @@ function NewStockContent() {
   const scanBarcode = async (variantId: string) => {
     try {
       // Check if the browser supports the Barcode Detection API
-      if ("BarcodeDetector" in window) {
+      if ("BarcodeDetector" in window && window.BarcodeDetector) {
         // Use the native Barcode Detection API if available
-        const barcodeDetector = new (window as any).BarcodeDetector();
+        const barcodeDetector = new window.BarcodeDetector();
 
         // Request camera access
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -545,6 +558,7 @@ function NewStockContent() {
       const stockPromises = selectedShops.map(async (shopId) => {
         const stockData: CreateStockRequest = {
           groupName: groupName.trim(),
+          category: category || undefined,
           unitPrice: parseFloat(unitPrice),
           originalPrice: parseFloat(originalPrice),
           releaseDate,
@@ -677,6 +691,7 @@ function NewStockContent() {
                     </label>
                     <div className="flex gap-2">
                       <select
+                        title="category"
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"

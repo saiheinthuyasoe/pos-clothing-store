@@ -67,13 +67,13 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   // Discount type state (percentage or amount)
   const [discountType, setDiscountType] = React.useState<
     "percentage" | "amount"
-  >("percentage");
+  >("amount");
   const [groupDiscountType, setGroupDiscountType] = React.useState<
     "percentage" | "amount"
-  >("percentage");
+  >("amount");
   const [variantDiscountType, setVariantDiscountType] = React.useState<
     "percentage" | "amount"
-  >("percentage");
+  >("amount");
 
   // Search state for group and variant selection
   const [groupSearchTerm, setGroupSearchTerm] = React.useState<string>("");
@@ -665,15 +665,19 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                   matchingTier.price / matchingTier.minQuantity;
 
                                 return (
-                                  <div className="mt-2 p-2 bg-white-50 border border-gray-900 rounded-lg">
+                                  <div className="mt-2 p-2 bg-white border border-gray-200 rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <div className="flex-1">
-                                        <p className="text-xs font-medium text-gray-900 mb-1">
-                                          Wholesale Price Available for
-                                          Group!
+                                        <p className="text-xs font-medium text-gray-800 mb-1">
+                                          Wholesale Price Available
                                         </p>
-                                        
-                                        
+                                        <p className="text-xs text-gray-700">
+                                          Total {totalGroupQuantity} items ={" "}
+                                          {formatPrice(matchingTier.price)}{" "}
+                                          total (
+                                          {formatPrice(wholesalePricePerItem)}
+                                          /item)
+                                        </p>
                                       </div>
                                       {isFirstInGroup && (
                                         <button
@@ -726,7 +730,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                           }}
                                           className="ml-2 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded transition-colors whitespace-nowrap"
                                         >
-                                          Apply to Group
+                                          Apply
                                         </button>
                                       )}
                                     </div>
@@ -952,28 +956,26 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                           }
                           step="0.1"
                         />
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => setDiscountType("percentage")}
-                            className={`px-3 py-2 text-xs font-medium rounded ${
-                              discountType === "percentage"
-                                ? "bg-green-600 text-white"
-                                : "bg-white text-green-600 border border-green-300"
-                            }`}
-                          >
-                            %
-                          </button>
-                          <button
-                            onClick={() => setDiscountType("amount")}
-                            className={`px-3 py-2 text-xs font-medium rounded ${
-                              discountType === "amount"
-                                ? "bg-green-600 text-white"
-                                : "bg-white text-green-600 border border-green-300"
-                            }`}
-                          >
-                            {getCurrencySymbol()}
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setDiscountType("percentage")}
+                          className={`px-3 py-2 text-xs font-medium rounded ${
+                            discountType === "percentage"
+                              ? "bg-green-600 text-white"
+                              : "bg-white text-green-600 border border-green-300"
+                          }`}
+                        >
+                          %
+                        </button>
+                        <button
+                          onClick={() => setDiscountType("amount")}
+                          className={`px-3 py-2 text-xs font-medium rounded ${
+                            discountType === "amount"
+                              ? "bg-green-600 text-white"
+                              : "bg-white text-green-600 border border-green-300"
+                          }`}
+                        >
+                          {getCurrencySymbol()}
+                        </button>
                         <button
                           onClick={handleApplyDiscount}
                           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
@@ -1038,28 +1040,26 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                           }
                           step="0.1"
                         />
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => setGroupDiscountType("percentage")}
-                            className={`px-3 py-2 text-xs font-medium rounded ${
-                              groupDiscountType === "percentage"
-                                ? "bg-green-600 text-white"
-                                : "bg-white text-green-600 border border-green-300"
-                            }`}
-                          >
-                            %
-                          </button>
-                          <button
-                            onClick={() => setGroupDiscountType("amount")}
-                            className={`px-3 py-2 text-xs font-medium rounded ${
-                              groupDiscountType === "amount"
-                                ? "bg-green-600 text-white"
-                                : "bg-white text-green-600 border border-green-300"
-                            }`}
-                          >
-                            {getCurrencySymbol()}
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setGroupDiscountType("percentage")}
+                          className={`px-3 py-2 text-xs font-medium rounded ${
+                            groupDiscountType === "percentage"
+                              ? "bg-green-600 text-white"
+                              : "bg-white text-green-600 border border-green-300"
+                          }`}
+                        >
+                          %
+                        </button>
+                        <button
+                          onClick={() => setGroupDiscountType("amount")}
+                          className={`px-3 py-2 text-xs font-medium rounded ${
+                            groupDiscountType === "amount"
+                              ? "bg-green-600 text-white"
+                              : "bg-white text-green-600 border border-green-300"
+                          }`}
+                        >
+                          {getCurrencySymbol()}
+                        </button>
                         <button
                           onClick={handleApplyGroupDiscount}
                           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"
@@ -1127,28 +1127,26 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                           }
                           step="0.1"
                         />
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => setVariantDiscountType("percentage")}
-                            className={`px-3 py-2 text-xs font-medium rounded ${
-                              variantDiscountType === "percentage"
-                                ? "bg-green-600 text-white"
-                                : "bg-white text-green-600 border border-green-300"
-                            }`}
-                          >
-                            %
-                          </button>
-                          <button
-                            onClick={() => setVariantDiscountType("amount")}
-                            className={`px-3 py-2 text-xs font-medium rounded ${
-                              variantDiscountType === "amount"
-                                ? "bg-green-600 text-white"
-                                : "bg-white text-green-600 border border-green-300"
-                            }`}
-                          >
-                            {getCurrencySymbol()}
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setVariantDiscountType("percentage")}
+                          className={`px-3 py-2 text-xs font-medium rounded ${
+                            variantDiscountType === "percentage"
+                              ? "bg-green-600 text-white"
+                              : "bg-white text-green-600 border border-green-300"
+                          }`}
+                        >
+                          %
+                        </button>
+                        <button
+                          onClick={() => setVariantDiscountType("amount")}
+                          className={`px-3 py-2 text-xs font-medium rounded ${
+                            variantDiscountType === "amount"
+                              ? "bg-green-600 text-white"
+                              : "bg-white text-green-600 border border-green-300"
+                          }`}
+                        >
+                          {getCurrencySymbol()}
+                        </button>
                         <button
                           onClick={handleApplyVariantDiscount}
                           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 border-2 border-blue-700 shadow-sm"

@@ -70,7 +70,10 @@ export class CategoryService {
 
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        await updateDoc(docRef, data);
+        await updateDoc(docRef, {
+          categories,
+          updatedAt: new Date().toISOString(),
+        });
       } else {
         await setDoc(docRef, data);
       }

@@ -53,12 +53,15 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: staffMember });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in POST /api/staff:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Failed to create staff account",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create staff account",
       },
       { status: 500 }
     );
@@ -114,9 +117,14 @@ export async function DELETE(request: NextRequest) {
         try {
           await adminAuth.deleteUser(id);
           console.log("Successfully deleted user from Firebase Auth:", id);
-        } catch (authError: any) {
+        } catch (authError: unknown) {
           // If user doesn't exist in Auth, that's fine - they might have been deleted already
-          if (authError.code === "auth/user-not-found") {
+          if (
+            authError &&
+            typeof authError === "object" &&
+            "code" in authError &&
+            authError.code === "auth/user-not-found"
+          ) {
             console.log(
               "User not found in Firebase Auth (already deleted):",
               id

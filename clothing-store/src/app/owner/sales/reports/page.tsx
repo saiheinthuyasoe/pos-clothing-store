@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { transactionService, Transaction } from "@/services/transactionService";
+import { ShopService } from "@/services/shopService";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import {
@@ -17,6 +19,10 @@ import {
   Download,
   Filter,
   RefreshCw,
+  CreditCard,
+  Smartphone,
+  Wallet,
+  Truck,
 } from "lucide-react";
 
 interface ReportData {
@@ -46,8 +52,11 @@ interface ReportData {
 function ReportsPageContent() {
   const { user } = useAuth();
   const { formatPrice } = useCurrency();
+  const { businessSettings } = useSettings();
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
+  const [filterBranch, setFilterBranch] = useState<string>("");
   const [dateRange, setDateRange] = useState<
     "7d" | "30d" | "90d" | "1y" | "all"
   >("30d");
@@ -57,7 +66,26 @@ function ReportsPageContent() {
 
   useEffect(() => {
     loadReportData();
-  }, [dateRange]);
+  }, [dateRange, filterBranch]);
+
+  // Load shops and set initial branch filter
+  useEffect(() => {
+    const fetchShops = async () => {
+      try {
+        const shopsData = await ShopService.getAllShops();
+        setShops(shopsData || []);
+      } catch (error) {
+        console.error("Error fetching shops:", error);
+      }
+    };
+    fetchShops();
+  }, []);
+
+  useEffect(() => {
+    if (businessSettings?.currentBranch && filterBranch === "") {
+      setFilterBranch(businessSettings.currentBranch);
+    }
+  }, [businessSettings, filterBranch]);
 
   const loadReportData = async () => {
     try {
@@ -86,6 +114,13 @@ function ReportsPageContent() {
         );
       }
 
+      // Filter by branch
+      if (filterBranch && filterBranch !== "all") {
+        filteredTransactions = filteredTransactions.filter(
+          (t) => t.branchName === filterBranch
+        );
+      }
+
       // Calculate report data
       const data = calculateReportData(filteredTransactions);
       setReportData(data);
@@ -98,12 +133,15 @@ function ReportsPageContent() {
 
   const calculateReportData = (transactions: Transaction[]): ReportData => {
     // Filter for revenue-generating transactions (completed, partially refunded, and refunded)
-    const revenueTransactions = transactions.filter(
-      (t) =>
-        t.status === "completed" ||
-        t.status === "partially_refunded" ||
-        t.status === "refunded"
-    );
+    // Exclude pending COD transactions
+    const revenueTransactions = transactions
+      .filter(
+        (t) =>
+          t.status === "completed" ||
+          t.status === "partially_refunded" ||
+          t.status === "refunded"
+      )
+      .filter((t) => t.paymentMethod !== "cod");
 
     // Calculate net revenue after refunds
     const totalRevenue = revenueTransactions.reduce((sum, t) => {
@@ -291,16 +329,42 @@ function ReportsPageContent() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    const date = new Date(dateString);
+    return (
+      date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }) +
+      ", " +
+      date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    );
+  };
+
+  const getPaymentMethodIcon = (method: string) => {
+    switch (method) {
+      case "cash":
+        return <CreditCard className="h-4 w-4 text-gray-900" />;
+      case "scan":
+        return <Smartphone className="h-4 w-4 text-gray-900" />;
+      case "wallet":
+        return <Wallet className="h-4 w-4 text-gray-900" />;
+      case "cod":
+        return <Truck className="h-4 w-4 text-gray-900" />;
+      default:
+        return <CreditCard className="h-4 w-4 text-gray-900" />;
+    }
   };
 
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50">
         <Sidebar
+          activeItem="reports"
+          onItemClick={() => {}}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           isCartModalOpen={isCartModalOpen}
@@ -323,6 +387,8 @@ function ReportsPageContent() {
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar
+        activeItem="reports"
+        onItemClick={() => {}}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isCartModalOpen={isCartModalOpen}
@@ -344,6 +410,19 @@ function ReportsPageContent() {
                 </p>
               </div>
               <div className="flex space-x-4">
+                <select
+                  aria-label="Select branch"
+                  value={filterBranch}
+                  onChange={(e) => setFilterBranch(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Branches</option>
+                  {shops.map((shop) => (
+                    <option key={shop.id} value={shop.name}>
+                      {shop.name}
+                    </option>
+                  ))}
+                </select>
                 <select
                   aria-label="Select date range"
                   value={dateRange}
@@ -579,7 +658,7 @@ function ReportsPageContent() {
                         Quantity Sold
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Revenue
+                        Total Sale
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Performance
@@ -654,69 +733,199 @@ function ReportsPageContent() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Transaction ID
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ID
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Customer
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Items
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Subtotal
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Discount
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tax
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Profit
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Payment Method
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Branch
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Selling Currency
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Sold By
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total (THB)
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date & Time
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {reportData?.recentTransactions.map((transaction) => (
                       <tr key={transaction.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-600">
                           #{transaction.transactionId}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {transaction.customer?.uid
-                            ? transaction.customer.uid
-                            : "Walk-in Customer"}
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {transaction.customer?.displayName
+                            ? transaction.customer.displayName
+                            : "Walk-in customer"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {transaction.branchName || "Main Branch"}
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {transaction.items.reduce(
+                                (total, item) => total + item.quantity,
+                                0
+                              )}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {transaction.items.length} type(s)
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {transaction.sellingCurrency &&
-                          transaction.exchangeRate &&
-                          transaction.sellingTotal ? (
-                            <div className="space-y-1">
-                              <div className="font-medium">
-                                {transaction.sellingCurrency === "MMK"
-                                  ? "Ks"
-                                  : transaction.sellingCurrency}{" "}
-                                {transaction.sellingTotal.toLocaleString()}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Rate: 1 THB = {transaction.exchangeRate}{" "}
-                                {transaction.sellingCurrency === "MMK"
-                                  ? "Ks"
-                                  : transaction.sellingCurrency}
-                              </div>
-                            </div>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {formatPrice(transaction.subtotal)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          {transaction.discount > 0 ? (
+                            <span className="text-red-600 font-medium">
+                              -{formatPrice(transaction.discount)}
+                            </span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatPrice(transaction.total)}
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {formatPrice(transaction.tax)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
+                          {(() => {
+                            const refundedAmount =
+                              transaction.refunds?.reduce(
+                                (sum, refund) => sum + refund.totalAmount,
+                                0
+                              ) || 0;
+                            const netTotal = transaction.total - refundedAmount;
+
+                            if (refundedAmount > 0) {
+                              return (
+                                <div className="flex flex-col">
+                                  <span className="text-gray-900">
+                                    {formatPrice(netTotal)}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    (Original: {formatPrice(transaction.total)})
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            return formatPrice(transaction.total);
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                          {(() => {
+                            // Calculate profit: (selling price - original price) * quantity for each item
+                            const totalProfit = transaction.items.reduce(
+                              (sum, item) => {
+                                const sellingPrice =
+                                  item.discountedPrice || item.unitPrice;
+                                const profit =
+                                  (sellingPrice - item.originalPrice) *
+                                  item.quantity;
+                                return sum + profit;
+                              },
+                              0
+                            );
+
+                            // Calculate profit lost from refunds (not the entire refund amount)
+                            const refundedProfit =
+                              transaction.refunds?.reduce(
+                                (refundTotal, refund) => {
+                                  return (
+                                    refundTotal +
+                                    refund.items.reduce(
+                                      (refundItemTotal, refundItem) => {
+                                        const originalItem =
+                                          transaction.items[
+                                            refundItem.itemIndex
+                                          ];
+                                        if (originalItem) {
+                                          const itemSellingPrice =
+                                            originalItem.discountedPrice ||
+                                            originalItem.unitPrice;
+                                          const refundedItemProfit =
+                                            (itemSellingPrice -
+                                              originalItem.originalPrice) *
+                                            refundItem.quantity;
+                                          return (
+                                            refundItemTotal + refundedItemProfit
+                                          );
+                                        }
+                                        return refundItemTotal;
+                                      },
+                                      0
+                                    )
+                                  );
+                                },
+                                0
+                              ) || 0;
+
+                            const netProfit = totalProfit - refundedProfit;
+                            const isProfitable = netProfit >= 0;
+
+                            return (
+                              <span
+                                className={
+                                  isProfitable
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }
+                              >
+                                {formatPrice(netProfit)}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          <div className="flex items-center">
+                            {getPaymentMethodIcon(transaction.paymentMethod)}
+                            <span className="ml-2 text-sm text-gray-900 capitalize">
+                              {transaction.paymentMethod}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {transaction.branchName || "Main Branch"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
+                              <span className="text-xs font-medium text-blue-800">
+                                {user?.email?.charAt(0).toUpperCase() || "S"}
+                              </span>
+                            </div>
+                            <span className="text-gray-700">
+                              {user?.email?.split("@")[0] || "System"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               transaction.status === "completed"
@@ -743,7 +952,7 @@ function ReportsPageContent() {
                               : transaction.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(transaction.timestamp)}
                         </td>
                       </tr>

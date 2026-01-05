@@ -23,9 +23,9 @@ interface StaffUser extends User {
   id: string;
 }
 
-function TellersContent() {
+function StaffContent() {
   const { user } = useAuth();
-  const [activeMenuItem, setActiveMenuItem] = useState("tellers");
+  const [activeMenuItem, setActiveMenuItem] = useState("staff");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -646,10 +646,10 @@ function TellersContent() {
   );
 }
 
-export default function TellersPage() {
+export default function StaffPage() {
   return (
     <ProtectedRoute>
-      <TellersContent />
+      <StaffContent />
     </ProtectedRoute>
   );
 }

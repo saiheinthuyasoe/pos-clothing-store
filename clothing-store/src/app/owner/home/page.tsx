@@ -3,11 +3,20 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
-import { Store, User, Package, BarChart3, ShoppingCart } from "lucide-react";
+import {
+  Store,
+  User,
+  Package,
+  BarChart3,
+  ShoppingCart,
+  Filter,
+  X,
+} from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,6 +24,7 @@ import { StockItem, WholesaleTier } from "@/types/stock";
 import { SettingsService } from "@/services/settingsService";
 import { StockService } from "@/services/stockService";
 import { InventoryRealtimeService } from "@/services/inventoryRealtimeService";
+import { CategoryService } from "@/services/categoryService";
 
 interface ClothingInventoryItem {
   id: string;
@@ -41,7 +51,7 @@ function OwnerHomeContent() {
   const {} = useAuth();
   const { addToCart, setInventoryCallbacks } = useCart();
   const { formatPrice, getCurrencySymbol } = useCurrency();
-  const [activeMenuItem, setActiveMenuItem] = useState("home");
+  const { businessSettings } = useSettings();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
@@ -50,12 +60,19 @@ function OwnerHomeContent() {
     ClothingInventoryItem[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [shopsLoading, setShopsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Shop filter state
   const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
-  const [selectedShopFilter, setSelectedShopFilter] = useState<string>("");
-  const [isLoadingShops, setIsLoadingShops] = useState(false);
+
+  // Filter state
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedStockStatus, setSelectedStockStatus] = useState<string>("all");
+  const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
 
   // Selection state for colors and sizes
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>(
@@ -67,14 +84,11 @@ function OwnerHomeContent() {
 
   // Helper functions for color and size selection
   const handleColorSelect = (itemId: string, colorId: string) => {
-    console.log(`handleColorSelect: itemId=${itemId}, colorId=${colorId}`);
     setSelectedColors((prev) => {
       const currentSelection = prev[itemId];
       // If clicking the same color, unselect it (set to empty string)
       const newColorId = currentSelection === colorId ? "" : colorId;
-      const newState = { ...prev, [itemId]: newColorId };
-      console.log("Updated selectedColors:", newState);
-      return newState;
+      return { ...prev, [itemId]: newColorId };
     });
     // Reset size selection when color changes or is unselected
     setSelectedSizes((prev) => ({ ...prev, [itemId]: "" }));
@@ -84,32 +98,63 @@ function OwnerHomeContent() {
     setSelectedSizes((prev) => ({ ...prev, [itemId]: size }));
   };
 
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".filter-dropdown-container")) {
+        setShowFilterDropdown(false);
+      }
+    };
+
+    if (showFilterDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showFilterDropdown]);
+
+  // Load categories from Firebase
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const cats = await CategoryService.getCategories();
+        setCategories(cats);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+
+    // Subscribe to real-time category updates
+    const unsubscribe = CategoryService.subscribeToCategories((cats) => {
+      setCategories(cats);
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
   const getSelectedColorVariant = (item: ClothingInventoryItem) => {
     if (!item.colorVariants || item.colorVariants.length === 0) {
-      console.log(`No color variants for item ${item.id}`);
       return null;
     }
     const selectedColorId = selectedColors[item.id];
-    console.log(
-      `getSelectedColorVariant for ${item.id}: selectedColorId="${selectedColorId}"`
-    );
 
     // Return null if no color is selected (empty string)
     if (!selectedColorId) {
-      console.log(`No color selected for item ${item.id}`);
       return null;
     }
 
     const foundVariant = item.colorVariants.find((variant) => {
-      console.log(
-        `Checking variant: ${variant.id} === ${selectedColorId} ? ${
-          variant.id === selectedColorId
-        }`
-      );
       return variant.id === selectedColorId;
     });
 
-    console.log(`Found variant for ${item.id}:`, foundVariant);
     return foundVariant || null;
   };
 
@@ -347,20 +392,18 @@ function OwnerHomeContent() {
           stock.colorVariants && stock.colorVariants.length > 0;
 
         if (!hasColorVariants) {
-          console.log(
-            `No colorVariants for ${stock.groupName}, skipping item without variants`
-          );
           // Return item without color variants - UI will handle this appropriately
           return {
             id: stock.id,
             name: stock.groupName,
             price: stock.unitPrice,
+            originalPrice: stock.originalPrice || stock.unitPrice,
             stock: 0, // No stock since no variants
             colors: [],
             image:
               stock.groupImage ||
               `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
-            category: "Clothing",
+            category: stock.category || "Uncategorized",
             isNew: true,
             shop: stock.shop,
             wholesaleTiers: stock.wholesaleTiers || [],
@@ -391,15 +434,11 @@ function OwnerHomeContent() {
           image:
             stock.groupImage ||
             `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
-          category: "Clothing",
+          category: stock.category || "Uncategorized",
           isNew: true,
           shop: stock.shop,
           wholesaleTiers: stock.wholesaleTiers || [],
           colorVariants: stock.colorVariants.map((variant, index) => {
-            console.log(
-              `Transforming variant ${index} for ${stock.groupName}:`,
-              variant
-            );
             return {
               id: variant.id || `cv${index + 1}-${stock.id}`, // Ensure ID exists
               color: variant.color,
@@ -414,24 +453,41 @@ function OwnerHomeContent() {
     []
   );
 
-  // Fetch shops
+  // Fetch shops and categories together for better performance
   useEffect(() => {
-    const fetchShops = async () => {
-      setIsLoadingShops(true);
+    const fetchInitialData = async () => {
       try {
-        const response = await fetch("/api/shops");
-        if (!response.ok) {
-          throw new Error("Failed to fetch shops");
+        // Fetch shops and categories in parallel
+        const [shopsResponse, cats] = await Promise.all([
+          fetch("/api/shops"),
+          CategoryService.getCategories(),
+        ]);
+
+        if (shopsResponse.ok) {
+          const shopsData = await shopsResponse.json();
+          setShops(shopsData.data || []);
         }
-        const data = await response.json();
-        setShops(data.data || []);
+
+        setCategories(cats);
       } catch (error) {
-        console.error("Error fetching shops:", error);
+        console.error("Error fetching initial data:", error);
       } finally {
-        setIsLoadingShops(false);
+        setShopsLoading(false);
       }
     };
-    fetchShops();
+
+    fetchInitialData();
+
+    // Subscribe to real-time category updates
+    const unsubscribe = CategoryService.subscribeToCategories((cats) => {
+      setCategories(cats);
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   // Set up real-time inventory updates
@@ -442,7 +498,6 @@ function OwnerHomeContent() {
     // Subscribe to real-time stock updates
     const unsubscribe = InventoryRealtimeService.subscribeToAllStocks(
       (stocks) => {
-        console.log("Real-time stock update received:", stocks);
         const transformedData = transformStockData(stocks);
         setClothingInventory(transformedData);
         setIsLoading(false);
@@ -459,7 +514,6 @@ function OwnerHomeContent() {
           }
 
           const data = await response.json();
-          console.log("Fallback API data:", data);
           const transformedData = transformStockData(data.data);
           setClothingInventory(transformedData);
         } catch (err) {
@@ -486,15 +540,12 @@ function OwnerHomeContent() {
 
   // Initialize color selection for each item when inventory loads
   useEffect(() => {
-    const currentInventory =
-      clothingInventory.length > 0 ? clothingInventory : fallbackInventory;
-
     // Initialize selectedColors as empty - no auto-selection
     setSelectedColors((prev) => {
       const newColors = { ...prev };
       let hasChanges = false;
 
-      currentInventory.forEach((item) => {
+      clothingInventory.forEach((item) => {
         if (!newColors[item.id]) {
           newColors[item.id] = ""; // No color selected initially
           hasChanges = true;
@@ -583,745 +634,105 @@ function OwnerHomeContent() {
     setInventoryCallbacks,
   ]); // Include all dependencies
 
-  // Mock data as fallback (keeping a few items for when no API data is available)
-  const fallbackInventory = [
-    {
-      id: "Jean7010",
-      name: "Jean7010",
-      price: 290,
-      originalPrice: 200,
-      stock: 4,
-      colors: ["red", "green", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-      shop: "default",
-      wholesaleTiers: [],
-      colorVariants: [
-        {
-          id: "cv1",
-          color: "Red",
-          colorCode: "#FF0000",
-          image:
-            "https://via.placeholder.com/200x250/FF0000/FFFFFF?text=Red+Jean7010",
-          sizeQuantities: [
-            { size: "S", quantity: 1 },
-            { size: "M", quantity: 2 },
-            { size: "L", quantity: 1 },
-          ],
-        },
-        {
-          id: "cv2",
-          color: "Green",
-          colorCode: "#00FF00",
-          image:
-            "https://via.placeholder.com/200x250/00FF00/FFFFFF?text=Green+Jean7010",
-          sizeQuantities: [
-            { size: "S", quantity: 0 },
-            { size: "M", quantity: 1 },
-            { size: "L", quantity: 2 },
-          ],
-        },
-        {
-          id: "cv3",
-          color: "Blue",
-          colorCode: "#0000FF",
-          image:
-            "https://via.placeholder.com/200x250/0000FF/FFFFFF?text=Blue+Jean7010",
-          sizeQuantities: [
-            { size: "S", quantity: 1 },
-            { size: "M", quantity: 0 },
-            { size: "L", quantity: 1 },
-          ],
-        },
-      ],
-    },
-    {
-      id: "Jean9035",
-      name: "Jean9035",
-      price: 300,
-      stock: 6,
-      colors: ["green", "red", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-      colorVariants: [
-        {
-          id: "cv4",
-          color: "Green",
-          colorCode: "#00FF00",
-          sizeQuantities: [
-            { size: "S", quantity: 2 },
-            { size: "M", quantity: 2 },
-            { size: "L", quantity: 2 },
-          ],
-        },
-        {
-          id: "cv5",
-          color: "Red",
-          colorCode: "#FF0000",
-          sizeQuantities: [
-            { size: "S", quantity: 1 },
-            { size: "M", quantity: 1 },
-            { size: "L", quantity: 1 },
-          ],
-        },
-        {
-          id: "cv6",
-          color: "Blue",
-          colorCode: "#0000FF",
-          sizeQuantities: [
-            { size: "S", quantity: 1 },
-            { size: "M", quantity: 2 },
-            { size: "L", quantity: 0 },
-          ],
-        },
-      ],
-    },
-    {
-      id: "Jean8803",
-      name: "Jean8803",
-      price: 290,
-      originalPrice: 200,
-      stock: 6,
-      colors: ["red", "blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-      shop: "default",
-      wholesaleTiers: [],
-      colorVariants: [],
-    },
-    {
-      id: "Jean7677",
-      name: "Jean7677",
-      price: 360,
-      stock: 9,
-      colors: ["yellow", "green", "blue", "black", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean6682",
-      name: "Jean6682",
-      price: 360,
-      stock: 5,
-      colors: ["red", "yellow", "green", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean5583",
-      name: "Jean5583",
-      price: 320,
-      stock: 8,
-      colors: ["blue", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean4484",
-      name: "Jean4484",
-      price: 380,
-      stock: 7,
-      colors: ["green", "yellow", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean3385",
-      name: "Jean3385",
-      price: 275,
-      stock: 12,
-      colors: ["black", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean2286",
-      name: "Jean2286",
-      price: 345,
-      stock: 6,
-      colors: ["red", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean1187",
-      name: "Jean1187",
-      price: 310,
-      stock: 9,
-      colors: ["yellow", "blue", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean9988",
-      name: "Jean9988",
-      price: 395,
-      stock: 5,
-      colors: ["green", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean8889",
-      name: "Jean8889",
-      price: 285,
-      stock: 11,
-      colors: ["blue", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean7790",
-      name: "Jean7790",
-      price: 355,
-      stock: 7,
-      colors: ["black", "green", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean6691",
-      name: "Jean6691",
-      price: 330,
-      stock: 8,
-      colors: ["yellow", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean5592",
-      name: "Jean5592",
-      price: 370,
-      stock: 6,
-      colors: ["red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean4493",
-      name: "Jean4493",
-      price: 295,
-      stock: 10,
-      colors: ["green", "blue", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean3394",
-      name: "Jean3394",
-      price: 385,
-      stock: 5,
-      colors: ["black", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean2295",
-      name: "Jean2295",
-      price: 315,
-      stock: 9,
-      colors: ["blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean1196",
-      name: "Jean1196",
-      price: 340,
-      stock: 7,
-      colors: ["yellow", "red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean9997",
-      name: "Jean9997",
-      price: 280,
-      stock: 13,
-      colors: ["green", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean8898",
-      name: "Jean8898",
-      price: 365,
-      stock: 6,
-      colors: ["red", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean7799",
-      name: "Jean7799",
-      price: 325,
-      stock: 8,
-      colors: ["black", "blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean6600",
-      name: "Jean6600",
-      price: 350,
-      stock: 5,
-      colors: ["yellow", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean5501",
-      name: "Jean5501",
-      price: 290,
-      stock: 11,
-      colors: ["blue", "green", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean4402",
-      name: "Jean4402",
-      price: 375,
-      stock: 7,
-      colors: ["red", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean3303",
-      name: "Jean3303",
-      price: 305,
-      stock: 9,
-      colors: ["green", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean2204",
-      name: "Jean2204",
-      price: 335,
-      stock: 6,
-      colors: ["black", "red", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean1105",
-      name: "Jean1105",
-      price: 270,
-      stock: 14,
-      colors: ["blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean9906",
-      name: "Jean9906",
-      price: 390,
-      stock: 5,
-      colors: ["red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean8807",
-      name: "Jean8807",
-      price: 320,
-      stock: 8,
-      colors: ["yellow", "blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean7708",
-      name: "Jean7708",
-      price: 355,
-      stock: 7,
-      colors: ["black", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean6609",
-      name: "Jean6609",
-      price: 285,
-      stock: 12,
-      colors: ["green", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean5510",
-      name: "Jean5510",
-      price: 345,
-      stock: 6,
-      colors: ["blue", "red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean4411",
-      name: "Jean4411",
-      price: 310,
-      stock: 9,
-      colors: ["yellow", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean3312",
-      name: "Jean3312",
-      price: 380,
-      stock: 5,
-      colors: ["red", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean2213",
-      name: "Jean2213",
-      price: 295,
-      stock: 10,
-      colors: ["black", "green", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean1114",
-      name: "Jean1114",
-      price: 365,
-      stock: 7,
-      colors: ["blue", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean9915",
-      name: "Jean9915",
-      price: 330,
-      stock: 8,
-      colors: ["green", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean8816",
-      name: "Jean8816",
-      price: 350,
-      stock: 6,
-      colors: ["black", "red", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean7717",
-      name: "Jean7717",
-      price: 275,
-      stock: 13,
-      colors: ["yellow", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean6618",
-      name: "Jean6618",
-      price: 395,
-      stock: 5,
-      colors: ["red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean5519",
-      name: "Jean5519",
-      price: 315,
-      stock: 9,
-      colors: ["blue", "green", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean4420",
-      name: "Jean4420",
-      price: 340,
-      stock: 7,
-      colors: ["black", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean3321",
-      name: "Jean3321",
-      price: 290,
-      stock: 11,
-      colors: ["green", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean2222",
-      name: "Jean2222",
-      price: 370,
-      stock: 6,
-      colors: ["yellow", "red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean1123",
-      name: "Jean1123",
-      price: 305,
-      stock: 8,
-      colors: ["blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean9924",
-      name: "Jean9924",
-      price: 385,
-      stock: 5,
-      colors: ["red", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean8825",
-      name: "Jean8825",
-      price: 325,
-      stock: 9,
-      colors: ["black", "blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean7726",
-      name: "Jean7726",
-      price: 355,
-      stock: 7,
-      colors: ["yellow", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean6627",
-      name: "Jean6627",
-      price: 280,
-      stock: 12,
-      colors: ["green", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean5528",
-      name: "Jean5528",
-      price: 375,
-      stock: 6,
-      colors: ["black", "red", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean4429",
-      name: "Jean4429",
-      price: 310,
-      stock: 8,
-      colors: ["blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean3330",
-      name: "Jean3330",
-      price: 345,
-      stock: 5,
-      colors: ["red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean2231",
-      name: "Jean2231",
-      price: 295,
-      stock: 10,
-      colors: ["yellow", "blue", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean1132",
-      name: "Jean1132",
-      price: 365,
-      stock: 7,
-      colors: ["black", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean9933",
-      name: "Jean9933",
-      price: 320,
-      stock: 9,
-      colors: ["green", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean8834",
-      name: "Jean8834",
-      price: 390,
-      stock: 5,
-      colors: ["blue", "red", "black"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean7735",
-      name: "Jean7735",
-      price: 275,
-      stock: 13,
-      colors: ["yellow", "green"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean6636",
-      name: "Jean6636",
-      price: 350,
-      stock: 6,
-      colors: ["red", "blue"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean5537",
-      name: "Jean5537",
-      price: 315,
-      stock: 8,
-      colors: ["black", "green", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-    {
-      id: "Jean4438",
-      name: "Jean4438",
-      price: 335,
-      stock: 7,
-      colors: ["blue", "red"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: true,
-    },
-    {
-      id: "Jean3339",
-      name: "Jean3339",
-      price: 285,
-      stock: 11,
-      colors: ["green", "yellow"],
-      image: "/api/placeholder/200/250",
-      category: "Jeans",
-      isNew: false,
-    },
-  ];
-
   // Search and pagination state
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 60;
 
-  // Use API data if available, otherwise use fallback data
-  const displayInventory =
-    clothingInventory.length > 0 ? clothingInventory : fallbackInventory;
+  // Use API data
+  const displayInventory = clothingInventory;
 
   // Debug inventory source
   console.log("Inventory source:", {
     clothingInventoryLength: clothingInventory.length,
-    usingFallback: clothingInventory.length === 0,
     firstItem: displayInventory[0],
     firstItemColorVariants: displayInventory[0]?.colorVariants,
   });
 
-  // Filter items based on search term and shop
-  const filteredInventory = displayInventory.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase());
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedCategory("all");
+    setSelectedStockStatus("all");
+    setPriceRange({ min: "", max: "" });
+    setCurrentPage(1);
+  };
 
-    const matchesShop =
-      selectedShopFilter === "" || item.shop === selectedShopFilter;
+  // Check if any filters are active
+  const hasActiveFilters =
+    selectedCategory !== "all" ||
+    selectedStockStatus !== "all" ||
+    priceRange.min !== "" ||
+    priceRange.max !== "";
 
-    return matchesSearch && matchesShop;
-  });
+  // Filter items based on search term and shop (memoized for performance)
+  const filteredInventory = useMemo(() => {
+    return displayInventory.filter((item) => {
+      const matchesSearch =
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Get current branch from settings and filter by it
+      const currentBranch = businessSettings?.currentBranch || "Main Branch";
+
+      // Find shop by name to get its ID, or match directly
+      const currentShop = shops.find((s) => s.name === currentBranch);
+      const currentShopId = currentShop?.id;
+
+      // Match if item.shop equals currentBranch name OR currentShop ID
+      const matchesShop =
+        item.shop === currentBranch || // Match by name
+        item.shop === currentShopId || // Match by ID
+        (!item.shop && currentBranch === "Main Branch") ||
+        (item.shop === "" && currentBranch === "Main Branch");
+
+      // Category filter
+      const matchesCategory =
+        selectedCategory === "all" ||
+        (item.category &&
+          item.category.toLowerCase() === selectedCategory.toLowerCase());
+
+      // Stock status filter
+      const matchesStockStatus =
+        selectedStockStatus === "all" ||
+        (selectedStockStatus === "in-stock" && item.stock > 10) ||
+        (selectedStockStatus === "low-stock" &&
+          item.stock > 0 &&
+          item.stock <= 10) ||
+        (selectedStockStatus === "out-of-stock" && item.stock === 0);
+
+      // Price range filter
+      const matchesPriceRange =
+        (priceRange.min === "" || item.price >= parseFloat(priceRange.min)) &&
+        (priceRange.max === "" || item.price <= parseFloat(priceRange.max));
+
+      return (
+        matchesSearch &&
+        matchesShop &&
+        matchesCategory &&
+        matchesStockStatus &&
+        matchesPriceRange
+      );
+    });
+  }, [
+    displayInventory,
+    searchTerm,
+    businessSettings?.currentBranch,
+    shops,
+    selectedCategory,
+    selectedStockStatus,
+    priceRange.min,
+    priceRange.max,
+  ]);
 
   const totalPages = Math.ceil(filteredInventory.length / itemsPerPage);
 
-  // Get current page items
-  const getCurrentPageItems = () => {
+  // Get current page items (memoized for performance)
+  const currentPageItems = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filteredInventory.slice(startIndex, endIndex);
-  };
+  }, [filteredInventory, currentPage, itemsPerPage]);
 
   // Reset to first page when search changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1382,8 +793,8 @@ function OwnerHomeContent() {
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <Sidebar
-        activeItem={activeMenuItem}
-        onItemClick={(item) => setActiveMenuItem(item.id)}
+        activeItem="home"
+        onItemClick={() => {}}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isCartModalOpen={isCartModalOpen}
@@ -1428,23 +839,127 @@ function OwnerHomeContent() {
                         />
                       </svg>
                     </div>
-                    <div className="relative">
-                      <select
-                        value={selectedShopFilter}
-                        onChange={(e) => {
-                          setSelectedShopFilter(e.target.value);
-                          setCurrentPage(1);
-                        }}
-                        disabled={isLoadingShops}
-                        className="pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+
+                    {/* Filter Dropdown */}
+                    <div className="relative filter-dropdown-container">
+                      <button
+                        onClick={() =>
+                          setShowFilterDropdown(!showFilterDropdown)
+                        }
+                        className="flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                       >
-                        <option value="">All Branches</option>
-                        {shops.map((shop) => (
-                          <option key={shop.id} value={shop.id}>
-                            {shop.name}
-                          </option>
-                        ))}
-                      </select>
+                        <Filter className="h-4 w-4 mr-2" />
+                        Filter
+                        {hasActiveFilters && (
+                          <span className="ml-2 px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                            {
+                              [
+                                selectedCategory !== "all",
+                                selectedStockStatus !== "all",
+                                priceRange.min !== "" || priceRange.max !== "",
+                              ].filter(Boolean).length
+                            }
+                          </span>
+                        )}
+                      </button>
+
+                      {showFilterDropdown && (
+                        <div className="absolute z-50 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-gray-900">
+                              Filters
+                            </h3>
+                            {hasActiveFilters && (
+                              <button
+                                onClick={clearFilters}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                Clear all
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Category Filter */}
+                          <div className="mb-4">
+                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                              Category
+                            </label>
+                            <select
+                              title="Category"
+                              value={selectedCategory}
+                              onChange={(e) => {
+                                setSelectedCategory(e.target.value);
+                                setCurrentPage(1);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                            >
+                              <option value="all">All Categories</option>
+                              {categories.map((cat) => (
+                                <option key={cat} value={cat}>
+                                  {cat}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Stock Status Filter */}
+                          <div className="mb-4">
+                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                              Stock Status
+                            </label>
+                            <select
+                              title="Stock Status"
+                              value={selectedStockStatus}
+                              onChange={(e) => {
+                                setSelectedStockStatus(e.target.value);
+                                setCurrentPage(1);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                            >
+                              <option value="all">All Status</option>
+                              <option value="in-stock">In Stock</option>
+                              <option value="low-stock">Low Stock (≤10)</option>
+                              <option value="out-of-stock">Out of Stock</option>
+                            </select>
+                          </div>
+
+                          {/* Price Range Filter */}
+                          <div className="mb-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                              Price Range (THB)
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="number"
+                                placeholder="Min"
+                                value={priceRange.min}
+                                onChange={(e) => {
+                                  setPriceRange({
+                                    ...priceRange,
+                                    min: e.target.value,
+                                  });
+                                  setCurrentPage(1);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                              />
+                              <span className="text-gray-500">-</span>
+                              <input
+                                type="number"
+                                placeholder="Max"
+                                value={priceRange.max}
+                                onChange={(e) => {
+                                  setPriceRange({
+                                    ...priceRange,
+                                    max: e.target.value,
+                                  });
+                                  setCurrentPage(1);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1534,7 +1049,7 @@ function OwnerHomeContent() {
 
                 {/* Clothing Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                  {isLoading ? (
+                  {isLoading || shopsLoading ? (
                     // Loading state
                     Array.from({ length: 12 }).map((_, index) => (
                       <div
@@ -1564,7 +1079,7 @@ function OwnerHomeContent() {
                         Try Again
                       </Button>
                     </div>
-                  ) : getCurrentPageItems().length === 0 ? (
+                  ) : currentPageItems.length === 0 ? (
                     // No items state
                     <div className="col-span-full flex flex-col items-center justify-center py-12">
                       <Package className="h-12 w-12 text-gray-400 mb-4" />
@@ -1583,197 +1098,246 @@ function OwnerHomeContent() {
                       </Link>
                     </div>
                   ) : (
-                    getCurrentPageItems().map((item) => (
-                      <div
-                        key={`${item.id}-${
-                          selectedColors[item.id] || "no-color"
-                        }`}
-                        className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                      >
-                        {/* Product Image */}
-                        <div className="relative h-48 bg-gray-100">
-                          {item.isNew && (
-                            <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                              New
-                            </span>
-                          )}
-                          <Image
-                            key={`${item.id}-image-${
-                              selectedColors[item.id] || "default"
-                            }`}
-                            src={getCurrentImage(item as ClothingInventoryItem)}
-                            alt={item.name}
-                            width={150}
-                            height={200}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                    currentPageItems.map((item) => {
+                      const itemStock = getDisplayStock(
+                        item as ClothingInventoryItem
+                      );
+                      const isOutOfStock = itemStock === 0;
 
-                        {/* Product Details */}
-                        <div className="p-3">
-                          <h4 className="font-medium text-gray-900 text-sm mb-1">
-                            {item.name.length > 17
-                              ? `${item.name.substring(0, 17)}...`
-                              : item.name}
-                          </h4>
-                          {item.shop && getShopName(item.shop) && (
-                            <div className="text-xs text-gray-500 mb-2">
-                              Branch: {getShopName(item.shop)}
-                            </div>
-                          )}
-
-                          {/* Price and Stock */}
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-gray-900">
-                              {formatPrice(item.price)}
-                            </span>
-                            <span className="text-xs text-gray-600">
-                              Stock:{" "}
-                              <span className="font-medium text-green-600">
-                                {getDisplayStock(item as ClothingInventoryItem)}
+                      return (
+                        <div
+                          key={`${item.id}-${
+                            selectedColors[item.id] || "no-color"
+                          }`}
+                          className={`bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow ${
+                            isOutOfStock
+                              ? "border-red-200 opacity-75"
+                              : "border-gray-200"
+                          }`}
+                        >
+                          {/* Product Image */}
+                          <div className="relative h-48 bg-gray-100 overflow-hidden">
+                            {item.isNew && !isOutOfStock && (
+                              <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded z-[1] pointer-events-none">
+                                New
                               </span>
-                            </span>
-                          </div>
-
-                          {/* Color Selection */}
-                          <div className="mb-3">
-                            <label className="text-xs font-medium text-gray-700 mb-1 block">
-                              Color:
-                            </label>
-                            <div className="flex items-center space-x-1">
-                              {item.colorVariants &&
-                              item.colorVariants.length > 0 ? (
-                                item.colorVariants.map((variant, index) => {
-                                  const variantId =
-                                    variant.id || `variant-${index}`;
-                                  const isSelected =
-                                    selectedColors[item.id] === variantId;
-                                  return (
-                                    <button
-                                      key={`${item.id}-${variantId}`}
-                                      onClick={() =>
-                                        handleColorSelect(item.id, variantId)
-                                      }
-                                      className={`relative w-6 h-6 rounded-full border-2 transition-all ${
-                                        isSelected
-                                          ? "border-blue-500 ring-2 ring-blue-200"
-                                          : "border-gray-300 hover:border-gray-400"
-                                      }`}
-                                      style={{
-                                        backgroundColor: variant.colorCode,
-                                      }}
-                                      title={
-                                        isSelected
-                                          ? `${variant.color} (click to unselect)`
-                                          : variant.color
-                                      }
-                                    >
-                                      {isSelected && (
-                                        <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow-sm">
-                                          ×
-                                        </span>
-                                      )}
-                                    </button>
-                                  );
-                                })
-                              ) : (
-                                <span className="text-xs text-gray-500">
-                                  No color variants available
-                                </span>
+                            )}
+                            {isOutOfStock && (
+                              <>
+                                <div className="absolute inset-0 bg-black z-0"></div>
+                                <div className="absolute inset-0 flex items-center justify-center z-20">
+                                  <span className="text-sm font-bold px-4 py-2 ">
+                                    OUT OF STOCK
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                            <Image
+                              key={`${item.id}-image-${
+                                selectedColors[item.id] || "default"
+                              }`}
+                              src={getCurrentImage(
+                                item as ClothingInventoryItem
                               )}
-                            </div>
+                              alt={item.name}
+                              width={150}
+                              height={200}
+                              className={`w-full h-full object-cover ${
+                                isOutOfStock ? "opacity-60" : ""
+                              }`}
+                            />
                           </div>
 
-                          {/* Size Selection */}
-                          <div
-                            className="mb-3"
-                            key={`sizes-${item.id}-${
-                              selectedColors[item.id] || "no-color"
-                            }`}
-                          >
-                            <label className="text-xs font-medium text-gray-700 mb-1 block">
-                              Size:
-                            </label>
-                            <div className="grid grid-cols-3 gap-1">
-                              {(() => {
-                                const availableSizes = item.colorVariants
-                                  ? getAvailableSizes(
-                                      item as ClothingInventoryItem
-                                    )
-                                  : [];
-                                console.log(
-                                  `Size rendering for ${item.id}: availableSizes=`,
-                                  availableSizes,
-                                  `length=${availableSizes.length}`
-                                );
-                                return availableSizes.length > 0 ? (
-                                  availableSizes.map((sizeQty) => {
+                          {/* Product Details */}
+                          <div className="p-3">
+                            <h4 className="font-medium text-gray-900 text-sm mb-1">
+                              {item.name.length > 17
+                                ? `${item.name.substring(0, 17)}...`
+                                : item.name}
+                            </h4>
+                            {item.category && (
+                              <div className="text-xs text-gray-500 mb-1">
+                                {item.category}
+                              </div>
+                            )}
+                            {item.shop && getShopName(item.shop) && (
+                              <div className="text-xs text-gray-500 mb-2">
+                                Branch: {getShopName(item.shop)}
+                              </div>
+                            )}
+
+                            {/* Price and Stock */}
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                {formatPrice(item.price)}
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                Stock:{" "}
+                                <span
+                                  className={`font-medium ${
+                                    isOutOfStock
+                                      ? "text-red-600"
+                                      : itemStock <= 10
+                                      ? "text-orange-600"
+                                      : "text-green-600"
+                                  }`}
+                                >
+                                  {itemStock}
+                                </span>
+                              </span>
+                            </div>
+
+                            {/* Color Selection */}
+                            <div className="mb-3">
+                              <label className="text-xs font-medium text-gray-700 mb-1 block">
+                                Color:
+                              </label>
+                              <div className="flex items-center space-x-1">
+                                {item.colorVariants &&
+                                item.colorVariants.length > 0 ? (
+                                  item.colorVariants.map((variant, index) => {
+                                    const variantId =
+                                      variant.id || `variant-${index}`;
                                     const isSelected =
-                                      selectedSizes[item.id] === sizeQty.size;
-                                    const isOutOfStock = sizeQty.quantity === 0;
+                                      selectedColors[item.id] === variantId;
                                     return (
                                       <button
-                                        key={`${item.id}-${sizeQty.size}`}
+                                        key={`${item.id}-${variantId}`}
                                         onClick={() =>
-                                          !isOutOfStock &&
-                                          handleSizeSelect(
-                                            item.id,
-                                            sizeQty.size
-                                          )
+                                          handleColorSelect(item.id, variantId)
                                         }
-                                        disabled={isOutOfStock}
-                                        className={`text-xs py-1 px-2 rounded border transition-all ${
-                                          isOutOfStock
-                                            ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                                            : isSelected
-                                            ? "bg-blue-600 text-white border-blue-600"
-                                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                                        className={`relative w-6 h-6 rounded-full border-2 transition-all ${
+                                          isSelected
+                                            ? "border-blue-500 ring-2 ring-blue-200"
+                                            : "border-gray-300 hover:border-gray-400"
                                         }`}
-                                        title={`${sizeQty.size} - ${sizeQty.quantity} in stock`}
+                                        style={{
+                                          backgroundColor: variant.colorCode,
+                                        }}
+                                        title={
+                                          isSelected
+                                            ? `${variant.color} (click to unselect)`
+                                            : variant.color
+                                        }
                                       >
-                                        <div className="flex flex-col items-center">
-                                          <span>{sizeQty.size}</span>
-                                          <span
-                                            className={`text-xs ${
-                                              isSelected
-                                                ? "text-blue-200"
-                                                : "text-gray-500"
-                                            }`}
-                                          >
-                                            ({sizeQty.quantity})
+                                        {isSelected && (
+                                          <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow-sm">
+                                            ×
                                           </span>
-                                        </div>
+                                        )}
                                       </button>
                                     );
                                   })
                                 ) : (
-                                  <span className="text-xs text-gray-500 col-span-3">
-                                    {selectedColors[item.id]
-                                      ? "No sizes available"
-                                      : "Select a color first"}
+                                  <span className="text-xs text-gray-500">
+                                    No color variants available
                                   </span>
-                                );
-                              })()}
+                                )}
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Add to Cart Button */}
-                          <button
-                            onClick={() =>
-                              handleAddToCart(item as ClothingInventoryItem)
-                            }
-                            className={`w-full py-2 px-3 text-sm font-medium rounded transition-colors flex items-center justify-center space-x-2 ${
-                              selectedColors[item.id] && selectedSizes[item.id]
-                                ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            }`}
-                          >
-                            <ShoppingCart className="h-4 w-4" />
-                            <span>ADD TO CART</span>
-                          </button>
+                            {/* Size Selection */}
+                            <div
+                              className="mb-3"
+                              key={`sizes-${item.id}-${
+                                selectedColors[item.id] || "no-color"
+                              }`}
+                            >
+                              <label className="text-xs font-medium text-gray-700 mb-1 block">
+                                Size:
+                              </label>
+                              <div className="grid grid-cols-3 gap-1">
+                                {(() => {
+                                  const availableSizes = item.colorVariants
+                                    ? getAvailableSizes(
+                                        item as ClothingInventoryItem
+                                      )
+                                    : [];
+                                  console.log(
+                                    `Size rendering for ${item.id}: availableSizes=`,
+                                    availableSizes,
+                                    `length=${availableSizes.length}`
+                                  );
+                                  return availableSizes.length > 0 ? (
+                                    availableSizes.map((sizeQty) => {
+                                      const isSelected =
+                                        selectedSizes[item.id] === sizeQty.size;
+                                      const isOutOfStock =
+                                        sizeQty.quantity === 0;
+                                      return (
+                                        <button
+                                          key={`${item.id}-${sizeQty.size}`}
+                                          onClick={() =>
+                                            !isOutOfStock &&
+                                            handleSizeSelect(
+                                              item.id,
+                                              sizeQty.size
+                                            )
+                                          }
+                                          disabled={isOutOfStock}
+                                          className={`text-xs py-1 px-2 rounded border transition-all ${
+                                            isOutOfStock
+                                              ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                              : isSelected
+                                              ? "bg-blue-600 text-white border-blue-600"
+                                              : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                                          }`}
+                                          title={`${sizeQty.size} - ${sizeQty.quantity} in stock`}
+                                        >
+                                          <div className="flex flex-col items-center">
+                                            <span>{sizeQty.size}</span>
+                                            <span
+                                              className={`text-xs ${
+                                                isSelected
+                                                  ? "text-blue-200"
+                                                  : "text-gray-500"
+                                              }`}
+                                            >
+                                              ({sizeQty.quantity})
+                                            </span>
+                                          </div>
+                                        </button>
+                                      );
+                                    })
+                                  ) : (
+                                    <span className="text-xs text-gray-500 col-span-3">
+                                      {selectedColors[item.id]
+                                        ? "No sizes available"
+                                        : "Select a color first"}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+
+                            {/* Add to Cart Button */}
+                            <button
+                              onClick={() =>
+                                handleAddToCart(item as ClothingInventoryItem)
+                              }
+                              disabled={
+                                isOutOfStock ||
+                                !selectedColors[item.id] ||
+                                !selectedSizes[item.id]
+                              }
+                              className={`w-full py-2 px-3 text-sm font-medium rounded transition-colors flex items-center justify-center space-x-2 ${
+                                isOutOfStock
+                                  ? "bg-red-100 text-red-400 cursor-not-allowed border border-red-200"
+                                  : selectedColors[item.id] &&
+                                    selectedSizes[item.id]
+                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              }`}
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                              <span>
+                                {isOutOfStock ? "OUT OF STOCK" : "ADD TO CART"}
+                              </span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

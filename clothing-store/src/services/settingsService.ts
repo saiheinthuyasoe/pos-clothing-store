@@ -4,11 +4,11 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
-} from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '@/lib/firebase';
+} from "firebase/firestore";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
 
-const COLLECTION_NAME = 'business_settings';
-const SETTINGS_DOC_ID = 'main'; // Single document for business settings
+const COLLECTION_NAME = "business_settings";
+const SETTINGS_DOC_ID = "main"; // Single document for business settings
 
 export interface BusinessSettings {
   businessName: string;
@@ -24,25 +24,26 @@ export interface BusinessSettings {
   enableDarkMode: boolean;
   enableSoundEffects: boolean;
   currencyRate: number;
+  currentBranch?: string;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface CurrencyInfo {
-  code: 'THB' | 'MMK';
+  code: "THB" | "MMK";
   name: string;
   symbol: string;
 }
 
 export class SettingsService {
-  private static currencyMap: Record<'THB' | 'MMK', CurrencyInfo> = {
-    THB: { code: 'THB', name: 'Thai Baht', symbol: '฿' },
-    MMK: { code: 'MMK', name: 'Myanmar Kyat', symbol: 'Ks' }
+  private static currencyMap: Record<"THB" | "MMK", CurrencyInfo> = {
+    THB: { code: "THB", name: "Thai Baht", symbol: "฿" },
+    MMK: { code: "MMK", name: "Myanmar Kyat", symbol: "Ks" },
   };
 
   static async getBusinessSettings(): Promise<BusinessSettings | null> {
     if (!db || !isFirebaseConfigured) {
-      throw new Error('Firebase is not configured');
+      throw new Error("Firebase is not configured");
     }
 
     try {
@@ -52,39 +53,45 @@ export class SettingsService {
       if (docSnap.exists()) {
         const data = docSnap.data();
         return {
-          businessName: data.businessName || '',
-          shortName: data.shortName || '',
-          defaultCurrency: data.defaultCurrency || 'THB',
+          businessName: data.businessName || "",
+          shortName: data.shortName || "",
+          defaultCurrency: data.defaultCurrency || "THB",
           taxRate: data.taxRate || 0,
-          registeredBy: data.registeredBy || '',
-          registeredAt: data.registeredAt || '',
-          businessLogo: data.businessLogo || '',
+          registeredBy: data.registeredBy || "",
+          registeredAt: data.registeredAt || "",
+          businessLogo: data.businessLogo || "",
           showBusinessLogoOnInvoice: data.showBusinessLogoOnInvoice ?? true,
-          autoPrintReceiptAfterCheckout: data.autoPrintReceiptAfterCheckout ?? true,
-          invoiceFooterMessage: data.invoiceFooterMessage || '',
+          autoPrintReceiptAfterCheckout:
+            data.autoPrintReceiptAfterCheckout ?? true,
+          invoiceFooterMessage: data.invoiceFooterMessage || "",
           enableDarkMode: data.enableDarkMode ?? false,
           enableSoundEffects: data.enableSoundEffects ?? false,
           currencyRate: data.currencyRate || 0,
-          createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
+          currentBranch: data.currentBranch || "Main Branch",
+          createdAt:
+            data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+          updatedAt:
+            data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
         };
       }
 
       return null; // No settings found
     } catch (error) {
-      console.error('Error fetching business settings:', error);
-      throw new Error('Failed to fetch business settings');
+      console.error("Error fetching business settings:", error);
+      throw new Error("Failed to fetch business settings");
     }
   }
 
-  static async saveBusinessSettings(settings: Omit<BusinessSettings, 'createdAt' | 'updatedAt'>): Promise<BusinessSettings> {
+  static async saveBusinessSettings(
+    settings: Omit<BusinessSettings, "createdAt" | "updatedAt">
+  ): Promise<BusinessSettings> {
     if (!db || !isFirebaseConfigured) {
-      throw new Error('Firebase is not configured');
+      throw new Error("Firebase is not configured");
     }
 
     try {
       const docRef = doc(db, COLLECTION_NAME, SETTINGS_DOC_ID);
-      
+
       // Check if document exists to determine if this is create or update
       const existingDoc = await getDoc(docRef);
       const isUpdate = existingDoc.exists();
@@ -92,7 +99,7 @@ export class SettingsService {
       const settingsData = {
         ...settings,
         updatedAt: serverTimestamp(),
-        ...(isUpdate ? {} : { createdAt: serverTimestamp() })
+        ...(isUpdate ? {} : { createdAt: serverTimestamp() }),
       };
 
       await setDoc(docRef, settingsData, { merge: true });
@@ -100,27 +107,29 @@ export class SettingsService {
       // Return the saved settings with current timestamp
       return {
         ...settings,
-        createdAt: isUpdate ? existingDoc.data()?.createdAt?.toDate?.()?.toISOString() : new Date().toISOString(),
+        createdAt: isUpdate
+          ? existingDoc.data()?.createdAt?.toDate?.()?.toISOString()
+          : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Error saving business settings:', error);
-      throw new Error('Failed to save business settings');
+      console.error("Error saving business settings:", error);
+      throw new Error("Failed to save business settings");
     }
   }
 
   static async resetBusinessSettings(): Promise<BusinessSettings> {
-    const defaultSettings: Omit<BusinessSettings, 'createdAt' | 'updatedAt'> = {
-      businessName: '',
-      shortName: '',
-      defaultCurrency: 'THB',
+    const defaultSettings: Omit<BusinessSettings, "createdAt" | "updatedAt"> = {
+      businessName: "",
+      shortName: "",
+      defaultCurrency: "THB",
       taxRate: 0,
-      registeredBy: '',
-      registeredAt: '',
-      businessLogo: '',
+      registeredBy: "",
+      registeredAt: "",
+      businessLogo: "",
       showBusinessLogoOnInvoice: true,
       autoPrintReceiptAfterCheckout: true,
-      invoiceFooterMessage: '',
+      invoiceFooterMessage: "",
       enableDarkMode: false,
       enableSoundEffects: false,
       currencyRate: 0,
@@ -132,23 +141,25 @@ export class SettingsService {
   /**
    * Get currency information by code
    */
-  static getCurrencyInfo(code: 'THB' | 'MMK'): CurrencyInfo {
+  static getCurrencyInfo(code: "THB" | "MMK"): CurrencyInfo {
     return this.currencyMap[code];
   }
 
   /**
    * Format price with currency symbol
    */
-  static formatPrice(amount: number, currencyCode: 'THB' | 'MMK'): string {
+  static formatPrice(amount: number, currencyCode: "THB" | "MMK"): string {
     const currency = this.getCurrencyInfo(currencyCode);
-    
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
+
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
       currency: currencyCode,
-      currencyDisplay: 'symbol',
+      currencyDisplay: "symbol",
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
-    }).format(amount).replace(currencyCode, currency.symbol);
+    })
+      .format(amount)
+      .replace(currencyCode, currency.symbol);
   }
 
   /**
@@ -156,29 +167,29 @@ export class SettingsService {
    * The exchange rate is always interpreted as: 1 [defaultCurrency] = exchangeRate [otherCurrency]
    */
   static convertPrice(
-    amount: number, 
-    fromCurrency: 'THB' | 'MMK', 
-    toCurrency: 'THB' | 'MMK', 
+    amount: number,
+    fromCurrency: "THB" | "MMK",
+    toCurrency: "THB" | "MMK",
     exchangeRate: number,
-    defaultCurrency: 'THB' | 'MMK' = 'THB'
+    defaultCurrency: "THB" | "MMK" = "THB"
   ): number {
     if (fromCurrency === toCurrency) {
       return amount;
     }
 
     // Determine the exchange rate interpretation based on default currency
-    if (defaultCurrency === 'THB') {
+    if (defaultCurrency === "THB") {
       // Rate means: 1 THB = exchangeRate MMK
-      if (fromCurrency === 'THB' && toCurrency === 'MMK') {
+      if (fromCurrency === "THB" && toCurrency === "MMK") {
         return amount * exchangeRate;
-      } else if (fromCurrency === 'MMK' && toCurrency === 'THB') {
+      } else if (fromCurrency === "MMK" && toCurrency === "THB") {
         return amount / exchangeRate;
       }
-    } else if (defaultCurrency === 'MMK') {
+    } else if (defaultCurrency === "MMK") {
       // Rate means: 1 MMK = exchangeRate THB
-      if (fromCurrency === 'MMK' && toCurrency === 'THB') {
+      if (fromCurrency === "MMK" && toCurrency === "THB") {
         return amount * exchangeRate;
-      } else if (fromCurrency === 'THB' && toCurrency === 'MMK') {
+      } else if (fromCurrency === "THB" && toCurrency === "MMK") {
         return amount / exchangeRate;
       }
     }

@@ -8,7 +8,6 @@ import {
   deleteDoc,
   query,
   orderBy,
-  where,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -28,6 +27,10 @@ export const addExpenseCategory = async (
   name: string
 ): Promise<ExpenseCategory> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), {
       name,
       createdAt: Timestamp.now(),
@@ -46,6 +49,10 @@ export const addExpenseCategory = async (
 
 export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     const q = query(
       collection(db, CATEGORIES_COLLECTION),
       orderBy("createdAt", "desc")
@@ -65,6 +72,10 @@ export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
 
 export const deleteExpenseCategory = async (id: string): Promise<void> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
   } catch (error) {
     console.error("Error deleting expense category:", error);
@@ -75,6 +86,10 @@ export const deleteExpenseCategory = async (id: string): Promise<void> => {
 // Spending Menu functions
 export const addSpendingMenu = async (name: string): Promise<SpendingMenu> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     const docRef = await addDoc(collection(db, SPENDING_MENUS_COLLECTION), {
       name,
       createdAt: Timestamp.now(),
@@ -93,6 +108,10 @@ export const addSpendingMenu = async (name: string): Promise<SpendingMenu> => {
 
 export const getSpendingMenus = async (): Promise<SpendingMenu[]> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     const q = query(
       collection(db, SPENDING_MENUS_COLLECTION),
       orderBy("createdAt", "desc")
@@ -112,6 +131,10 @@ export const getSpendingMenus = async (): Promise<SpendingMenu[]> => {
 
 export const deleteSpendingMenu = async (id: string): Promise<void> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     await deleteDoc(doc(db, SPENDING_MENUS_COLLECTION, id));
   } catch (error) {
     console.error("Error deleting spending menu:", error);
@@ -122,6 +145,10 @@ export const deleteSpendingMenu = async (id: string): Promise<void> => {
 // Expense functions
 export const addExpense = async (data: CreateExpenseData): Promise<Expense> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     // Get category and spending menu names
     const categoryDoc = await getDoc(
       doc(db, CATEGORIES_COLLECTION, data.categoryId)
@@ -168,6 +195,10 @@ export const addExpense = async (data: CreateExpenseData): Promise<Expense> => {
 
 export const getExpenses = async (): Promise<Expense[]> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     const q = query(
       collection(db, EXPENSES_COLLECTION),
       orderBy("date", "desc")
@@ -199,6 +230,10 @@ export const getExpenses = async (): Promise<Expense[]> => {
 
 export const getExpenseById = async (id: string): Promise<Expense | null> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     const docRef = doc(db, EXPENSES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
 
@@ -232,7 +267,11 @@ export const updateExpense = async (
   data: Partial<CreateExpenseData>
 ): Promise<void> => {
   try {
-    const updateData: any = {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
+    const updateData: Record<string, unknown> = {
       updatedAt: Timestamp.now(),
     };
 
@@ -271,6 +310,10 @@ export const updateExpense = async (
 
 export const deleteExpense = async (id: string): Promise<void> => {
   try {
+    if (!db) {
+      throw new Error("Database not initialized");
+    }
+
     await deleteDoc(doc(db, EXPENSES_COLLECTION, id));
   } catch (error) {
     console.error("Error deleting expense:", error);
