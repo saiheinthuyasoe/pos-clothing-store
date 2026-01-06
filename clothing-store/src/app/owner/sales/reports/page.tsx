@@ -23,6 +23,9 @@ import {
   Smartphone,
   Wallet,
   Truck,
+  ChevronLeft,
+  ChevronRight,
+  Search,
 } from "lucide-react";
 
 interface ReportData {
@@ -58,15 +61,41 @@ function ReportsPageContent() {
   const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
   const [filterBranch, setFilterBranch] = useState<string>("");
   const [dateRange, setDateRange] = useState<
-    "7d" | "30d" | "90d" | "1y" | "all"
+    "today" | "7d" | "30d" | "90d" | "all" | "custom"
   >("30d");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<
+    | "all"
+    | "completed"
+    | "pending"
+    | "cancelled"
+    | "refunded"
+    | "partially_refunded"
+  >("all");
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<
+    "all" | "cash" | "scan" | "wallet" | "cod"
+  >("all");
   const [refreshing, setRefreshing] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   useEffect(() => {
     loadReportData();
-  }, [dateRange, filterBranch]);
+  }, [
+    dateRange,
+    filterBranch,
+    filterStatus,
+    filterPaymentMethod,
+    searchTerm,
+    startDate,
+    endDate,
+  ]);
 
   // Load shops and set initial branch filter
   useEffect(() => {
@@ -87,6 +116,18 @@ function ReportsPageContent() {
     }
   }, [businessSettings, filterBranch]);
 
+  // Initialize date filters
+  useEffect(() => {
+    if (!startDate || !endDate) {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 30);
+
+      setStartDate(start.toISOString().split("T")[0]);
+      setEndDate(end.toISOString().split("T")[0]);
+    }
+  }, [startDate, endDate]);
+
   const loadReportData = async () => {
     try {
       setLoading(true);
@@ -95,22 +136,40 @@ function ReportsPageContent() {
       // Filter transactions based on date range
       let filteredTransactions = transactions;
 
-      if (dateRange !== "all") {
+      if (dateRange === "custom") {
+        // Use custom date range
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          filteredTransactions = transactions.filter((t) => {
+            const transactionDate = new Date(t.timestamp);
+            return transactionDate >= start && transactionDate <= end;
+          });
+        }
+      } else if (dateRange !== "all") {
         const now = new Date();
         const daysBack =
-          dateRange === "7d"
+          dateRange === "today"
+            ? 0
+            : dateRange === "7d"
             ? 7
             : dateRange === "30d"
             ? 30
             : dateRange === "90d"
             ? 90
-            : 365;
-        const startDate = new Date(
-          now.getTime() - daysBack * 24 * 60 * 60 * 1000
-        );
+            : 0;
+
+        const startDateCalc = new Date(now);
+        if (dateRange === "today") {
+          startDateCalc.setHours(0, 0, 0, 0);
+        } else {
+          startDateCalc.setDate(startDateCalc.getDate() - daysBack);
+        }
 
         filteredTransactions = transactions.filter(
-          (t) => new Date(t.timestamp) >= startDate
+          (t) => new Date(t.timestamp) >= startDateCalc
         );
       }
 
@@ -118,6 +177,30 @@ function ReportsPageContent() {
       if (filterBranch && filterBranch !== "all") {
         filteredTransactions = filteredTransactions.filter(
           (t) => t.branchName === filterBranch
+        );
+      }
+
+      // Filter by status
+      if (filterStatus !== "all") {
+        filteredTransactions = filteredTransactions.filter(
+          (t) => t.status === filterStatus
+        );
+      }
+
+      // Filter by payment method
+      if (filterPaymentMethod !== "all") {
+        filteredTransactions = filteredTransactions.filter(
+          (t) => t.paymentMethod === filterPaymentMethod
+        );
+      }
+
+      // Filter by search term
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filteredTransactions = filteredTransactions.filter(
+          (t) =>
+            t.transactionId?.toLowerCase().includes(term) ||
+            t.customer?.displayName?.toLowerCase().includes(term)
         );
       }
 
@@ -301,13 +384,11 @@ function ReportsPageContent() {
       })
     );
 
-    // Get recent transactions (latest 10)
-    const recentTransactions = transactions
-      .sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      )
-      .slice(0, 10);
+    // Get recent transactions (sorted by timestamp, pagination will be applied in render)
+    const recentTransactions = transactions.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
 
     return {
       totalRevenue,
@@ -326,6 +407,109 @@ function ReportsPageContent() {
     setRefreshing(true);
     await loadReportData();
     setRefreshing(false);
+  };
+
+  const exportToCSV = () => {
+    const transactions = reportData?.recentTransactions || [];
+    if (transactions.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      "Transaction ID",
+      "Date & Time",
+      "Customer Name",
+      "Items",
+      "Total",
+      "Profit",
+      "Tax",
+      "Branch",
+      "Selling Currency",
+      "Payment Method",
+      "Status",
+    ];
+
+    // Convert transactions to CSV rows
+    const rows = transactions.map((transaction) => {
+      const refundedAmount =
+        transaction.refunds?.reduce(
+          (sum, refund) => sum + refund.totalAmount,
+          0
+        ) || 0;
+      const netTotal = Math.max(0, transaction.total - refundedAmount);
+
+      const transactionProfit = transaction.items.reduce((itemTotal, item) => {
+        const profitPerItem =
+          (item.unitPrice - item.originalPrice) * item.quantity;
+        return itemTotal + profitPerItem;
+      }, 0);
+
+      const refundedProfit =
+        transaction.refunds?.reduce((refundTotal, refund) => {
+          return refund.items.reduce((refundItemTotal, refundItem) => {
+            const originalItem = transaction.items.find(
+              (item) => item.id === refundItem.itemId
+            );
+            if (originalItem) {
+              const refundedProfitPerItem =
+                (originalItem.unitPrice - originalItem.originalPrice) *
+                refundItem.quantity;
+              return refundItemTotal + refundedProfitPerItem;
+            }
+            return refundItemTotal;
+          }, 0);
+        }, 0) || 0;
+
+      const netProfit = Math.max(0, transactionProfit - refundedProfit);
+      const statusMap: { [key: string]: string } = {
+        completed: "Completed",
+        pending: "Pending",
+        cancelled: "Cancelled",
+        refunded: "Refunded",
+        partially_refunded: "Partially Refunded",
+      };
+
+      return [
+        transaction.transactionId || "",
+        formatDate(transaction.timestamp),
+        transaction.customer?.displayName || "Walk-in Customer",
+        transaction.items.length.toString(),
+        formatPrice(netTotal),
+        formatPrice(netProfit),
+        formatPrice(transaction.tax || 0),
+        transaction.branchName || "N/A",
+        transaction.sellingCurrency || "THB",
+        transaction.paymentMethod?.toUpperCase() || "N/A",
+        statusMap[transaction.status] || transaction.status,
+      ];
+    });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => `"${cell.toString().replace(/"/g, '""') }"`).join(",")
+      ),
+    ].join("\n");
+
+    // Prepend UTF-8 BOM so Excel on Windows detects UTF-8 correctly
+    const bom = "\uFEFF";
+
+    // Create download link
+    const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `reports_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const formatDate = (dateString: string) => {
@@ -358,6 +542,13 @@ function ReportsPageContent() {
         return <CreditCard className="h-4 w-4 text-gray-900" />;
     }
   };
+
+  // Pagination calculations for recent transactions
+  const allTransactions = reportData?.recentTransactions || [];
+  const totalPages = Math.ceil(allTransactions.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentTransactions = allTransactions.slice(startIndex, endIndex);
 
   if (loading) {
     return (
@@ -400,62 +591,13 @@ function ReportsPageContent() {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  Reports & Analytics
-                </h1>
-                <p className="text-gray-600">
-                  Comprehensive business insights and performance metrics
-                </p>
-              </div>
-              <div className="flex space-x-4">
-                <select
-                  aria-label="Select branch"
-                  value={filterBranch}
-                  onChange={(e) => setFilterBranch(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Branches</option>
-                  {shops.map((shop) => (
-                    <option key={shop.id} value={shop.name}>
-                      {shop.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Select date range"
-                  value={dateRange}
-                  onChange={(e) =>
-                    setDateRange(
-                      e.target.value as "7d" | "30d" | "90d" | "1y" | "all"
-                    )
-                  }
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d">Last 30 days</option>
-                  <option value="90d">Last 90 days</option>
-                  <option value="1y">Last year</option>
-                  <option value="all">All Time</option>
-                </select>
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 mr-2 ${
-                      refreshing ? "animate-spin" : ""
-                    }`}
-                  />
-                  Refresh
-                </button>
-                <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </button>
-              </div>
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Reports & Analytics
+              </h1>
+              <p className="text-gray-600">
+                Comprehensive business insights and performance metrics
+              </p>
             </div>
 
             {/* Key Metrics */}
@@ -722,6 +864,182 @@ function ReportsPageContent() {
               </div>
             </div>
 
+            {/* Filters and Search */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search transactions..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  />
+                </div>
+
+                {/* Status Filter */}
+                <select
+                  aria-label="Filter by status"
+                  value={filterStatus}
+                  onChange={(e) => {
+                    setFilterStatus(
+                      e.target.value as
+                        | "all"
+                        | "completed"
+                        | "pending"
+                        | "cancelled"
+                        | "refunded"
+                        | "partially_refunded"
+                    );
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="all">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="refunded">Refunded</option>
+                  <option value="partially_refunded">Partially Refunded</option>
+                </select>
+
+                {/* Payment Method Filter */}
+                <select
+                  aria-label="Filter by payment method"
+                  value={filterPaymentMethod}
+                  onChange={(e) => {
+                    setFilterPaymentMethod(
+                      e.target.value as
+                        | "all"
+                        | "cash"
+                        | "scan"
+                        | "wallet"
+                        | "cod"
+                    );
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="all">All Payment Methods</option>
+                  <option value="cash">Cash</option>
+                  <option value="scan">Scan Payment</option>
+                  <option value="wallet">Wallet</option>
+                  <option value="cod">COD</option>
+                </select>
+
+                {/* Branch Filter */}
+                <select
+                  aria-label="Filter by branch"
+                  value={filterBranch}
+                  onChange={(e) => {
+                    setFilterBranch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="all">All Branches</option>
+                  {shops.map((shop) => (
+                    <option key={shop.id} value={shop.name}>
+                      {shop.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Date Range Filter */}
+                <select
+                  aria-label="Filter by date range"
+                  value={dateRange}
+                  onChange={(e) => {
+                    const range = e.target.value as
+                      | "today"
+                      | "7d"
+                      | "30d"
+                      | "90d"
+                      | "all"
+                      | "custom";
+                    setDateRange(range);
+                    setCurrentPage(1);
+
+                    if (range !== "custom") {
+                      const end = new Date();
+                      const start = new Date();
+
+                      switch (range) {
+                        case "today":
+                          break;
+                        case "7d":
+                          start.setDate(start.getDate() - 7);
+                          break;
+                        case "30d":
+                          start.setDate(start.getDate() - 30);
+                          break;
+                        case "90d":
+                          start.setDate(start.getDate() - 90);
+                          break;
+                      }
+
+                      if (range !== "all") {
+                        setStartDate(start.toISOString().split("T")[0]);
+                        setEndDate(end.toISOString().split("T")[0]);
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                >
+                  <option value="today">Today</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="90d">Last 90 Days</option>
+                  <option value="all">All Time</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+
+                {/* Custom Date Range Inputs - Same Row */}
+                <div className="flex items-center gap-2 lg:col-span-2">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setDateRange("custom");
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    max={endDate}
+                    aria-label="Start Date"
+                  />
+                  <span className="text-gray-500">to</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setDateRange("custom");
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    min={startDate}
+                    max={new Date().toISOString().split("T")[0]}
+                    aria-label="End Date"
+                  />
+                </div>
+
+                {/*Export Buttons */}
+                <button
+                  onClick={exportToCSV}
+                  className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </button>
+              </div>
+            </div>
+
             {/* Recent Transactions */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
               <div className="p-6 border-b border-gray-200">
@@ -775,7 +1093,7 @@ function ReportsPageContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {reportData?.recentTransactions.map((transaction) => (
+                    {currentTransactions.map((transaction) => (
                       <tr key={transaction.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-600">
                           #{transaction.transactionId}
@@ -959,6 +1277,79 @@ function ReportsPageContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm text-gray-700">Rows per page:</p>
+                    <select
+                      title="Select number of rows per page"
+                      value={rowsPerPage}
+                      onChange={(e) => {
+                        setRowsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <p className="text-sm text-gray-700">
+                      Showing {startIndex + 1}–
+                      {Math.min(endIndex, allTransactions.length)} of{" "}
+                      {allTransactions.length} transactions
+                    </p>
+                  </div>
+                  <div>
+                    <nav
+                      className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                      aria-label="Pagination"
+                    >
+                      <button
+                        title="Go to previous page"
+                        onClick={() =>
+                          setCurrentPage(Math.max(1, currentPage - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <button
+                        title="Go to next page"
+                        onClick={() =>
+                          setCurrentPage(Math.min(totalPages, currentPage + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </nav>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

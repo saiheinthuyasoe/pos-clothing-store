@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -17,6 +16,8 @@ import {
   UserX,
   Eye,
   EyeOff,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface StaffUser extends User {
@@ -24,7 +25,6 @@ interface StaffUser extends User {
 }
 
 function StaffContent() {
-  const { user } = useAuth();
   const [activeMenuItem, setActiveMenuItem] = useState("staff");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -48,11 +48,11 @@ function StaffContent() {
     role: "staff" as UserRole,
   });
 
-  useEffect(() => {
-    fetchStaff();
-  }, []);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const fetchStaff = async () => {
+  const fetchStaff = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch("/api/staff");
@@ -66,7 +66,11 @@ function StaffContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
 
   const showAlert = (type: "success" | "error", message: string) => {
     setAlert({ type, message });
@@ -228,20 +232,23 @@ function StaffContent() {
     }
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(staff.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentStaff = staff.slice(startIndex, endIndex);
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar
-        activeMenuItem={activeMenuItem}
-        onMenuItemClick={setActiveMenuItem}
+        activeItem={activeMenuItem}
+        onItemClick={(item) => setActiveMenuItem(item.id)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavBar
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        />
+        <TopNavBar />
 
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto">
@@ -308,7 +315,7 @@ function StaffContent() {
                         </td>
                       </tr>
                     ) : (
-                      staff.map((member) => {
+                      currentStaff.map((member) => {
                         const roleInfo = getRoleInfo(member.role);
                         return (
                           <tr
@@ -389,6 +396,85 @@ function StaffContent() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {staff.length > 0 && (
+                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm text-gray-700">Rows per page:</p>
+                      <select
+                        title="Select number of rows per page"
+                        value={rowsPerPage}
+                        onChange={(e) => {
+                          setRowsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <p className="text-sm text-gray-700">
+                        Showing {startIndex + 1}–
+                        {Math.min(endIndex, staff.length)} of {staff.length}{" "}
+                        staff members
+                      </p>
+                    </div>
+                    <div>
+                      <nav
+                        className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                        aria-label="Pagination"
+                      >
+                        <button
+                          title="Go to previous page"
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                          title="Go to next page"
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1)
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Role Permissions Info */}
@@ -502,6 +588,7 @@ function StaffContent() {
                         Role *
                       </label>
                       <select
+                        title="role"
                         value={formData.role}
                         onChange={(e) =>
                           setFormData({
@@ -596,6 +683,7 @@ function StaffContent() {
                         Role
                       </label>
                       <select
+                        title="role"
                         value={editingStaff.role}
                         onChange={(e) =>
                           setEditingStaff({

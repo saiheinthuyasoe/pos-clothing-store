@@ -223,7 +223,6 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
                   colorCode: colorVariant.colorCode,
                   size: sizeQty.size,
                   barcode:
-                    colorVariant.barcode ||
                     item.barcode ||
                     `${item.id}-${colorVariant.id}-${sizeQty.size}`,
                   price: item.price,
@@ -407,7 +406,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
         let barcodeNumber = variant.barcode;
         if (!barcodeNumber) {
           // Generate a 12-digit number for EAN13
-          const baseNumber = `${gs1CompanyPrefix}${(autoSequence + variantIndex).toString().padStart(5, '0')}`;
+          const baseNumber = `${gs1CompanyPrefix}${(Number(autoSequence) + variantIndex).toString().padStart(5, '0')}`;
           barcodeNumber = baseNumber.padEnd(12, '0');
         }
         
@@ -475,7 +474,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
         let barcodeNumber = variant.barcode;
         if (!barcodeNumber) {
           // Generate a 12-digit number for EAN13 (13th digit is check digit, calculated by JsBarcode)
-          const baseNumber = `${gs1CompanyPrefix}${(autoSequence + variantIndex).toString().padStart(5, '0')}`;
+          const baseNumber = `${gs1CompanyPrefix}${(Number(autoSequence) + variantIndex).toString().padStart(5, '0')}`;
           barcodeNumber = baseNumber.padEnd(12, '0');
         }
         
@@ -564,7 +563,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
         let barcodeNumber = variant.barcode;
         if (!barcodeNumber) {
           // Generate a 12-digit number for EAN13 (13th digit is check digit, calculated by JsBarcode)
-          const baseNumber = `${gs1CompanyPrefix}${(autoSequence + variantIndex).toString().padStart(5, '0')}`;
+          const baseNumber = `${gs1CompanyPrefix}${(Number(autoSequence) + variantIndex).toString().padStart(5, '0')}`;
           barcodeNumber = baseNumber.padEnd(12, '0');
         }
         
@@ -755,6 +754,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
                       Label Width (mm)
                     </label>
                     <input
+                      title="labelWidth"
                       type="number"
                       value={labelWidth}
                       onChange={(e) => {
@@ -777,6 +777,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
                       Label Height (mm)
                     </label>
                     <input
+                      title="labelHeight"
                       type="number"
                       value={labelHeight}
                       onChange={(e) => {
@@ -799,6 +800,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
                       Gap (mm)
                     </label>
                     <input
+                      title="labelGap"
                       type="number"
                       value={labelGap}
                       onChange={(e) => {
@@ -824,6 +826,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
                       Standard
                     </label>
                     <select
+                      title="standard"
                       value={standard}
                       onChange={(e) => setStandard(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
@@ -853,6 +856,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
                       Auto Sequence
                     </label>
                     <input
+                      title="autoSequence"
                       type="number"
                       value={autoSequence}
                       onChange={(e) => {
@@ -1015,6 +1019,7 @@ const [savedSettings, setSavedSettings] = useState<LabelSettings | null>(null);
                     />
                   </div>
                   <select
+                    title="selectedShop"
                     value={selectedShop}
                     onChange={(e) => setSelectedShop(e.target.value)}
                     className="w-44 px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-gray-700 transition-all"

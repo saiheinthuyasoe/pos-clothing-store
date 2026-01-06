@@ -666,7 +666,7 @@ function OwnerHomeContent() {
 
   // Filter items based on search term and shop (memoized for performance)
   const filteredInventory = useMemo(() => {
-    return displayInventory.filter((item) => {
+    const filtered = displayInventory.filter((item) => {
       const matchesSearch =
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -713,6 +713,13 @@ function OwnerHomeContent() {
         matchesStockStatus &&
         matchesPriceRange
       );
+    });
+
+    // Sort items: in-stock items first, out-of-stock items last
+    return filtered.sort((a, b) => {
+      if (a.stock === 0 && b.stock > 0) return 1; // a is out of stock, move to end
+      if (a.stock > 0 && b.stock === 0) return -1; // b is out of stock, move to end
+      return 0; // maintain original order for items with same stock status
     });
   }, [
     displayInventory,

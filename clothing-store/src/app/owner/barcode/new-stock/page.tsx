@@ -38,6 +38,7 @@ interface NewStockForm {
 }
 
 function NewStockContent() {
+  const { user } = useAuth();
   const [activeMenuItem, setActiveMenuItem] = useState("new-stock");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
@@ -128,7 +129,10 @@ function NewStockContent() {
   };
 
   // Handle form input changes
-  const handleInputChange = (field: keyof NewStockForm, value: any) => {
+  const handleInputChange = (
+    field: keyof NewStockForm,
+    value: string | number | string[]
+  ) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear field error when user starts typing
     if (formErrors[field]) {
@@ -206,19 +210,26 @@ function NewStockContent() {
         name: formData.name.trim(),
         category: formData.category,
         barcode: formData.barcode.trim(),
-        costPrice: formData.costPrice,
-        sellingPrice: formData.sellingPrice,
-        quantity: formData.quantity,
+        price: formData.sellingPrice,
+        stock: formData.quantity,
         colors: formData.colors,
-        sizes: formData.sizes,
-        description: formData.description.trim(),
-        supplier: formData.supplier.trim(),
-        imageUrl: formData.imageUrl.trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        image: formData.imageUrl,
+        wholesaleTiers: [],
+        colorVariants: formData.colors.length > 0 ? formData.colors.map(color => ({
+          id: crypto.randomUUID(),
+          color,
+          colorCode: '',
+          sizeQuantities: formData.sizes.map(size => ({
+            size,
+            quantity: formData.quantity / formData.sizes.length
+          }))
+        })) : [],
+        shop: user?.uid ?? "", // Add shop property, fallback to empty string if user.uid is undefined
+        isNew: true // Add isNew property, default to true for new stock
       };
       
-      await InventoryService.addClothingInventoryItem(newItem);
+      if (!user?.uid) throw new Error("User ID is required to add stock item");
+      await InventoryService.addClothingInventoryItem(newItem, user.uid);
       
       setSuccess('New stock item added successfully!');
       
@@ -329,6 +340,7 @@ function NewStockContent() {
                       Category *
                     </label>
                     <select
+                       title="category"
                        value={formData.category}
                        onChange={(e) => handleInputChange('category', e.target.value)}
                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
@@ -551,6 +563,7 @@ function NewStockContent() {
                       >
                         {color}
                         <button
+                          title="button"
                           type="button"
                           onClick={() => removeColor(color)}
                           className="ml-2 text-blue-600 hover:text-blue-800"
@@ -604,6 +617,7 @@ function NewStockContent() {
                       >
                         {size}
                         <button
+                          title="button"
                           type="button"
                           onClick={() => removeSize(size)}
                           className="ml-2 text-green-600 hover:text-green-800"

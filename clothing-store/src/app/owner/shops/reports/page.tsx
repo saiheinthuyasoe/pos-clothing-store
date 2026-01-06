@@ -19,6 +19,8 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface Shop {
@@ -47,16 +49,35 @@ function ShopReportsContent() {
   const [shopReports, setShopReports] = useState<ShopReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<
-    "7d" | "30d" | "90d" | "1y" | "all"
+    "7d" | "30d" | "90d" | "1y" | "all" | "custom"
   >("30d");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [expandedShops, setExpandedShops] = useState<Set<string>>(new Set());
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   useEffect(() => {
     loadData();
-  }, [dateRange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, startDate, endDate]);
+
+  // Initialize date filters
+  useEffect(() => {
+    if (!startDate || !endDate) {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 30); // Default to last 30 days
+
+      setStartDate(start.toISOString().split("T")[0]);
+      setEndDate(end.toISOString().split("T")[0]);
+    }
+  }, [startDate, endDate]);
 
   const loadData = async () => {
     try {
@@ -72,20 +93,32 @@ function ShopReportsContent() {
       // Filter transactions based on date range
       let filteredTransactions = transactions;
       if (dateRange !== "all") {
-        const now = new Date();
-        const daysBack =
-          dateRange === "7d"
-            ? 7
-            : dateRange === "30d"
-            ? 30
-            : dateRange === "90d"
-            ? 90
-            : 365;
-        const startDate = new Date(
-          now.getTime() - daysBack * 24 * 60 * 60 * 1000
-        );
+        let rangeStartDate: Date;
+        let rangeEndDate: Date = new Date();
+
+        if (dateRange === "custom" && startDate && endDate) {
+          rangeStartDate = new Date(startDate);
+          rangeEndDate = new Date(endDate);
+          rangeEndDate.setHours(23, 59, 59, 999);
+        } else {
+          const now = new Date();
+          const daysBack =
+            dateRange === "7d"
+              ? 7
+              : dateRange === "30d"
+              ? 30
+              : dateRange === "90d"
+              ? 90
+              : 365;
+          rangeStartDate = new Date(
+            now.getTime() - daysBack * 24 * 60 * 60 * 1000
+          );
+        }
+
         filteredTransactions = transactions.filter(
-          (t) => new Date(t.timestamp) >= startDate
+          (t) =>
+            new Date(t.timestamp) >= rangeStartDate &&
+            new Date(t.timestamp) <= rangeEndDate
         );
       }
 
@@ -146,8 +179,7 @@ function ShopReportsContent() {
       // Calculate profit for all items
       const transactionProfit = transaction.items.reduce((itemTotal, item) => {
         const profitPerItem =
-          ((item.unitPrice || 0) - (item.originalPrice || 0)) *
-          item.quantity;
+          ((item.unitPrice || 0) - (item.originalPrice || 0)) * item.quantity;
         totalItems += item.quantity;
         return itemTotal + profitPerItem;
       }, 0);
@@ -271,6 +303,12 @@ function ShopReportsContent() {
     );
   }
 
+  // Pagination calculations
+  const totalPages = Math.ceil(shopReports.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentReports = shopReports.slice(startIndex, endIndex);
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar
@@ -304,15 +342,81 @@ function ShopReportsContent() {
                   <select
                     title="dateRange"
                     value={dateRange}
-                    onChange={(e) => setDateRange(e.target.value as "7d" | "30d" | "90d" | "1y" | "all")}
-                    className="px-4 py-2 border border-gray-300 text-gray-900 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onChange={(e) => {
+                      const range = e.target.value as
+                        | "7d"
+                        | "30d"
+                        | "90d"
+                        | "1y"
+                        | "all"
+                        | "custom";
+                      setDateRange(range);
+                      setCurrentPage(1);
+
+                      if (range !== "custom") {
+                        const end = new Date();
+                        const start = new Date();
+
+                        switch (range) {
+                          case "7d":
+                            start.setDate(start.getDate() - 7);
+                            break;
+                          case "30d":
+                            start.setDate(start.getDate() - 30);
+                            break;
+                          case "90d":
+                            start.setDate(start.getDate() - 90);
+                            break;
+                          case "1y":
+                            start.setDate(start.getDate() - 365);
+                            break;
+                        }
+
+                        if (range !== "all") {
+                          setStartDate(start.toISOString().split("T")[0]);
+                          setEndDate(end.toISOString().split("T")[0]);
+                        }
+                      }
+                    }}
+                    className="px-4 py-2 border border-gray-300 text-gray-900 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                   >
                     <option value="7d">Last 7 Days</option>
                     <option value="30d">Last 30 Days</option>
                     <option value="90d">Last 90 Days</option>
                     <option value="1y">Last Year</option>
                     <option value="all">All Time</option>
+                    <option value="custom">Custom Range</option>
                   </select>
+                </div>
+
+                {/* Custom Date Range Inputs */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setDateRange("custom");
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 text-sm"
+                    max={endDate}
+                    aria-label="Start Date"
+                  />
+                  <span className="text-gray-500 text-sm">to</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setDateRange("custom");
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 text-sm"
+                    min={startDate}
+                    max={new Date().toISOString().split("T")[0]}
+                    aria-label="End Date"
+                  />
                 </div>
 
                 <button
@@ -425,7 +529,7 @@ function ShopReportsContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {shopReports.length === 0 ? (
+                    {currentReports.length === 0 ? (
                       <tr>
                         <td
                           colSpan={7}
@@ -436,7 +540,7 @@ function ShopReportsContent() {
                         </td>
                       </tr>
                     ) : (
-                      shopReports.map((report) => (
+                      currentReports.map((report) => (
                         <React.Fragment key={report.shopId}>
                           <tr className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -532,6 +636,85 @@ function ShopReportsContent() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {shopReports.length > 0 && (
+                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm text-gray-700">Rows per page:</p>
+                      <select
+                        title="Select number of rows per page"
+                        value={rowsPerPage}
+                        onChange={(e) => {
+                          setRowsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <p className="text-sm text-gray-700">
+                        Showing {startIndex + 1}–
+                        {Math.min(endIndex, shopReports.length)} of{" "}
+                        {shopReports.length} shops
+                      </p>
+                    </div>
+                    <div>
+                      <nav
+                        className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                        aria-label="Pagination"
+                      >
+                        <button
+                          title="Go to previous page"
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                          title="Go to next page"
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1)
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>

@@ -23,6 +23,8 @@ import {
   Clock,
   AlertCircle,
   Truck,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface PaymentStats {
@@ -51,14 +53,25 @@ function PaymentsPageContent() {
     "all" | "cash" | "scan" | "wallet" | "cod"
   >("all");
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "completed" | "pending" | "failed"
+    | "all"
+    | "completed"
+    | "pending"
+    | "cancelled"
+    | "refunded"
+    | "partially_refunded"
   >("all");
   const [dateRange, setDateRange] = useState<
-    "today" | "7d" | "30d" | "90d" | "all"
+    "today" | "7d" | "30d" | "90d" | "all" | "custom"
   >("30d");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const loadPayments = useCallback(async () => {
     try {
@@ -68,32 +81,46 @@ function PaymentsPageContent() {
       // Filter by date range
       let filteredData = data;
 
-      if (dateRange !== "all") {
+      if (dateRange === "custom") {
+        // Use custom date range
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          filteredData = data.filter((t) => {
+            const transactionDate = new Date(t.timestamp);
+            return transactionDate >= start && transactionDate <= end;
+          });
+        }
+      } else if (dateRange !== "all") {
         const now = new Date();
-        let startDate: Date;
+        let startDateCalc: Date;
 
         switch (dateRange) {
           case "today":
-            startDate = new Date(
+            startDateCalc = new Date(
               now.getFullYear(),
               now.getMonth(),
               now.getDate()
             );
             break;
           case "7d":
-            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            startDateCalc = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             break;
           case "30d":
-            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            startDateCalc = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             break;
           case "90d":
-            startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            startDateCalc = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
             break;
           default:
-            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            startDateCalc = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         }
 
-        filteredData = data.filter((t) => new Date(t.timestamp) >= startDate);
+        filteredData = data.filter(
+          (t) => new Date(t.timestamp) >= startDateCalc
+        );
       }
 
       // Filter by branch
@@ -109,7 +136,7 @@ function PaymentsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, filterBranch]);
+  }, [dateRange, filterBranch, startDate, endDate]);
 
   // Load shops and set initial branch filter
   useEffect(() => {
@@ -130,6 +157,18 @@ function PaymentsPageContent() {
     }
   }, [businessSettings, filterBranch]);
 
+  // Initialize date filters
+  useEffect(() => {
+    if (!startDate || !endDate) {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 30);
+
+      setStartDate(start.toISOString().split("T")[0]);
+      setEndDate(end.toISOString().split("T")[0]);
+    }
+  }, [startDate, endDate]);
+
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
@@ -138,6 +177,110 @@ function PaymentsPageContent() {
     setRefreshing(true);
     await loadPayments();
     setRefreshing(false);
+  };
+
+  const exportToCSV = () => {
+    if (filteredTransactions.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      "Transaction ID",
+      "Date & Time",
+      "Customer Name",
+      "Items",
+      "Total",
+      "Profit",
+      "Tax",
+      "Branch",
+      "Selling Currency",
+      "Payment Method",
+      "Status",
+    ];
+
+    // Convert transactions to CSV rows
+    const rows = filteredTransactions.map((transaction) => {
+      const refundedAmount =
+        transaction.refunds?.reduce(
+          (sum, refund) => sum + refund.totalAmount,
+          0
+        ) || 0;
+      const netTotal = Math.max(0, transaction.total - refundedAmount);
+
+      const transactionProfit = transaction.items.reduce((itemTotal, item) => {
+        const profitPerItem =
+          (item.unitPrice - item.originalPrice) * item.quantity;
+        return itemTotal + profitPerItem;
+      }, 0);
+
+      const refundedProfit =
+        transaction.refunds?.reduce((refundTotal, refund) => {
+          return refund.items.reduce((refundItemTotal, refundItem) => {
+            const originalItem = transaction.items.find(
+              (item) => item.id === refundItem.itemId
+            );
+            if (originalItem) {
+              const refundedProfitPerItem =
+                (originalItem.unitPrice - originalItem.originalPrice) *
+                refundItem.quantity;
+              return refundItemTotal + refundedProfitPerItem;
+            }
+            return refundItemTotal;
+          }, 0);
+        }, 0) || 0;
+
+      const netProfit = Math.max(0, transactionProfit - refundedProfit);
+      const statusMap: { [key: string]: string } = {
+        completed: "Completed",
+        pending: "Pending",
+        cancelled: "Cancelled",
+        refunded: "Refunded",
+        partially_refunded: "Partially Refunded",
+      };
+
+      return [
+        transaction.transactionId || "",
+        formatDate(transaction.timestamp),
+        transaction.customer?.displayName || "Walk-in Customer",
+        transaction.items.length.toString(),
+        formatPrice(netTotal),
+        formatPrice(netProfit),
+        formatPrice(transaction.tax || 0),
+        transaction.branchName || "N/A",
+        transaction.sellingCurrency || "THB",
+        transaction.paymentMethod?.toUpperCase() || "N/A",
+        statusMap[transaction.status] || transaction.status,
+      ];
+    });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(",")
+      ),
+    ].join("\n");
+
+    // Prepend UTF-8 BOM so Excel on Windows detects UTF-8 correctly
+    const bom = "\uFEFF";
+
+    // Create download link
+    const blob = new Blob([bom + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `payments_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const calculatePaymentStats = (): PaymentStats => {
@@ -284,6 +427,12 @@ function PaymentsPageContent() {
     return matchesSearch && matchesMethod && matchesStatus;
   });
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredTransactions.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentTransactions = filteredTransactions.slice(startIndex, endIndex);
+
   const paymentStats = calculatePaymentStats();
 
   const formatDate = (dateString: string) => {
@@ -356,45 +505,13 @@ function PaymentsPageContent() {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  Payment Management
-                </h1>
-                <p className="text-gray-600">
-                  Monitor and manage all payment transactions
-                </p>
-              </div>
-              <div className="flex space-x-4">
-                <select
-                  title="Filter by Date Range"
-                  value={dateRange}
-                  onChange={(e) =>
-                    setDateRange(
-                      e.target.value as "today" | "7d" | "30d" | "90d" | "all"
-                    )
-                  }
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="today">Today</option>
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d">Last 30 days</option>
-                  <option value="90d">Last 90 days</option>
-                  <option value="all">All Time</option>
-                </select>
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 mr-2 ${
-                      refreshing ? "animate-spin" : ""
-                    }`}
-                  />
-                  Refresh
-                </button>
-              </div>
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Payment Management
+              </h1>
+              <p className="text-gray-600">
+                Monitor and manage all payment transactions
+              </p>
             </div>
 
             {/* Payment Stats */}
@@ -616,47 +733,9 @@ function PaymentsPageContent() {
             {/* Transactions List */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <div className="p-6 border-b border-gray-200">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Recent Transactions
-                  </h2>
-
-                  {/* Filters */}
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <input
-                        type="text"
-                        placeholder="Search transactions..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-64"
-                      />
-                    </div>
-
-                    <select
-                      value={filterMethod}
-                      onChange={(e) => setFilterMethod(e.target.value as any)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="all">All Methods</option>
-                      <option value="cash">Cash</option>
-                      <option value="scan">Scan</option>
-                      <option value="wallet">Wallet</option>
-                    </select>
-
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value as any)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="completed">Completed</option>
-                      <option value="pending">Pending</option>
-                      <option value="failed">Failed</option>
-                    </select>
-                  </div>
-                </div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Recent Transactions
+                </h2>
               </div>
             </div>
 
@@ -732,24 +811,55 @@ function PaymentsPageContent() {
               </div>
             </div>
 
-            {/* Filters */}
+            {/* Filters and Search */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Search */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
                     type="text"
-                    placeholder="Search payments..."
+                    placeholder="Search transactions..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
 
+                {/* Status Filter */}
                 <select
-                  title="Filter by Payment Method"
+                  aria-label="Filter by status"
+                  value={filterStatus}
+                  onChange={(e) => {
+                    setFilterStatus(
+                      e.target.value as
+                        | "all"
+                        | "completed"
+                        | "pending"
+                        | "cancelled"
+                        | "refunded"
+                        | "partially_refunded"
+                    );
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="all">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="refunded">Refunded</option>
+                  <option value="partially_refunded">Partially Refunded</option>
+                </select>
+
+                {/* Payment Method Filter */}
+                <select
+                  aria-label="Filter by payment method"
                   value={filterMethod}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFilterMethod(
                       e.target.value as
                         | "all"
@@ -757,9 +867,10 @@ function PaymentsPageContent() {
                         | "scan"
                         | "wallet"
                         | "cod"
-                    )
-                  }
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    );
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Payment Methods</option>
                   <option value="cash">Cash</option>
@@ -768,13 +879,15 @@ function PaymentsPageContent() {
                   <option value="cod">COD</option>
                 </select>
 
+                {/* Branch Filter */}
                 <select
-                  title="Filter by Status"
-                  value={filterStatus}
                   aria-label="Filter by branch"
                   value={filterBranch}
-                  onChange={(e) => setFilterBranch(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => {
+                    setFilterBranch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Branches</option>
                   {shops.map((shop) => (
@@ -784,25 +897,90 @@ function PaymentsPageContent() {
                   ))}
                 </select>
 
+                {/* Date Range Filter */}
                 <select
-                  onChange={(e) =>
-                    setFilterStatus(
-                      e.target.value as
-                        | "all"
-                        | "completed"
-                        | "pending"
-                        | "failed"
-                    )
-                  }
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Filter by date range"
+                  value={dateRange}
+                  onChange={(e) => {
+                    const range = e.target.value as
+                      | "today"
+                      | "7d"
+                      | "30d"
+                      | "90d"
+                      | "all"
+                      | "custom";
+                    setDateRange(range);
+                    setCurrentPage(1);
+
+                    if (range !== "custom") {
+                      const end = new Date();
+                      const start = new Date();
+
+                      switch (range) {
+                        case "today":
+                          break;
+                        case "7d":
+                          start.setDate(start.getDate() - 7);
+                          break;
+                        case "30d":
+                          start.setDate(start.getDate() - 30);
+                          break;
+                        case "90d":
+                          start.setDate(start.getDate() - 90);
+                          break;
+                      }
+
+                      if (range !== "all") {
+                        setStartDate(start.toISOString().split("T")[0]);
+                        setEndDate(end.toISOString().split("T")[0]);
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
                 >
-                  <option value="all">All Status</option>
-                  <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="failed">Failed</option>
+                  <option value="today">Today</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="90d">Last 90 Days</option>
+                  <option value="all">All Time</option>
+                  <option value="custom">Custom Range</option>
                 </select>
 
-                <button className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                {/* Custom Date Range Inputs - Same Row */}
+                <div className="flex items-center gap-2 lg:col-span-2">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setDateRange("custom");
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    max={endDate}
+                    aria-label="Start Date"
+                  />
+                  <span className="text-gray-500">to</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setDateRange("custom");
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    min={startDate}
+                    max={new Date().toISOString().split("T")[0]}
+                    aria-label="End Date"
+                  />
+                </div>
+
+                {/*Export Buttons */}
+                <button
+                  onClick={exportToCSV}
+                  className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </button>
@@ -852,7 +1030,7 @@ function PaymentsPageContent() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredTransactions.map((transaction) => (
+                      {currentTransactions.map((transaction) => (
                         <tr key={transaction.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {transaction.transactionId}
@@ -861,9 +1039,6 @@ function PaymentsPageContent() {
                             <div className="text-sm text-gray-900">
                               {transaction.customer?.displayName ||
                                 "Walk-in customer"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {transaction.customer?.email}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -921,6 +1096,85 @@ function PaymentsPageContent() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {filteredTransactions.length > 0 && (
+                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm text-gray-700">Rows per page:</p>
+                      <select
+                        title="Select number of rows per page"
+                        value={rowsPerPage}
+                        onChange={(e) => {
+                          setRowsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <p className="text-sm text-gray-700">
+                        Showing {startIndex + 1}–
+                        {Math.min(endIndex, filteredTransactions.length)} of{" "}
+                        {filteredTransactions.length} payments
+                      </p>
+                    </div>
+                    <div>
+                      <nav
+                        className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                        aria-label="Pagination"
+                      >
+                        <button
+                          title="Go to previous page"
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                          title="Go to next page"
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1)
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

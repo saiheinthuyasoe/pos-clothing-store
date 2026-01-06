@@ -15,6 +15,8 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Shop,
@@ -49,6 +51,10 @@ function ShopManagementContent() {
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Fetch shops on component mount
   useEffect(() => {
@@ -298,6 +304,12 @@ function ShopManagementContent() {
     setFormErrors({});
     setError(null);
   };
+
+  // Pagination calculations
+  const totalPages = Math.ceil(shops.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentShops = shops.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -623,7 +635,7 @@ function ShopManagementContent() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {shops.map((shop) => (
+                      {currentShops.map((shop) => (
                         <tr key={shop.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
@@ -676,6 +688,85 @@ function ShopManagementContent() {
                     </tbody>
                   </table>
                 )}
+                {/* Pagination */}
+                {shops.length > 0 && (
+                  <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                    <div className="flex-1 flex justify-between sm:hidden">
+                      <button
+                        onClick={() =>
+                          setCurrentPage(Math.max(1, currentPage - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() =>
+                          setCurrentPage(Math.min(totalPages, currentPage + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                        className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                      <div className="flex items-center space-x-2">
+                        <p className="text-sm text-gray-700">Rows per page:</p>
+                        <select
+                          title="Select number of rows per page"
+                          value={rowsPerPage}
+                          onChange={(e) => {
+                            setRowsPerPage(Number(e.target.value));
+                            setCurrentPage(1);
+                          }}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                        <p className="text-sm text-gray-700">
+                          Showing {startIndex + 1}–
+                          {Math.min(endIndex, shops.length)} of {shops.length}{" "}
+                          shops
+                        </p>
+                      </div>
+                      <div>
+                        <nav
+                          className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                          aria-label="Pagination"
+                        >
+                          <button
+                            title="Go to previous page"
+                            onClick={() =>
+                              setCurrentPage(Math.max(1, currentPage - 1))
+                            }
+                            disabled={currentPage === 1}
+                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            <ChevronLeft className="h-5 w-5" />
+                          </button>
+                          <button
+                            title="Go to next page"
+                            onClick={() =>
+                              setCurrentPage(
+                                Math.min(totalPages, currentPage + 1)
+                              )
+                            }
+                            disabled={currentPage === totalPages}
+                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            <ChevronRight className="h-5 w-5" />
+                          </button>
+                        </nav>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                )
               </div>
             </div>
           </div>

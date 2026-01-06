@@ -249,7 +249,10 @@ function PrintSettingsContent() {
     `;
   };
 
-  const handleSettingChange = (key: keyof PrintSettings, value: any) => {
+  const handleSettingChange = (
+    key: keyof PrintSettings,
+    value: string | number | boolean
+  ) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
@@ -403,6 +406,7 @@ function PrintSettingsContent() {
                           Printer Type
                         </label>
                         <select
+                          title="printerType"
                           value={settings.printerType}
                           onChange={(e) => handleSettingChange('printerType', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -418,6 +422,7 @@ function PrintSettingsContent() {
                           Connection Type
                         </label>
                         <select
+                          title="connectionType"
                           value={settings.connectionType}
                           onChange={(e) => handleSettingChange('connectionType', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -458,6 +463,7 @@ function PrintSettingsContent() {
                           Label Size
                         </label>
                         <select
+                          title="labelSize"
                           value={settings.labelSize}
                           onChange={(e) => handleSettingChange('labelSize', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -474,6 +480,7 @@ function PrintSettingsContent() {
                           Orientation
                         </label>
                         <select
+                          title="labelOrientation"
                           value={settings.labelOrientation}
                           onChange={(e) => handleSettingChange('labelOrientation', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -490,6 +497,7 @@ function PrintSettingsContent() {
                               Width (mm)
                             </label>
                             <input
+                              title="number"
                               type="number"
                               min="10"
                               max="100"
@@ -504,6 +512,7 @@ function PrintSettingsContent() {
                               Height (mm)
                             </label>
                             <input
+                              title="number"
                               type="number"
                               min="10"
                               max="100"
@@ -525,6 +534,7 @@ function PrintSettingsContent() {
                           Margin (px)
                         </label>
                         <input
+                         title="number"
                           type="number"
                           min="0"
                           max="10"
@@ -539,6 +549,7 @@ function PrintSettingsContent() {
                           Padding (px)
                         </label>
                         <input
+                          title="number"
                           type="number"
                           min="0"
                           max="20"
@@ -553,6 +564,7 @@ function PrintSettingsContent() {
                           Text Alignment
                         </label>
                         <select
+                          title="alignment"
                           value={settings.alignment}
                           onChange={(e) => handleSettingChange('alignment', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -603,6 +615,7 @@ function PrintSettingsContent() {
                           Font Size
                         </label>
                         <select
+                         title="fontSize"
                           value={settings.fontSize}
                           onChange={(e) => handleSettingChange('fontSize', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -618,6 +631,7 @@ function PrintSettingsContent() {
                           Font Family
                         </label>
                         <select
+                          title="fontFamily"
                           value={settings.fontFamily}
                           onChange={(e) => handleSettingChange('fontFamily', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -634,6 +648,7 @@ function PrintSettingsContent() {
                           Font Weight
                         </label>
                         <select
+                          title="fontWeight"
                           value={settings.fontWeight}
                           onChange={(e) => handleSettingChange('fontWeight', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
@@ -658,6 +673,7 @@ function PrintSettingsContent() {
                           Receipt Width (mm)
                         </label>
                         <input
+                          title="receiptWidth"
                           type="number"
                           min="50"
                           max="120"
@@ -730,6 +746,7 @@ function PrintSettingsContent() {
                           Print Quality
                         </label>
                         <select
+                          title="printQuality"
                           value={settings.printQuality}
                           onChange={(e) => handleSettingChange('printQuality', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -745,6 +762,7 @@ function PrintSettingsContent() {
                           Print Speed
                         </label>
                         <select
+                          title="printspeed"
                           value={settings.printSpeed}
                           onChange={(e) => handleSettingChange('printSpeed', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"

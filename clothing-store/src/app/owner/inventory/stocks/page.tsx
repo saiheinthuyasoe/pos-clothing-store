@@ -221,7 +221,9 @@ function InventoryStocksContent() {
     // Price range filter
     let matchesPriceRange = true;
     if (priceRange.min !== "" || priceRange.max !== "") {
-      const price = group.unitPrice ? parseFloat(group.unitPrice.toString()) : 0;
+      const price = group.unitPrice
+        ? parseFloat(group.unitPrice.toString())
+        : 0;
       const minPrice = priceRange.min !== "" ? parseFloat(priceRange.min) : 0;
       const maxPrice =
         priceRange.max !== "" ? parseFloat(priceRange.max) : Infinity;
@@ -669,7 +671,13 @@ function InventoryStocksContent() {
                           scope="col"
                           className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
                         >
-                          Price
+                          Unit Price
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Original Price
                         </th>
                         <th
                           scope="col"
@@ -758,10 +766,19 @@ function InventoryStocksContent() {
                               </div>
                             </td>
 
-                            {/* Price Column */}
+                            {/* Unit Price Column */}
                             <td className="whitespace-nowrap px-3 py-4 text-sm">
                               <div className="font-semibold text-gray-900">
                                 {group.formattedPrice}
+                              </div>
+                            </td>
+
+                            {/* Original Price Column */}
+                            <td className="whitespace-nowrap px-3 py-4 text-sm">
+                              <div className="font-medium text-gray-600">
+                                {defaultCurrency === "THB"
+                                  ? `฿${group.originalPrice.toLocaleString()}`
+                                  : `${group.originalPrice.toLocaleString()} Ks`}
                               </div>
                             </td>
 
@@ -811,7 +828,7 @@ function InventoryStocksContent() {
                           {/* Expandable Variants Row */}
                           {expandedGroups.has(group.groupId) && (
                             <tr className="bg-gray-50">
-                              <td colSpan={6} className="px-4 py-4 sm:px-6">
+                              <td colSpan={7} className="px-4 py-4 sm:px-6">
                                 <div className="space-y-4">
                                   {/* Color Variants */}
                                   <div>
