@@ -530,6 +530,7 @@ function ExpensesContent() {
                       value={imageUrl}
                       onChange={setImageUrl}
                       onRemove={() => setImageUrl("")}
+                      folder="pos-clothing-store/expenses"
                     />
                   </div>
                 </div>

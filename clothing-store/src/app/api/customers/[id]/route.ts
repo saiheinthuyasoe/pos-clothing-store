@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { CustomerService } from '@/services/customerService';
-import { CustomerResponse, UpdateCustomerRequest } from '@/types/customer';
+import { NextRequest, NextResponse } from "next/server";
+import { CustomerService } from "@/services/customerService";
+import { CustomerResponse, UpdateCustomerRequest } from "@/types/customer";
 
 // GET /api/customers/[id] - Get a specific customer by ID
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
     if (!id) {
       const response: CustomerResponse = {
         success: false,
-        error: 'Customer ID is required',
+        error: "Customer ID is required",
       };
       return NextResponse.json(response, { status: 400 });
     }
@@ -23,7 +23,7 @@ export async function GET(
     if (!customer) {
       const response: CustomerResponse = {
         success: false,
-        error: 'Customer not found',
+        error: "Customer not found",
       };
       return NextResponse.json(response, { status: 404 });
     }
@@ -35,10 +35,11 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error in GET /api/customers/[id]:', error);
+    console.error("Error in GET /api/customers/[id]:", error);
     const response: CustomerResponse = {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch customer',
+      error:
+        error instanceof Error ? error.message : "Failed to fetch customer",
     };
     return NextResponse.json(response, { status: 500 });
   }
@@ -55,7 +56,7 @@ export async function PUT(
     if (!id) {
       const response: CustomerResponse = {
         success: false,
-        error: 'Customer ID is required',
+        error: "Customer ID is required",
       };
       return NextResponse.json(response, { status: 400 });
     }
@@ -66,7 +67,7 @@ export async function PUT(
     if (!body || Object.keys(body).length === 0) {
       const response: CustomerResponse = {
         success: false,
-        error: 'Update data is required',
+        error: "Update data is required",
       };
       return NextResponse.json(response, { status: 400 });
     }
@@ -76,15 +77,16 @@ export async function PUT(
     const response: CustomerResponse = {
       success: true,
       data: updatedCustomer,
-      message: 'Customer updated successfully',
+      message: "Customer updated successfully",
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error in PUT /api/customers/[id]:', error);
+    console.error("Error in PUT /api/customers/[id]:", error);
     const response: CustomerResponse = {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update customer',
+      error:
+        error instanceof Error ? error.message : "Failed to update customer",
     };
     return NextResponse.json(response, { status: 500 });
   }
@@ -101,7 +103,7 @@ export async function DELETE(
     if (!id) {
       const response: CustomerResponse = {
         success: false,
-        error: 'Customer ID is required',
+        error: "Customer ID is required",
       };
       return NextResponse.json(response, { status: 400 });
     }
@@ -110,15 +112,16 @@ export async function DELETE(
 
     const response: CustomerResponse = {
       success: true,
-      message: 'Customer deleted successfully',
+      message: "Customer deleted successfully",
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error in DELETE /api/customers/[id]:', error);
+    console.error("Error in DELETE /api/customers/[id]:", error);
     const response: CustomerResponse = {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to delete customer',
+      error:
+        error instanceof Error ? error.message : "Failed to delete customer",
     };
     return NextResponse.json(response, { status: 500 });
   }

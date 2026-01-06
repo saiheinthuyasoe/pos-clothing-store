@@ -53,8 +53,8 @@ export function ImageUpload({
       formData.append("file", file);
       formData.append("folder", folder);
 
-      // Upload to Cloudinary via API route
-      const response = await fetch("/api/cloudinary/upload", {
+      // Upload to Cloudflare via API route
+      const response = await fetch("/api/cloudflare/upload", {
         method: "POST",
         body: formData,
       });
@@ -91,7 +91,7 @@ export function ImageUpload({
         value.includes(".r2.") ||
         value.includes("r2.cloudflarestorage.com")
       ) {
-        await fetch("/api/cloudinary/delete", {
+        await fetch("/api/cloudflare/delete", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

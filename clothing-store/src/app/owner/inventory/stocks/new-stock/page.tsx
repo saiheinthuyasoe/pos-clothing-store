@@ -244,7 +244,7 @@ function NewStockContent() {
           formData.append("file", file);
           formData.append("folder", "pos-clothing-store/variants");
 
-          const response = await fetch("/api/cloudinary/upload", {
+          const response = await fetch("/api/cloudflare/upload", {
             method: "POST",
             body: formData,
           });
