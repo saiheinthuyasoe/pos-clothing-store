@@ -35,6 +35,7 @@ function OwnerSettingsContent() {
   const { refreshSettings } = useSettings();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string>("");
@@ -232,17 +233,33 @@ function OwnerSettingsContent() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isCartModalOpen={isCartModalOpen}
+        />
+      </div>
+
+      {/* Mobile Sidebar (overlay) */}
       <Sidebar
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isCartModalOpen={isCartModalOpen}
+        className="md:hidden"
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+        <TopNavBar
+          onCartModalStateChange={setIsCartModalOpen}
+          onMenuToggle={() => setIsMobileSidebarOpen(true)}
+        />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-screen-2xl mx-auto">
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>

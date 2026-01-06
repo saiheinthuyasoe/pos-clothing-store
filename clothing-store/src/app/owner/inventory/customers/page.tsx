@@ -73,6 +73,7 @@ function CustomerPageContent() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Fetch customers from API
   const fetchCustomers = async () => {
@@ -337,12 +338,27 @@ function CustomerPageContent() {
   return (
     <ProtectedRoute requiredRole="owner">
       <div className="flex h-screen bg-gray-50">
-        <Sidebar activeItem="customers" onItemClick={() => {}} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNavBar />
+        <div className="hidden md:block">
+          <Sidebar activeItem="customers" onItemClick={() => {}} />
+        </div>
 
-          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-            <div className="container mx-auto px-6 py-8">
+        <div className="md:hidden">
+          <Sidebar
+            activeItem="customers"
+            onItemClick={() => setIsMobileSidebarOpen(false)}
+            isMobileOpen={isMobileSidebarOpen}
+            onCloseMobile={() => setIsMobileSidebarOpen(false)}
+          />
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNavBar
+            onCartModalStateChange={() => {}}
+            onMenuToggle={() => setIsMobileSidebarOpen((s) => !s)}
+          />
+
+          <main className="flex-1 overflow-x-hidden overflow-y-auto">
+            <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               {/* Header */}
               <div className="flex items-center justify-between mb-8">
                 <div>
@@ -637,82 +653,82 @@ function CustomerPageContent() {
                   </div>
                 )}
 
-                  {/* Pagination */}
-                  <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                    <div className="flex-1 flex justify-between sm:hidden">
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.max(1, currentPage - 1))
-                        }
-                        disabled={currentPage === 1}
-                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                {/* Pagination */}
+                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm text-gray-700">Rows per page:</p>
+                      <select
+                        title="Select number of rows per page"
+                        value={rowsPerPage}
+                        onChange={(e) => {
+                          setRowsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
                       >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.min(totalPages, currentPage + 1))
-                        }
-                        disabled={currentPage === totalPages}
-                        className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Next
-                      </button>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <p className="text-sm text-gray-700">
+                        Showing {startIndex + 1}–
+                        {Math.min(endIndex, filteredCustomers.length)} of{" "}
+                        {filteredCustomers.length} customers
+                      </p>
                     </div>
-                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                      <div className="flex items-center space-x-2">
-                        <p className="text-sm text-gray-700">Rows per page:</p>
-                        <select
-                          title="Select number of rows per page"
-                          value={rowsPerPage}
-                          onChange={(e) => {
-                            setRowsPerPage(Number(e.target.value));
-                            setCurrentPage(1);
-                          }}
-                          className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                    <div>
+                      <nav
+                        className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                        aria-label="Pagination"
+                      >
+                        <button
+                          title="Go to previous page"
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                         >
-                          <option value={10}>10</option>
-                          <option value={25}>25</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
-                        <p className="text-sm text-gray-700">
-                          Showing {startIndex + 1}–
-                          {Math.min(endIndex, filteredCustomers.length)} of{" "}
-                          {filteredCustomers.length} customers
-                        </p>
-                      </div>
-                      <div>
-                        <nav
-                          className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                          aria-label="Pagination"
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                          title="Go to next page"
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1)
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                         >
-                          <button
-                            title="Go to previous page"
-                            onClick={() =>
-                              setCurrentPage(Math.max(1, currentPage - 1))
-                            }
-                            disabled={currentPage === 1}
-                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                          >
-                            <ChevronLeft className="h-5 w-5" />
-                          </button>
-                          <button
-                            title="Go to next page"
-                            onClick={() =>
-                              setCurrentPage(
-                                Math.min(totalPages, currentPage + 1)
-                              )
-                            }
-                            disabled={currentPage === totalPages}
-                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                          >
-                            <ChevronRight className="h-5 w-5" />
-                          </button>
-                        </nav>
-                      </div>
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </nav>
                     </div>
                   </div>
+                </div>
               </div>
             </div>
           </main>

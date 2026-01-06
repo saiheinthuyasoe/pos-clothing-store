@@ -168,14 +168,7 @@ const menuItems: MenuItem[] = [
     icon: "Settings",
     href: "/owner/settings",
     roles: ["owner"], // Only owner
-  },
-  {
-    id: "privacy-policy",
-    label: "Privacy Policy",
-    icon: "Shield",
-    href: "/owner/privacy-policy",
-    roles: ["owner", "manager", "staff"], // All roles
-  },
+  }
 ];
 
 const iconMap = {
@@ -205,6 +198,8 @@ interface SidebarProps extends NavigationProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   isCartModalOpen?: boolean;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export function Sidebar({
@@ -214,6 +209,8 @@ export function Sidebar({
   isCollapsed = false,
   onToggleCollapse,
   isCartModalOpen = false,
+  isMobileOpen,
+  onCloseMobile,
 }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [manuallyCollapsed, setManuallyCollapsed] = useState<string[]>([]);
@@ -446,7 +443,12 @@ export function Sidebar({
     );
   };
 
-  return (
+  // If this Sidebar instance is used for mobile overlay and it's not open, render nothing
+  if (typeof isMobileOpen !== "undefined" && !isMobileOpen) {
+    return null;
+  }
+
+  const container = (
     <div
       className={`${
         isCollapsed ? "w-16" : "w-64"
@@ -521,4 +523,25 @@ export function Sidebar({
       </div>
     </div>
   );
+
+  // If this is a mobile instance, render as overlay with backdrop
+  if (typeof isMobileOpen !== "undefined") {
+    return (
+      <>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-40 z-40"
+          onClick={() => onCloseMobile?.()}
+        />
+        <div
+          className={`fixed inset-y-0 left-0 z-50 transform transition-transform ${
+            isMobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          {container}
+        </div>
+      </>
+    );
+  }
+
+  return container;
 }

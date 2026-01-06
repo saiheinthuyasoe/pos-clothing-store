@@ -56,6 +56,7 @@ function ShopReportsContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [expandedShops, setExpandedShops] = useState<Set<string>>(new Set());
 
   // Pagination state
@@ -281,19 +282,37 @@ function ShopReportsContent() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50">
+        {/* Desktop Sidebar */}
+        <div className="hidden md:block">
+          <Sidebar
+            activeItem="shop-reports"
+            onItemClick={() => {}}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            isCartModalOpen={isCartModalOpen}
+          />
+        </div>
+
+        {/* Mobile Sidebar (overlay) */}
         <Sidebar
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
           activeItem="shop-reports"
           onItemClick={() => {}}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           isCartModalOpen={isCartModalOpen}
+          className="md:hidden"
         />
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+          <TopNavBar
+            onCartModalStateChange={setIsCartModalOpen}
+            onMenuToggle={() => setIsMobileSidebarOpen(true)}
+          />
 
-          <main className="flex-1 overflow-y-auto flex items-center justify-center">
-            <div className="text-center">
+          <main className="flex-1 overflow-y-auto flex items-center justify-center px-4 sm:px-6 lg:px-8 py-6">
+            <div className="text-center max-w-screen-2xl mx-auto">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-600">Loading shop reports...</p>
             </div>
@@ -311,19 +330,37 @@ function ShopReportsContent() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar
+          activeItem="shop-reports"
+          onItemClick={() => {}}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isCartModalOpen={isCartModalOpen}
+        />
+      </div>
+
+      {/* Mobile Sidebar (overlay) */}
       <Sidebar
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
         activeItem="shop-reports"
         onItemClick={() => {}}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isCartModalOpen={isCartModalOpen}
+        className="md:hidden"
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+        <TopNavBar
+          onCartModalStateChange={setIsCartModalOpen}
+          onMenuToggle={() => setIsMobileSidebarOpen(true)}
+        />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-screen-2xl mx-auto">
             {/* Header */}
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -378,7 +415,7 @@ function ShopReportsContent() {
                         }
                       }
                     }}
-                    className="px-4 py-2 border border-gray-300 text-gray-900 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    className="px-4 py-2 border border-gray-300 text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                   >
                     <option value="7d">Last 7 Days</option>
                     <option value="30d">Last 30 Days</option>
@@ -399,7 +436,7 @@ function ShopReportsContent() {
                       setDateRange("custom");
                       setCurrentPage(1);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 text-sm"
+                    className="px-4 py-2 border border-gray-300  focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 text-sm"
                     max={endDate}
                     aria-label="Start Date"
                   />
@@ -412,23 +449,12 @@ function ShopReportsContent() {
                       setDateRange("custom");
                       setCurrentPage(1);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 text-sm"
+                    className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 text-sm"
                     min={startDate}
                     max={new Date().toISOString().split("T")[0]}
                     aria-label="End Date"
                   />
                 </div>
-
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="ml-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-                  />
-                  Refresh
-                </button>
               </div>
             </div>
 

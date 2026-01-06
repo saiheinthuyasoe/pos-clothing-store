@@ -26,6 +26,7 @@ interface StaffUser extends User {
 
 function StaffContent() {
   const [activeMenuItem, setActiveMenuItem] = useState("staff");
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -240,18 +241,32 @@ function StaffContent() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar
+          activeItem={activeMenuItem}
+          onItemClick={(item) => setActiveMenuItem(item.id)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
+      </div>
+
+      {/* Mobile Sidebar (overlay) */}
       <Sidebar
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
         activeItem={activeMenuItem}
         onItemClick={(item) => setActiveMenuItem(item.id)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        className="md:hidden"
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavBar />
+        <TopNavBar onMenuToggle={() => setIsMobileSidebarOpen(true)} />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-screen-2xl mx-auto">
             {/* Alert */}
             {alert && (
               <div className="mb-4">

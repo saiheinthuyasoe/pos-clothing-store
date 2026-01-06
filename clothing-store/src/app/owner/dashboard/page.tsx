@@ -114,6 +114,7 @@ function OwnerDashboardContent() {
   const { formatPrice } = useCurrency();
   const { businessSettings } = useSettings();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -844,19 +845,37 @@ function OwnerDashboardContent() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar
-        activeItem="dashboard"
-        onItemClick={() => {}}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        isCartModalOpen={isCartModalOpen}
-      />
+      {/* Desktop sidebar (hidden on small screens) */}
+      <div className="hidden md:block">
+        <Sidebar
+          activeItem="dashboard"
+          onItemClick={() => {}}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isCartModalOpen={isCartModalOpen}
+        />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      <div className="md:hidden">
+        <Sidebar
+          activeItem="dashboard"
+          onItemClick={() => setIsMobileSidebarOpen(false)}
+          isCollapsed={false}
+          isCartModalOpen={isCartModalOpen}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+        <TopNavBar
+          onCartModalStateChange={setIsCartModalOpen}
+          onMenuToggle={() => setIsMobileSidebarOpen((s) => !s)}
+        />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-screen-2xl mx-auto">
             {/* Header */}
             <div className="mb-8">
               <div className="mb-4">
@@ -875,7 +894,7 @@ function OwnerDashboardContent() {
                   title="Filter by Branch"
                   value={filterBranch}
                   onChange={(e) => setFilterBranch(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                 >
                   <option value="all">All Branches</option>
                   {shops.map((shop) => (
@@ -920,7 +939,7 @@ function OwnerDashboardContent() {
                       setEndDate(end.toISOString().split("T")[0]);
                     }
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                  className="px-4 py-2 border border-gray-300  focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                 >
                   <option value="today">Today</option>
                   <option value="7d">Last 7 days</option>
@@ -938,7 +957,7 @@ function OwnerDashboardContent() {
                       setStartDate(e.target.value);
                       setDateRange("custom");
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                     max={endDate}
                     aria-label="Start Date"
                     placeholder="Start Date"
@@ -951,25 +970,13 @@ function OwnerDashboardContent() {
                       setEndDate(e.target.value);
                       setDateRange("custom");
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                     min={startDate}
                     max={new Date().toISOString().split("T")[0]}
                     aria-label="End Date"
                   />
                 </div>
 
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 mr-2 ${
-                      refreshing ? "animate-spin" : ""
-                    }`}
-                  />
-                  Refresh
-                </button>
               </div>
             </div>
 

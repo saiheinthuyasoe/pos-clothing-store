@@ -5,14 +5,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { LogOut, ChevronDown, ShoppingCart, Globe, Store } from "lucide-react";
+import {
+  LogOut,
+  ChevronDown,
+  ShoppingCart,
+  Globe,
+  Store,
+  Menu,
+} from "lucide-react";
 import { ShoppingCartModal } from "./ShoppingCartModal";
 
 interface TopNavBarProps {
   onCartModalStateChange?: (isOpen: boolean) => void;
+  onMenuToggle?: () => void;
 }
 
-export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
+export function TopNavBar({
+  onCartModalStateChange,
+  onMenuToggle,
+}: TopNavBarProps) {
   const { user, logout } = useAuth();
   const { getCartItemCount } = useCart();
   const {
@@ -95,6 +106,15 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
       <div className="px-4">
         <div className="flex justify-between items-center py-6">
           <div className="flex items-center">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => onMenuToggle?.()}
+              className="mr-3 p-2 rounded-md hover:bg-gray-100 md:hidden"
+              aria-label="Toggle menu"
+            >
+              <Menu className="w-6 h-6 text-gray-700" />
+            </button>
+
             <h1 className="text-2xl font-bold text-gray-900">
               {user?.displayName || user?.email || "Owner"}
             </h1>
@@ -111,7 +131,7 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
             </div>
 
             {/* Current Branch/Shop Display */}
-            <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg">
+            <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 ">
               <Store className="w-4 h-4 text-gray-600" />
               <span className="text-sm font-medium text-gray-700">
                 {businessSettings?.currentBranch === "No Branch"
@@ -121,7 +141,7 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
             </div>
 
             {/* Main Currency Title */}
-            <div className="flex items-center space-x-1 px-3 py-2 bg-white  border-gray-300 rounded-lg">
+            <div className="flex items-center space-x-1 px-3 py-2 bg-white  border-gray-300 ">
               <span className="text-sm font-semibold text-gray-800">
                 Main Currency:
               </span>
@@ -133,7 +153,7 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
             {/* Currency Selector */}
             <div className="relative" ref={currencyDropdownRef}>
               <div
-                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300  hover:bg-gray-50 cursor-pointer"
                 onClick={() =>
                   setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)
                 }
@@ -186,7 +206,7 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
             {/* Language Selector */}
             <div className="relative" ref={languageDropdownRef}>
               <div
-                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300  hover:bg-gray-50 cursor-pointer"
                 onClick={() =>
                   setIsLanguageDropdownOpen(!isLanguageDropdownOpen)
                 }

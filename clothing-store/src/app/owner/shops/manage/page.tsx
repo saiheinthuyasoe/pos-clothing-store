@@ -28,6 +28,7 @@ import {
 
 function ShopManagementContent() {
   const [activeMenuItem, setActiveMenuItem] = useState("manage-shops");
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
@@ -345,23 +346,40 @@ function ShopManagementContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar
+          activeItem={activeMenuItem}
+          onItemClick={(item) => setActiveMenuItem(item.id)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isCartModalOpen={isCartModalOpen}
+          className="h-screen"
+        />
+      </div>
+
+      {/* Mobile Sidebar (overlay) */}
       <Sidebar
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
         activeItem={activeMenuItem}
         onItemClick={(item) => setActiveMenuItem(item.id)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isCartModalOpen={isCartModalOpen}
-        className="h-screen"
+        className="md:hidden"
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {/* Top Navigation Bar */}
-        <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+        <TopNavBar
+          onCartModalStateChange={setIsCartModalOpen}
+          onMenuToggle={() => setIsMobileSidebarOpen(true)}
+        />
 
         {/* Page Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="bg-white border-b border-gray-200 px-4 md:px-8 lg:px-12 py-4">
           <div className="flex items-center">
             <Building2 className="h-6 w-6 text-blue-600 mr-3" />
             <h1 className="text-2xl font-semibold text-gray-900">
@@ -371,8 +389,8 @@ function ShopManagementContent() {
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 py-6 px-6">
-          <div className="max-w-7xl mx-auto space-y-8">
+        <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-screen-2xl mx-auto space-y-8">
             {/* Error Display */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center">
@@ -590,7 +608,7 @@ function ShopManagementContent() {
                   <Button
                     onClick={isEditMode ? handleUpdateShop : handleAddShop}
                     disabled={isSubmitting}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-3 rounded-lg flex items-center"
+                    className="bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 text-white px-6 py-3 flex items-center"
                   >
                     {isSubmitting ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -615,19 +633,6 @@ function ShopManagementContent() {
                 <h2 className="text-lg font-semibold text-gray-900">
                   Shops List
                 </h2>
-                <Button
-                  variant="outline"
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                  className="flex items-center text-gray-600 hover:text-gray-900"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 mr-2 ${
-                      isLoading ? "animate-spin" : ""
-                    }`}
-                  />
-                  Refresh
-                </Button>
               </div>
 
               <div className="overflow-x-auto">

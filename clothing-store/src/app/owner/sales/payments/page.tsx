@@ -68,6 +68,7 @@ function PaymentsPageContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -491,19 +492,35 @@ function PaymentsPageContent() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar
-        activeItem="payments"
-        onItemClick={() => {}}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        isCartModalOpen={isCartModalOpen}
-      />
+      <div className="hidden md:block">
+        <Sidebar
+          activeItem="payments"
+          onItemClick={() => {}}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isCartModalOpen={isCartModalOpen}
+        />
+      </div>
+
+      <div className="md:hidden">
+        <Sidebar
+          activeItem="payments"
+          onItemClick={() => setIsMobileSidebarOpen(false)}
+          isCollapsed={false}
+          isCartModalOpen={isCartModalOpen}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+        <TopNavBar
+          onCartModalStateChange={setIsCartModalOpen}
+          onMenuToggle={() => setIsMobileSidebarOpen((s) => !s)}
+        />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-screen-2xl mx-auto">
             {/* Header */}
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -825,7 +842,7 @@ function PaymentsPageContent() {
                       setSearchTerm(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300  focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
 
@@ -845,7 +862,7 @@ function PaymentsPageContent() {
                     );
                     setCurrentPage(1);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Status</option>
                   <option value="completed">Completed</option>
@@ -870,7 +887,7 @@ function PaymentsPageContent() {
                     );
                     setCurrentPage(1);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Payment Methods</option>
                   <option value="cash">Cash</option>
@@ -887,7 +904,7 @@ function PaymentsPageContent() {
                     setFilterBranch(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Branches</option>
                   {shops.map((shop) => (
@@ -936,7 +953,7 @@ function PaymentsPageContent() {
                       }
                     }
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
                 >
                   <option value="today">Today</option>
                   <option value="7d">Last 7 Days</option>
@@ -956,7 +973,7 @@ function PaymentsPageContent() {
                       setDateRange("custom");
                       setCurrentPage(1);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                     max={endDate}
                     aria-label="Start Date"
                   />
@@ -969,7 +986,7 @@ function PaymentsPageContent() {
                       setDateRange("custom");
                       setCurrentPage(1);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                     min={startDate}
                     max={new Date().toISOString().split("T")[0]}
                     aria-label="End Date"
@@ -979,7 +996,7 @@ function PaymentsPageContent() {
                 {/*Export Buttons */}
                 <button
                   onClick={exportToCSV}
-                  className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="inline-flex items-center justify-center font-normal transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 text-gray-900 hover:bg-gray-50 px-4 py-2 text-sm flex items-center"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export

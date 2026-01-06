@@ -13,6 +13,7 @@ import { ExpenseCategory, Expense } from "@/types/expense";
 function ExpensesContent() {
   const [activeMenuItem, setActiveMenuItem] = useState("expenses");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
@@ -287,23 +288,42 @@ function ExpensesContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <Sidebar
-        activeItem={activeMenuItem}
-        onItemClick={(item) => setActiveMenuItem(item.id)}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        className="h-screen"
-      />
+      {/* Desktop sidebar (hidden on small screens) */}
+      <div className="hidden md:block">
+        <Sidebar
+          activeItem={activeMenuItem}
+          onItemClick={(item) => setActiveMenuItem(item.id)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="h-screen"
+        />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      <div className="md:hidden">
+        <Sidebar
+          activeItem={activeMenuItem}
+          onItemClick={(item) => {
+            setActiveMenuItem(item.id);
+            setIsMobileSidebarOpen(false);
+          }}
+          isCollapsed={false}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        />
+      </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <TopNavBar />
+        <TopNavBar
+          onCartModalStateChange={() => {}}
+          onMenuToggle={() => setIsMobileSidebarOpen((s) => !s)}
+        />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-6 max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-screen-2xl mx-auto">
             {alert && (
               <div className="mb-4">
                 <Alert type={alert.type} message={alert.message} />

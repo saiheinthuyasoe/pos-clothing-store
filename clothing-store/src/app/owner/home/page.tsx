@@ -830,7 +830,7 @@ function OwnerHomeContent() {
                         placeholder="Search items, groups, IDs..."
                         value={searchTerm}
                         onChange={handleSearchChange}
-                        className="pl-10 pr-4 py-2 w-64 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
+                        className="pl-10 pr-4 py-2 w-64 border border-gray-300 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
                       />
                       <svg
                         className="absolute left-3 top-2.5 h-4 w-4 text-gray-400"
@@ -853,7 +853,7 @@ function OwnerHomeContent() {
                         onClick={() =>
                           setShowFilterDropdown(!showFilterDropdown)
                         }
-                        className="flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        className="flex items-center px-4 py-2 border border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                       >
                         <Filter className="h-4 w-4 mr-2" />
                         Filter

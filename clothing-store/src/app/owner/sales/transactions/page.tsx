@@ -58,6 +58,7 @@ export default function TransactionsPage() {
   // Layout state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Modal states
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -798,19 +799,37 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar
-        activeItem="transactions"
-        onItemClick={() => {}}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        isCartModalOpen={isCartModalOpen}
-      />
+      {/* Desktop sidebar (hidden on small screens) */}
+      <div className="hidden md:block">
+        <Sidebar
+          activeItem="transactions"
+          onItemClick={() => {}}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isCartModalOpen={isCartModalOpen}
+        />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      <div className="md:hidden">
+        <Sidebar
+          activeItem="transactions"
+          onItemClick={() => setIsMobileSidebarOpen(false)}
+          isCollapsed={false}
+          isCartModalOpen={isCartModalOpen}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
+        <TopNavBar
+          onCartModalStateChange={setIsCartModalOpen}
+          onMenuToggle={() => setIsMobileSidebarOpen((s) => !s)}
+        />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-screen-2xl mx-auto">
             {/* Header */}
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -879,21 +898,21 @@ export default function TransactionsPage() {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleBulkApprove}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    className="flex items-center px-4 py-2 bg-green-600 text-white  hover:bg-green-700 transition-colors text-sm font-medium"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Approve Selected
                   </button>
                   <button
                     onClick={handleBulkCancel}
-                    className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                    className="flex items-center px-4 py-2 bg-red-600 text-white  hover:bg-red-700 transition-colors text-sm font-medium"
                   >
                     <X className="h-4 w-4 mr-2" />
                     Cancel Checkout Selected
                   </button>
                   <button
                     onClick={() => setSelectedTransactions([])}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                    className="px-4 py-2 bg-gray-200 text-gray-700  hover:bg-gray-300 transition-colors text-sm font-medium"
                   >
                     Clear Selection
                   </button>
@@ -915,7 +934,7 @@ export default function TransactionsPage() {
                       setSearchTerm(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
 
@@ -935,7 +954,7 @@ export default function TransactionsPage() {
                     );
                     setCurrentPage(1);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Status</option>
                   <option value="completed">Completed</option>
@@ -960,7 +979,7 @@ export default function TransactionsPage() {
                     );
                     setCurrentPage(1);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Payment Methods</option>
                   <option value="cash">Cash</option>
@@ -977,7 +996,7 @@ export default function TransactionsPage() {
                     setFilterBranch(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
                   <option value="all">All Branches</option>
                   {shops.map((shop) => (
@@ -1026,7 +1045,7 @@ export default function TransactionsPage() {
                       }
                     }
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                  className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
                 >
                   <option value="today">Today</option>
                   <option value="7d">Last 7 Days</option>
@@ -1046,7 +1065,7 @@ export default function TransactionsPage() {
                       setDateRange("custom");
                       setCurrentPage(1);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                     max={endDate}
                     aria-label="Start Date"
                   />
@@ -1059,7 +1078,7 @@ export default function TransactionsPage() {
                       setDateRange("custom");
                       setCurrentPage(1);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    className="px-4 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                     min={startDate}
                     max={new Date().toISOString().split("T")[0]}
                     aria-label="End Date"
@@ -1069,7 +1088,7 @@ export default function TransactionsPage() {
                 {/* Export Button */}
                 <button
                   onClick={exportToCSV}
-                  className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="inline-flex items-center justify-center font-normal transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 text-gray-900 hover:bg-gray-50 px-4 py-2 text-sm flex items-center"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export
