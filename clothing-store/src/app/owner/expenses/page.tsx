@@ -1,22 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useState, useEffect } from "react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { useCurrency } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { ExpenseCategory, SpendingMenu, Expense } from "@/types/expense";
+import { ExpenseCategory, Expense } from "@/types/expense";
 
 function ExpensesContent() {
   const [activeMenuItem, setActiveMenuItem] = useState("expenses");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [spendingMenus, setSpendingMenus] = useState<SpendingMenu[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{
@@ -26,7 +23,6 @@ function ExpensesContent() {
 
   // Form state
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [selectedSpendingMenuId, setSelectedSpendingMenuId] = useState("");
   const [note, setNote] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -37,40 +33,30 @@ function ExpensesContent() {
 
   // Modal states
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showSpendingMenuModal, setShowSpendingMenuModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [newSpendingMenuName, setNewSpendingMenuName] = useState("");
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
   // Filter and pagination states
   const [filterCategory, setFilterCategory] = useState("");
-  const [filterSpendingMenu, setFilterSpendingMenu] = useState("");
   const [filterCurrency, setFilterCurrency] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = React.useCallback(async () => {
     try {
       setLoading(true);
-      const [categoriesRes, spendingMenusRes, expensesRes] = await Promise.all([
+      const [categoriesRes, expensesRes] = await Promise.all([
         fetch("/api/expenses?type=categories"),
-        fetch("/api/expenses?type=spendingMenus"),
         fetch("/api/expenses"),
       ]);
 
       const categoriesData = await categoriesRes.json();
-      const spendingMenusData = await spendingMenusRes.json();
       const expensesData = await expensesRes.json();
 
       if (categoriesData.success) setCategories(categoriesData.data);
-      if (spendingMenusData.success) setSpendingMenus(spendingMenusData.data);
       if (expensesData.success) setExpenses(expensesData.data);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -78,7 +64,11 @@ function ExpensesContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const showAlert = (type: "success" | "error", message: string) => {
     setAlert({ type, message });
@@ -113,39 +103,10 @@ function ExpensesContent() {
     }
   };
 
-  const handleAddSpendingMenu = async () => {
-    if (!newSpendingMenuName.trim()) {
-      showAlert("error", "Please enter a spending menu name");
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "spendingMenu",
-          name: newSpendingMenuName,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setSpendingMenus([data.data, ...spendingMenus]);
-        setNewSpendingMenuName("");
-        setShowSpendingMenuModal(false);
-        showAlert("success", "Spending menu added successfully");
-      } else {
-        showAlert("error", "Failed to add spending menu");
-      }
-    } catch (error) {
-      console.error("Error adding spending menu:", error);
-      showAlert("error", "Failed to add spending menu");
-    }
-  };
+  // Removed Spending Menu add handler
 
   const handleAddExpense = async () => {
-    if (!selectedCategoryId || !selectedSpendingMenuId || !amount || !date) {
+    if (!selectedCategoryId || !amount || !date) {
       showAlert("error", "Please fill in all required fields");
       return;
     }
@@ -157,7 +118,6 @@ function ExpensesContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           categoryId: selectedCategoryId,
-          spendingMenuId: selectedSpendingMenuId,
           note,
           imageUrl,
           date,
@@ -171,7 +131,6 @@ function ExpensesContent() {
         setExpenses([data.data, ...expenses]);
         // Reset form
         setSelectedCategoryId("");
-        setSelectedSpendingMenuId("");
         setNote("");
         setImageUrl("");
         setAmount("");
@@ -209,26 +168,7 @@ function ExpensesContent() {
     }
   };
 
-  const handleDeleteSpendingMenu = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this spending menu?")) return;
-
-    try {
-      const response = await fetch(`/api/expenses?type=spendingMenu&id=${id}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setSpendingMenus(spendingMenus.filter((menu) => menu.id !== id));
-        showAlert("success", "Spending menu deleted successfully");
-      } else {
-        showAlert("error", "Failed to delete spending menu");
-      }
-    } catch (error) {
-      console.error("Error deleting spending menu:", error);
-      showAlert("error", "Failed to delete spending menu");
-    }
-  };
+  // Removed Spending Menu delete handler
 
   const handleDeleteExpense = async (id: string) => {
     if (!confirm("Are you sure you want to delete this expense?")) {
@@ -261,11 +201,7 @@ function ExpensesContent() {
   const handleUpdateExpense = async () => {
     if (!editingExpense) return;
 
-    if (
-      !editingExpense.categoryId ||
-      !editingExpense.spendingMenuId ||
-      !editingExpense.amount
-    ) {
+    if (!editingExpense.categoryId || !editingExpense.amount) {
       showAlert("error", "Please fill in all required fields");
       return;
     }
@@ -277,7 +213,6 @@ function ExpensesContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           categoryId: editingExpense.categoryId,
-          spendingMenuId: editingExpense.spendingMenuId,
           note: editingExpense.note,
           date: editingExpense.date,
           amount: editingExpense.amount,
@@ -317,8 +252,6 @@ function ExpensesContent() {
   // Filter expenses
   const filteredExpenses = expenses.filter((expense) => {
     if (filterCategory && expense.categoryId !== filterCategory) return false;
-    if (filterSpendingMenu && expense.spendingMenuId !== filterSpendingMenu)
-      return false;
     if (filterCurrency && expense.currency !== filterCurrency) return false;
     if (filterDateFrom && new Date(expense.date) < new Date(filterDateFrom))
       return false;
@@ -350,13 +283,7 @@ function ExpensesContent() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [
-    filterCategory,
-    filterSpendingMenu,
-    filterCurrency,
-    filterDateFrom,
-    filterDateTo,
-  ]);
+  }, [filterCategory, filterCurrency, filterDateFrom, filterDateTo]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -425,41 +352,7 @@ function ExpensesContent() {
                     </div>
                   </div>
 
-                  {/* Spending Menu Selection */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-900">
-                      Spending Menu <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        title="spendingMenu"
-                        value={selectedSpendingMenuId}
-                        onChange={(e) =>
-                          setSelectedSpendingMenuId(e.target.value)
-                        }
-                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="" className="text-gray-500">
-                          Select Spending Menu
-                        </option>
-                        {spendingMenus.map((menu) => (
-                          <option
-                            key={menu.id}
-                            value={menu.id}
-                            className="text-gray-900"
-                          >
-                            {menu.name}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        onClick={() => setShowSpendingMenuModal(true)}
-                        variant="outline"
-                      >
-                        + Add
-                      </Button>
-                    </div>
-                  </div>
+                  {/* Removed Spending Menu Selection */}
 
                   {/* Date */}
                   <div>
@@ -579,30 +472,7 @@ function ExpensesContent() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Filter by Spending Menu
-                    </label>
-                    <select
-                      title="spendingMenu"
-                      value={filterSpendingMenu}
-                      onChange={(e) => setFilterSpendingMenu(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                    >
-                      <option value="" className="text-gray-900">
-                        All Menus
-                      </option>
-                      {spendingMenus.map((menu) => (
-                        <option
-                          key={menu.id}
-                          value={menu.id}
-                          className="text-gray-900"
-                        >
-                          {menu.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Removed Filter by Spending Menu */}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -653,7 +523,6 @@ function ExpensesContent() {
 
                 {/* Clear Filters Button */}
                 {(filterCategory ||
-                  filterSpendingMenu ||
                   filterCurrency ||
                   filterDateFrom ||
                   filterDateTo) && (
@@ -661,7 +530,7 @@ function ExpensesContent() {
                     <Button
                       onClick={() => {
                         setFilterCategory("");
-                        setFilterSpendingMenu("");
+                        // Removed setFilterSpendingMenu
                         setFilterCurrency("");
                         setFilterDateFrom("");
                         setFilterDateTo("");
@@ -725,7 +594,7 @@ function ExpensesContent() {
                           Category
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                          Spending Menu
+                          {/* Removed Spending Menu column */}
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
                           Amount
@@ -781,7 +650,7 @@ function ExpensesContent() {
                               {expense.categoryName}
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-900">
-                              {expense.spendingMenuName}
+                              {/* Removed Spending Menu value */}
                             </td>
                             <td className="px-4 py-3 text-sm font-semibold text-gray-900">
                               {formatCurrency(expense.amount, expense.currency)}
@@ -944,76 +813,7 @@ function ExpensesContent() {
               )}
 
               {/* Add Spending Menu Modal */}
-              {showSpendingMenuModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
-                    <h3 className="text-lg font-semibold mb-4 text-gray-900">
-                      Manage Spending Menus
-                    </h3>
-
-                    {/* Existing Spending Menus List */}
-                    <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">
-                        Existing Spending Menus
-                      </h4>
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {spendingMenus.map((menu) => (
-                          <div
-                            key={menu.id}
-                            className="flex justify-between items-center p-3 bg-gray-50 rounded hover:bg-gray-100"
-                          >
-                            <span className="text-gray-900 font-medium">
-                              {menu.name}
-                            </span>
-                            <button
-                              onClick={() => handleDeleteSpendingMenu(menu.id)}
-                              className="text-red-500 hover:text-red-700 text-sm font-medium px-3 py-1 rounded hover:bg-red-50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        ))}
-                        {spendingMenus.length === 0 && (
-                          <p className="text-gray-500 text-sm text-center py-4">
-                            No spending menus yet
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Add New Spending Menu Form */}
-                    <div className="border-t pt-4">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">
-                        Add New Spending Menu
-                      </h4>
-                      <Input
-                        value={newSpendingMenuName}
-                        onChange={(e) => setNewSpendingMenuName(e.target.value)}
-                        placeholder="Enter spending menu name"
-                        className="mb-4"
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleAddSpendingMenu}
-                          className="flex-1"
-                        >
-                          Add
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setShowSpendingMenuModal(false);
-                            setNewSpendingMenuName("");
-                          }}
-                          variant="outline"
-                          className="flex-1"
-                        >
-                          Close
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Removed Spending Menu Modal */}
 
               {/* Edit Expense Modal */}
               {showEditModal && editingExpense && (
@@ -1057,39 +857,7 @@ function ExpensesContent() {
                         </select>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Spending Menu
-                        </label>
-                        <select
-                          title="spendingMenu"
-                          value={editingExpense.spendingMenuId}
-                          onChange={(e) =>
-                            setEditingExpense({
-                              ...editingExpense,
-                              spendingMenuId: e.target.value,
-                              spendingMenuName:
-                                spendingMenus.find(
-                                  (m) => m.id === e.target.value
-                                )?.name || "",
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                        >
-                          <option value="" className="text-gray-900">
-                            Select Spending Menu
-                          </option>
-                          {spendingMenus.map((menu) => (
-                            <option
-                              key={menu.id}
-                              value={menu.id}
-                              className="text-gray-900"
-                            >
-                              {menu.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {/* Removed Spending Menu field in Edit Modal */}
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
