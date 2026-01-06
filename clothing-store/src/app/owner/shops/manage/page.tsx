@@ -32,6 +32,8 @@ function ShopManagementContent() {
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
   // Form state
+  // Track if all shops are deleted to trigger settings refresh
+  const [wasEmpty, setWasEmpty] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -132,7 +134,22 @@ function ShopManagementContent() {
       const data: ShopResponse = await response.json();
 
       if (data.success) {
-        setShops((prev) => prev.filter((shop) => shop.id !== id));
+        setShops((prevShops) => {
+          const updatedShops = prevShops.filter((shop) => shop.id !== id);
+          // If this deletion results in zero shops, set currentBranch to 'No Branch' in backend
+          if (updatedShops.length === 0) {
+            fetch("/api/settings", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ currentBranch: "No Branch" }),
+            }).finally(() => {
+              if (typeof window !== "undefined" && window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent("refreshSettings"));
+              }
+            });
+          }
+          return updatedShops;
+        });
         return true;
       } else {
         setError(data.error || "Failed to delete shop");
@@ -144,6 +161,15 @@ function ShopManagementContent() {
       return false;
     }
   };
+  // Effect: when shops become empty, trigger settings refresh (outside render)
+  useEffect(() => {
+    // Only track wasEmpty for UI logic, not for backend update
+    if (shops.length === 0 && !wasEmpty) {
+      setWasEmpty(true);
+    } else if (shops.length > 0 && wasEmpty) {
+      setWasEmpty(false);
+    }
+  }, [shops, wasEmpty]);
 
   const updateShop = async (id: string, shopData: UpdateShopRequest) => {
     try {
@@ -203,17 +229,16 @@ function ShopManagementContent() {
 
     if (!formData.primaryPhone.trim()) {
       errors.primaryPhone = "Primary phone is required";
-    } else if (!/^09\d{7,9}$/.test(formData.primaryPhone.trim())) {
-      errors.primaryPhone =
-        "Invalid phone format. Must start with 09 and be 9-11 digits";
+    } else if (!/^\d{7,17}$/.test(formData.primaryPhone.trim())) {
+      errors.primaryPhone = "Invalid phone format. Must be 7-17 digits";
     }
 
+    // secondaryPhone is optional, but if provided, must match format
     if (
       formData.secondaryPhone.trim() &&
-      !/^09\d{7,9}$/.test(formData.secondaryPhone.trim())
+      !/^\d{7,17}$/.test(formData.secondaryPhone.trim())
     ) {
-      errors.secondaryPhone =
-        "Invalid phone format. Must start with 09 and be 9-11 digits";
+      errors.secondaryPhone = "Invalid phone format. Must be 7-17 digits";
     }
 
     if (!formData.township.trim()) {
@@ -233,14 +258,21 @@ function ShopManagementContent() {
       return;
     }
 
-    const shopData: CreateShopRequest = {
+    // Only include secondaryPhone if it is non-empty after trim
+    let shopData: CreateShopRequest = {
       name: formData.name.trim(),
       address: formData.address.trim(),
       primaryPhone: formData.primaryPhone.trim(),
-      secondaryPhone: formData.secondaryPhone.trim() || undefined,
       township: formData.township.trim(),
       city: formData.city.trim(),
     };
+    const secondaryPhoneTrimmed = formData.secondaryPhone.trim();
+    if (secondaryPhoneTrimmed) {
+      shopData = {
+        ...shopData,
+        secondaryPhone: secondaryPhoneTrimmed,
+      };
+    }
 
     await createShop(shopData);
   };
@@ -469,7 +501,8 @@ function ShopManagementContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Secondary Phone
+                      Secondary Phone{" "}
+                      <span className="text-gray-400">(Optional)</span>
                     </label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />

@@ -40,6 +40,9 @@ function OwnerSettingsContent() {
   const [error, setError] = useState<string>("");
   const [shops, setShops] = useState<Array<{ id: string; name: string }>>([]);
 
+  // Helper: true if there are no shops
+  const noShops = shops.length === 0;
+
   // Main state for all settings
   const [settings, setSettings] = useState<BusinessSettings>({
     businessName: "",
@@ -55,7 +58,7 @@ function OwnerSettingsContent() {
     enableDarkMode: false,
     enableSoundEffects: false,
     currencyRate: 0,
-    currentBranch: "Main Branch",
+    currentBranch: "No Branch",
   });
 
   // Fetch existing settings on component mount
@@ -70,7 +73,7 @@ function OwnerSettingsContent() {
         const result = await response.json();
 
         if (result.success && result.data) {
-          setSettings(result.data);
+          setSettings((prev) => ({ ...prev, ...result.data }));
         } else {
           setError(result.error || "Failed to load settings");
         }
@@ -92,6 +95,23 @@ function OwnerSettingsContent() {
 
     fetchSettings();
   }, []);
+
+  // When shops change, update currentBranch logic
+  useEffect(() => {
+    if (shops.length === 0) {
+      // No shops: set to No Branch
+      setSettings((prev) => ({ ...prev, currentBranch: "No Branch" }));
+    }
+    // Do NOT auto-select the first shop if currentBranch is 'No Branch' and shops exist.
+    // Only update currentBranch if the currentBranch is not in the shops list and is not 'No Branch'.
+    else if (
+      settings.currentBranch !== "No Branch" &&
+      !shops.some((s) => s.name === settings.currentBranch)
+    ) {
+      setSettings((prev) => ({ ...prev, currentBranch: shops[0].name }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shops]);
 
   const currencies = [
     { code: "THB", name: "Thai Baht", symbol: "฿" },
@@ -377,16 +397,16 @@ function OwnerSettingsContent() {
                         <div className="relative">
                           <select
                             title="CurrentBranch"
-                            value={settings.currentBranch || "Main Branch"}
+                            value={settings.currentBranch || "No Branch"}
                             onChange={(e) =>
                               handleInputChange("currentBranch", e.target.value)
                             }
                             className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:border-gray-500 appearance-none bg-white text-gray-900"
                           >
-                            {!shops.some(
-                              (shop) => shop.name === "Main Branch"
-                            ) && (
-                              <option value="Main Branch">Main Branch</option>
+                            {/* Show 'No Branch' if selected, or if there are no shops */}
+                            {(settings.currentBranch === "No Branch" ||
+                              noShops) && (
+                              <option value="No Branch">No Branch</option>
                             )}
                             {shops.map((shop) => (
                               <option key={shop.id} value={shop.name}>

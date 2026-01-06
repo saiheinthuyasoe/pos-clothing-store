@@ -1,3 +1,39 @@
+// PATCH /api/settings - Partial update (e.g., just currentBranch)
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    if (!body || typeof body.currentBranch !== "string") {
+      return NextResponse.json(
+        { success: false, error: "currentBranch is required" },
+        { status: 400 }
+      );
+    }
+    // Get current settings
+    const current = await SettingsService.getBusinessSettings();
+    if (!current) {
+      return NextResponse.json(
+        { success: false, error: "No business settings found" },
+        { status: 404 }
+      );
+    }
+    // Update only currentBranch
+    const updated = await SettingsService.saveBusinessSettings({
+      ...current,
+      currentBranch: body.currentBranch,
+    });
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    console.error("Error in PATCH /api/settings:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to update settings",
+      },
+      { status: 500 }
+    );
+  }
+}
 import { NextRequest, NextResponse } from "next/server";
 import { SettingsService, BusinessSettings } from "@/services/settingsService";
 

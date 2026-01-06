@@ -1,7 +1,13 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { SettingsService, BusinessSettings } from '@/services/settingsService';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { SettingsService, BusinessSettings } from "@/services/settingsService";
 
 interface SettingsContextType {
   taxRate: number;
@@ -10,12 +16,14 @@ interface SettingsContextType {
   isLoading: boolean;
 }
 
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+const SettingsContext = createContext<SettingsContextType | undefined>(
+  undefined
+);
 
 export function useSettings() {
   const context = useContext(SettingsContext);
   if (context === undefined) {
-    throw new Error('useSettings must be used within a SettingsProvider');
+    throw new Error("useSettings must be used within a SettingsProvider");
   }
   return context;
 }
@@ -26,7 +34,8 @@ interface SettingsProviderProps {
 
 export function SettingsProvider({ children }: SettingsProviderProps) {
   const [taxRate, setTaxRate] = useState<number>(0);
-  const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
+  const [businessSettings, setBusinessSettings] =
+    useState<BusinessSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load settings from business settings
@@ -39,7 +48,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
         setBusinessSettings(settings);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error("Error loading settings:", error);
     } finally {
       setIsLoading(false);
     }
@@ -50,9 +59,15 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     await loadSettings();
   };
 
-  // Load settings on mount
+  // Load settings on mount and listen for refresh events
   useEffect(() => {
     loadSettings();
+    // Listen for manual refresh events (e.g., after all shops deleted)
+    const handler = () => loadSettings();
+    window.addEventListener("refreshSettings", handler);
+    return () => {
+      window.removeEventListener("refreshSettings", handler);
+    };
   }, []);
 
   const value: SettingsContextType = {

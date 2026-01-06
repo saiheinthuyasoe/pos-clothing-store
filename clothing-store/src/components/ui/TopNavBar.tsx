@@ -114,7 +114,9 @@ export function TopNavBar({ onCartModalStateChange }: TopNavBarProps) {
             <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg">
               <Store className="w-4 h-4 text-gray-600" />
               <span className="text-sm font-medium text-gray-700">
-                {businessSettings?.currentBranch || "Main Branch"}
+                {businessSettings?.currentBranch === "No Branch"
+                  ? "No Branch"
+                  : businessSettings?.currentBranch || "Main Branch"}
               </span>
             </div>
 
