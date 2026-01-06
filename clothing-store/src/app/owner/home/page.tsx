@@ -1113,10 +1113,10 @@ function OwnerHomeContent() {
 
                       return (
                         <div
-                          key={`${item.id}-${
+                          key={`${item.id}-$
                             selectedColors[item.id] || "no-color"
                           }`}
-                          className={`bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow ${
+                          className={`bg-white border rounded-lg overflow-hidden hover:shadow-lg hover:scale-[1.03] transition-transform transition-shadow duration-200 ${
                             isOutOfStock
                               ? "border-red-200 opacity-75"
                               : "border-gray-200"
@@ -1140,7 +1140,7 @@ function OwnerHomeContent() {
                               </>
                             )}
                             <Image
-                              key={`${item.id}-image-${
+                              key={`${item.id}-image-$
                                 selectedColors[item.id] || "default"
                               }`}
                               src={getCurrentImage(
@@ -1153,6 +1153,22 @@ function OwnerHomeContent() {
                                 isOutOfStock ? "opacity-60" : ""
                               }`}
                             />
+                            {/* Category and Branch bottom right overlay */}
+                            {(item.category ||
+                              (item.shop && getShopName(item.shop))) && (
+                              <div className="absolute bottom-2 right-2 flex flex-col items-end space-y-1 z-10">
+                                {item.category && (
+                                  <span className="bg-white/80 text-xs text-gray-700 px-2 py-0.5 rounded shadow whitespace-nowrap">
+                                    {item.category}
+                                  </span>
+                                )}
+                                {item.shop && getShopName(item.shop) && (
+                                  <span className="bg-white/80 text-xs text-gray-700 px-2 py-0.5 rounded shadow whitespace-nowrap">
+                                    {getShopName(item.shop)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Product Details */}
@@ -1162,16 +1178,7 @@ function OwnerHomeContent() {
                                 ? `${item.name.substring(0, 17)}...`
                                 : item.name}
                             </h4>
-                            {item.category && (
-                              <div className="text-xs text-gray-500 mb-1">
-                                {item.category}
-                              </div>
-                            )}
-                            {item.shop && getShopName(item.shop) && (
-                              <div className="text-xs text-gray-500 mb-2">
-                                Branch: {getShopName(item.shop)}
-                              </div>
-                            )}
+                            {/* Removed old category and branch display, now shown on image */}
 
                             {/* Price and Stock */}
                             <div className="flex justify-between items-center mb-2">
