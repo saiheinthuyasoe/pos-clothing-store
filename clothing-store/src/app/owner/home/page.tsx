@@ -1158,13 +1158,27 @@ function OwnerHomeContent() {
                               (item.shop && getShopName(item.shop))) && (
                               <div className="absolute bottom-2 right-2 flex flex-col items-end space-y-1 z-10">
                                 {item.category && (
-                                  <span className="bg-white/80 text-xs text-gray-700 px-2 py-0.5 rounded shadow whitespace-nowrap">
-                                    {item.category}
+                                  <span
+                                    className="bg-white bg-opacity-40 text-xs text-gray-900 px-2 py-0.5 rounded shadow whitespace-nowrap"
+                                    style={{
+                                      backgroundColor: "rgba(255,255,255,0.4)",
+                                    }}
+                                  >
+                                    <span className="text-opacity-100">
+                                      {item.category}
+                                    </span>
                                   </span>
                                 )}
                                 {item.shop && getShopName(item.shop) && (
-                                  <span className="bg-white/80 text-xs text-gray-700 px-2 py-0.5 rounded shadow whitespace-nowrap">
-                                    {getShopName(item.shop)}
+                                  <span
+                                    className="bg-white bg-opacity-40 text-xs text-gray-900 px-2 py-0.5 rounded shadow whitespace-nowrap"
+                                    style={{
+                                      backgroundColor: "rgba(255,255,255,0.4)",
+                                    }}
+                                  >
+                                    <span className="text-opacity-100">
+                                      {getShopName(item.shop)}
+                                    </span>
                                   </span>
                                 )}
                               </div>
