@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { SettingsService } from "@/services/settingsService";
 import { useSettings } from "@/contexts/SettingsContext";
 import {
   X,
@@ -42,6 +43,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     getSelectedCustomer,
   } = useCart();
   const { formatPrice, getCurrencySymbol } = useCurrency();
+  const { selectedCurrency, defaultCurrency, currencyRate } = useCurrency();
   const { taxRate } = useSettings();
   const [discountAmount, setDiscountAmount] = React.useState<string>("");
   const [cartDiscountPercent, setCartDiscountPercent] =
@@ -68,12 +70,24 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   const [discountType, setDiscountType] = React.useState<
     "percentage" | "amount"
   >("amount");
+
+  // Fixed cart discount amount entered by user (display units) — should NOT be converted by currency rate
+  const [cartFixedDiscount, setCartFixedDiscount] = React.useState<
+    number | null
+  >(null);
   const [groupDiscountType, setGroupDiscountType] = React.useState<
     "percentage" | "amount"
   >("amount");
   const [variantDiscountType, setVariantDiscountType] = React.useState<
     "percentage" | "amount"
   >("amount");
+  // Fixed group and variant discounts entered by user (display currency numbers)
+  const [groupFixedDiscounts, setGroupFixedDiscounts] = React.useState<
+    Record<string, number>
+  >({});
+  const [variantFixedDiscounts, setVariantFixedDiscounts] = React.useState<
+    Record<string, number>
+  >({});
 
   // Search state for group and variant selection
   const [groupSearchTerm, setGroupSearchTerm] = React.useState<string>("");
@@ -162,6 +176,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
       setVariantDiscountAmount("");
       setSelectedVariantForDiscount("");
       setDiscountMode("cart");
+      setCartFixedDiscount(null);
     }
   }, [cart.items.length]);
 
@@ -214,14 +229,12 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         alert("Please enter a valid discount percentage (0-100)");
       }
     } else {
-      // Custom amount discount - convert to percentage based on subtotal
+      // Custom amount discount — treat as a fixed numeric amount in the currently selected/display currency
       if (value >= 0) {
-        if (subtotal > 0) {
-          const percentEquivalent = (value / subtotal) * 100;
-          setCartDiscountPercent(percentEquivalent);
-        } else {
-          alert("Cart is empty or subtotal is 0");
-        }
+        setCartFixedDiscount(value);
+        // Clear any percentage-based discount
+        setCartDiscountPercent(0);
+        setDiscountAmount("");
       } else {
         alert("Please enter a valid discount amount (0 or greater)");
       }
@@ -241,24 +254,26 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         applyGroupDiscount(selectedGroupForDiscount, value);
         setGroupDiscountAmount("");
         setSelectedGroupForDiscount("");
+        // clear any fixed discount for this group
+        setGroupFixedDiscounts((prev) => {
+          const copy = { ...prev };
+          delete copy[selectedGroupForDiscount];
+          return copy;
+        });
       } else {
         alert("Please enter a valid discount percentage (0-100)");
       }
     } else {
-      // Custom amount discount - convert to percentage based on group total
-      const groupTotal = cart.items
-        .filter((item) => item.groupName === selectedGroupForDiscount)
-        .reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-
+      // Custom amount discount - store fixed amount (in display currency) and do not convert
       if (value >= 0) {
-        if (groupTotal > 0) {
-          const percentEquivalent = (value / groupTotal) * 100;
-          applyGroupDiscount(selectedGroupForDiscount, percentEquivalent);
-          setGroupDiscountAmount("");
-          setSelectedGroupForDiscount("");
-        } else {
-          alert("Group total is 0");
-        }
+        setGroupFixedDiscounts((prev) => ({
+          ...prev,
+          [selectedGroupForDiscount]: value,
+        }));
+        // remove any percentage discount on the group
+        removeGroupDiscount(selectedGroupForDiscount);
+        setGroupDiscountAmount("");
+        setSelectedGroupForDiscount("");
       } else {
         alert("Please enter a valid discount amount (0 or greater)");
       }
@@ -277,25 +292,26 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         applyVariantDiscount(selectedVariantForDiscount, value);
         setVariantDiscountAmount("");
         setSelectedVariantForDiscount("");
+        // clear any fixed variant discount
+        setVariantFixedDiscounts((prev) => {
+          const copy = { ...prev };
+          delete copy[selectedVariantForDiscount];
+          return copy;
+        });
       } else {
         alert("Please enter a valid discount percentage (0-100)");
       }
     } else {
-      // Custom amount discount - convert to percentage based on variant total
-      const variantItem = cart.items.find(
-        (item) => item.id === selectedVariantForDiscount
-      );
-
-      if (variantItem && value >= 0) {
-        const variantTotal = variantItem.unitPrice * variantItem.quantity;
-        if (variantTotal > 0) {
-          const percentEquivalent = (value / variantTotal) * 100;
-          applyVariantDiscount(selectedVariantForDiscount, percentEquivalent);
-          setVariantDiscountAmount("");
-          setSelectedVariantForDiscount("");
-        } else {
-          alert("Variant total is 0");
-        }
+      // Custom amount discount - store fixed amount (in display currency) for this variant
+      if (value >= 0) {
+        setVariantFixedDiscounts((prev) => ({
+          ...prev,
+          [selectedVariantForDiscount]: value,
+        }));
+        // remove any percentage discount on the variant
+        removeVariantDiscount(selectedVariantForDiscount);
+        setVariantDiscountAmount("");
+        setSelectedVariantForDiscount("");
       } else {
         alert("Please enter a valid discount amount (0 or greater)");
       }
@@ -304,10 +320,37 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
 
   const handleRemoveGroupDiscount = (groupName: string) => {
     removeGroupDiscount(groupName);
+    setGroupFixedDiscounts((prev) => {
+      const copy = { ...prev };
+      delete copy[groupName];
+      return copy;
+    });
   };
 
   const handleRemoveVariantDiscount = (itemId: string) => {
     removeVariantDiscount(itemId);
+    setVariantFixedDiscounts((prev) => {
+      const copy = { ...prev };
+      delete copy[itemId];
+      return copy;
+    });
+  };
+
+  // Remove fixed amount discounts
+  const handleRemoveGroupFixedDiscount = (groupName: string) => {
+    setGroupFixedDiscounts((prev) => {
+      const copy = { ...prev };
+      delete copy[groupName];
+      return copy;
+    });
+  };
+
+  const handleRemoveVariantFixedDiscount = (itemId: string) => {
+    setVariantFixedDiscounts((prev) => {
+      const copy = { ...prev };
+      delete copy[itemId];
+      return copy;
+    });
   };
 
   // Get unique groups from cart items
@@ -436,12 +479,115 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
     return total;
   }, 0);
 
-  // Calculate cart discount dynamically based on percentage and current subtotal (after individual discounts)
-  const appliedDiscount = subtotal * (cartDiscountPercent / 100);
-  const discount = appliedDiscount; // Cart-wide discount
-  const subtotalAfterAllDiscounts = subtotal - discount; // Subtotal after all discounts including cart discount
-  const tax = subtotalAfterAllDiscounts * (taxRate / 100); // Calculate tax based on tax rate from settings
-  const grandTotal = subtotalAfterAllDiscounts + tax;
+  // Convert base amounts to display (selected) currency for correct fixed-amount behavior
+  const displaySubtotal = SettingsService.convertPrice(
+    subtotal,
+    defaultCurrency as "THB" | "MMK",
+    selectedCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  const displayOriginalSubtotal = SettingsService.convertPrice(
+    originalSubtotal,
+    defaultCurrency as "THB" | "MMK",
+    selectedCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  const displayGroupPercentSavings = SettingsService.convertPrice(
+    groupDiscountSavings,
+    defaultCurrency as "THB" | "MMK",
+    selectedCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  const displayVariantPercentSavings = SettingsService.convertPrice(
+    variantDiscountSavings,
+    defaultCurrency as "THB" | "MMK",
+    selectedCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  const displayWholesaleSavings = SettingsService.convertPrice(
+    wholesaleSavings,
+    defaultCurrency as "THB" | "MMK",
+    selectedCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  // Sum fixed group/variant discounts (values stored are per-item amounts in display currency)
+  const groupFixedTotal = cart.items.reduce((sum, ci) => {
+    const perItem = groupFixedDiscounts[ci.groupName] || 0;
+    return sum + perItem * ci.quantity;
+  }, 0);
+
+  const variantFixedTotal = cart.items.reduce((sum, ci) => {
+    const perItem = variantFixedDiscounts[ci.id] || 0;
+    return sum + perItem * ci.quantity;
+  }, 0);
+
+  // Displayed cart discount (in display currency)
+  const displayCartDiscount =
+    cartFixedDiscount !== null
+      ? cartFixedDiscount
+      : SettingsService.convertPrice(
+          subtotal * (cartDiscountPercent / 100),
+          defaultCurrency as "THB" | "MMK",
+          selectedCurrency as "THB" | "MMK",
+          currencyRate,
+          defaultCurrency as "THB" | "MMK"
+        );
+
+  // Subtotal after all discounts (in display currency). Note: percent-based group/variant/wholesale already applied into `displaySubtotal`.
+  const subtotalAfterAllDiscountsDisplay =
+    displaySubtotal - displayCartDiscount - groupFixedTotal - variantFixedTotal;
+
+  const taxDisplay = subtotalAfterAllDiscountsDisplay * (taxRate / 100);
+  const grandTotalDisplay = subtotalAfterAllDiscountsDisplay + taxDisplay;
+
+  // Convert display numbers back to base currency for payment/transaction processing
+  const subtotalForPayment = SettingsService.convertPrice(
+    subtotalAfterAllDiscountsDisplay +
+      displayCartDiscount +
+      groupFixedTotal +
+      variantFixedTotal -
+      (displayGroupPercentSavings +
+        displayVariantPercentSavings +
+        displayWholesaleSavings),
+    selectedCurrency as "THB" | "MMK",
+    defaultCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  const discountForPayment = SettingsService.convertPrice(
+    displayCartDiscount + groupFixedTotal + variantFixedTotal,
+    selectedCurrency as "THB" | "MMK",
+    defaultCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  const taxForPayment = SettingsService.convertPrice(
+    taxDisplay,
+    selectedCurrency as "THB" | "MMK",
+    defaultCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
+
+  const grandTotalForPayment = SettingsService.convertPrice(
+    grandTotalDisplay,
+    selectedCurrency as "THB" | "MMK",
+    defaultCurrency as "THB" | "MMK",
+    currencyRate,
+    defaultCurrency as "THB" | "MMK"
+  );
 
   return (
     <div
@@ -563,20 +709,60 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                               </span>
                             </div>
 
-                            {/* Discounted Price (if any) */}
-                            {item.discountedPrice !== undefined &&
-                              item.discountedPrice !== item.unitPrice && (
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs font-medium text-gray-700">
-                                    After Discount:
-                                  </span>
-                                  <span className="text-xs font-bold text-green-600">
-                                    {formatPrice(item.discountedPrice)}
-                                  </span>
-                                </div>
-                              )}
+                            {/* Discounted Price (if any) or fixed group/variant discount applied */}
+                            {(() => {
+                              // Compute display unit (converted) and effective unit after fixed discounts
+                              const baseUnit =
+                                item.discountedPrice !== undefined
+                                  ? item.discountedPrice
+                                  : item.unitPrice;
+                              const displayUnit = SettingsService.convertPrice(
+                                baseUnit,
+                                defaultCurrency as "THB" | "MMK",
+                                selectedCurrency as "THB" | "MMK",
+                                currencyRate,
+                                defaultCurrency as "THB" | "MMK"
+                              );
 
-                            {/* Group Discount Badge */}
+                              // Variant fixed discount per item (display currency)
+                              const perItemVariantFixed =
+                                variantFixedDiscounts[item.id] || 0;
+
+                              // Group fixed discount per item (display currency)
+                              const perItemGroupFixed =
+                                groupFixedDiscounts[item.groupName] || 0;
+
+                              const effectiveDisplayUnit = Math.max(
+                                0,
+                                displayUnit -
+                                  perItemVariantFixed -
+                                  perItemGroupFixed
+                              );
+
+                              const showAfter =
+                                item.discountedPrice !== undefined ||
+                                perItemVariantFixed > 0 ||
+                                perItemGroupFixed > 0;
+
+                              if (showAfter) {
+                                return (
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-xs font-medium text-gray-700">
+                                      After Discount:
+                                    </span>
+                                    <span className="text-xs font-bold text-green-600">
+                                      {SettingsService.formatPrice(
+                                        effectiveDisplayUnit,
+                                        selectedCurrency as "THB" | "MMK"
+                                      )}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            {/* Group Discount Badge (percentage or fixed amount) */}
                             {item.groupDiscount && item.groupDiscount > 0 ? (
                               <div className="flex items-center space-x-2">
                                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">
@@ -591,9 +777,30 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                   Remove
                                 </button>
                               </div>
+                            ) : groupFixedDiscounts[item.groupName] ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">
+                                  Group:{" "}
+                                  {SettingsService.formatPrice(
+                                    groupFixedDiscounts[item.groupName],
+                                    selectedCurrency as "THB" | "MMK"
+                                  )}{" "}
+                                  OFF
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleRemoveGroupFixedDiscount(
+                                      item.groupName
+                                    )
+                                  }
+                                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </div>
                             ) : null}
 
-                            {/* Variant Discount Badge */}
+                            {/* Variant Discount Badge (percentage or fixed amount) */}
                             {item.variantDiscount &&
                             item.variantDiscount > 0 ? (
                               <div className="flex items-center space-x-2">
@@ -603,6 +810,25 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                 <button
                                   onClick={() =>
                                     handleRemoveVariantDiscount(item.id)
+                                  }
+                                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ) : variantFixedDiscounts[item.id] ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-medium">
+                                  Variant:{" "}
+                                  {SettingsService.formatPrice(
+                                    variantFixedDiscounts[item.id],
+                                    selectedCurrency as "THB" | "MMK"
+                                  )}{" "}
+                                  OFF
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleRemoveVariantFixedDiscount(item.id)
                                   }
                                   className="text-xs text-red-600 hover:text-red-800 font-medium"
                                 >
@@ -781,27 +1007,58 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                               <div className="text-xs font-medium text-gray-700 mb-1">
                                 Item Total:
                               </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="font-medium text-gray-700">
-                                  {item.quantity}
-                                </span>
-                                <span className="text-gray-500">×</span>
-                                <span className="font-semibold text-gray-900">
-                                  {formatPrice(
-                                    item.discountedPrice !== undefined
-                                      ? item.discountedPrice
-                                      : item.unitPrice
-                                  )}
-                                </span>
-                                <span className="text-gray-500">=</span>
-                                <span className="font-bold text-blue-600">
-                                  {formatPrice(
-                                    (item.discountedPrice !== undefined
-                                      ? item.discountedPrice
-                                      : item.unitPrice) * item.quantity
-                                  )}
-                                </span>
-                              </div>
+                              {(() => {
+                                // Compute effective display unit and total including fixed group/variant discounts
+                                const baseUnit =
+                                  item.discountedPrice !== undefined
+                                    ? item.discountedPrice
+                                    : item.unitPrice;
+                                const displayUnit =
+                                  SettingsService.convertPrice(
+                                    baseUnit,
+                                    defaultCurrency as "THB" | "MMK",
+                                    selectedCurrency as "THB" | "MMK",
+                                    currencyRate,
+                                    defaultCurrency as "THB" | "MMK"
+                                  );
+
+                                const perItemVariantFixed =
+                                  variantFixedDiscounts[item.id] || 0;
+                                const perItemGroupFixed =
+                                  groupFixedDiscounts[item.groupName] || 0;
+
+                                const effectiveDisplayUnit = Math.max(
+                                  0,
+                                  displayUnit -
+                                    perItemVariantFixed -
+                                    perItemGroupFixed
+                                );
+
+                                const effectiveTotal =
+                                  effectiveDisplayUnit * item.quantity;
+
+                                return (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <span className="font-medium text-gray-700">
+                                      {item.quantity}
+                                    </span>
+                                    <span className="text-gray-500">×</span>
+                                    <span className="font-semibold text-gray-900">
+                                      {SettingsService.formatPrice(
+                                        effectiveDisplayUnit,
+                                        selectedCurrency as "THB" | "MMK"
+                                      )}
+                                    </span>
+                                    <span className="text-gray-500">=</span>
+                                    <span className="font-bold text-blue-600">
+                                      {SettingsService.formatPrice(
+                                        effectiveTotal,
+                                        selectedCurrency as "THB" | "MMK"
+                                      )}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -1168,7 +1425,7 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                   </div>
 
                   {/* Wholesale Pricing Display */}
-                  {wholesaleSavings > 0 && (
+                  {displayWholesaleSavings > 0 && (
                     <div className="flex justify-between text-sm font-medium text-gray-800">
                       <span className="flex items-center space-x-1">
                         <span>Wholesale Pricing:</span>
@@ -1177,13 +1434,16 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                         </span>
                       </span>
                       <span className="font-bold text-red-600">
-                        -{formatPrice(wholesaleSavings)}
+                        -
+                        {SettingsService.formatPrice(
+                          displayWholesaleSavings,
+                          selectedCurrency as "THB" | "MMK"
+                        )}
                       </span>
                     </div>
                   )}
 
-                  {/* Group Discount Display */}
-                  {groupDiscountSavings > 0 && (
+                  {displayGroupPercentSavings > 0 && (
                     <div className="flex justify-between text-sm font-medium text-gray-800">
                       <span className="flex items-center space-x-1">
                         <span>Group Discount:</span>
@@ -1192,13 +1452,34 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                         </span>
                       </span>
                       <span className="font-bold text-red-600">
-                        -{formatPrice(groupDiscountSavings)}
+                        -
+                        {SettingsService.formatPrice(
+                          displayGroupPercentSavings,
+                          selectedCurrency as "THB" | "MMK"
+                        )}
                       </span>
                     </div>
                   )}
 
-                  {/* Variant Discount Display */}
-                  {variantDiscountSavings > 0 && (
+                  {groupFixedTotal > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-gray-800">
+                      <span className="flex items-center space-x-1">
+                        <span>Group Fixed Discount:</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                          GROUP
+                        </span>
+                      </span>
+                      <span className="font-bold text-red-600">
+                        -
+                        {SettingsService.formatPrice(
+                          groupFixedTotal,
+                          selectedCurrency as "THB" | "MMK"
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {displayVariantPercentSavings > 0 && (
                     <div className="flex justify-between text-sm font-medium text-gray-800">
                       <span className="flex items-center space-x-1">
                         <span>Variant Discount:</span>
@@ -1207,13 +1488,34 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                         </span>
                       </span>
                       <span className="font-bold text-red-600">
-                        -{formatPrice(variantDiscountSavings)}
+                        -
+                        {SettingsService.formatPrice(
+                          displayVariantPercentSavings,
+                          selectedCurrency as "THB" | "MMK"
+                        )}
                       </span>
                     </div>
                   )}
 
-                  {/* Cart-wide Discount Display */}
-                  {discount > 0 && (
+                  {variantFixedTotal > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-gray-800">
+                      <span className="flex items-center space-x-1">
+                        <span>Variant Fixed Discount:</span>
+                        <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">
+                          VARIANT
+                        </span>
+                      </span>
+                      <span className="font-bold text-red-600">
+                        -
+                        {SettingsService.formatPrice(
+                          variantFixedTotal,
+                          selectedCurrency as "THB" | "MMK"
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {displayCartDiscount > 0 && (
                     <div className="flex justify-between text-sm font-medium text-gray-800">
                       <span className="flex items-center space-x-1">
                         <span>
@@ -1228,7 +1530,11 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                         </span>
                       </span>
                       <span className="font-bold text-red-600">
-                        -{formatPrice(discount)}
+                        -
+                        {SettingsService.formatPrice(
+                          displayCartDiscount,
+                          selectedCurrency as "THB" | "MMK"
+                        )}
                       </span>
                     </div>
                   )}
@@ -1236,12 +1542,20 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                   <div className="flex justify-between text-sm font-medium text-gray-800">
                     <span>Subtotal After Discounts:</span>
                     <span className="font-bold">
-                      {formatPrice(subtotalAfterAllDiscounts)}
+                      {SettingsService.formatPrice(
+                        subtotalAfterAllDiscountsDisplay,
+                        selectedCurrency as "THB" | "MMK"
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm font-medium text-gray-800">
                     <span>Tax ({taxRate}%):</span>
-                    <span className="font-bold">{formatPrice(tax)}</span>
+                    <span className="font-bold">
+                      {SettingsService.formatPrice(
+                        taxDisplay,
+                        selectedCurrency as "THB" | "MMK"
+                      )}
+                    </span>
                   </div>
                   <div className="border-t border-gray-300 pt-2">
                     <div className="flex justify-between items-center bg-white p-2 rounded">
@@ -1253,7 +1567,10 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                           (Qty. {cart.totalItems})
                         </div>
                         <div className="font-bold text-lg text-green-600">
-                          {formatPrice(grandTotal)}
+                          {SettingsService.formatPrice(
+                            grandTotalDisplay,
+                            selectedCurrency as "THB" | "MMK"
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1293,16 +1610,16 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
           // Call the original handler with the expected shape
           handlePaymentComplete({
             transactionId,
-            total: grandTotal,
+            total: grandTotalForPayment,
           });
         }}
         customer={getSelectedCustomer()}
         items={cart.items}
-        subtotal={subtotal}
-        discount={appliedDiscount}
-        tax={tax}
-        total={grandTotal}
-        currency="B"
+        subtotal={subtotalForPayment}
+        discount={discountForPayment}
+        tax={taxForPayment}
+        total={grandTotalForPayment}
+        currency={selectedCurrency}
       />
     </div>
   );
