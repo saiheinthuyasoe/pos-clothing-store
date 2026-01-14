@@ -1156,7 +1156,7 @@ function OwnerHomeContent() {
                             {/* Category and Branch bottom right overlay */}
                             {(item.category ||
                               (item.shop && getShopName(item.shop))) && (
-                              <div className="absolute bottom-2 right-2 flex flex-col items-end space-y-1 z-10">
+                              <div className="absolute bottom-2 right-2 flex flex-col items-end space-y-1 z-1">
                                 {item.category && (
                                   <span
                                     className="bg-white bg-opacity-40 text-xs text-gray-900 px-2 py-0.5 rounded shadow whitespace-nowrap"
