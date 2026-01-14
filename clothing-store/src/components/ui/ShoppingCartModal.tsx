@@ -254,6 +254,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         applyGroupDiscount(selectedGroupForDiscount, value);
         setGroupDiscountAmount("");
         setSelectedGroupForDiscount("");
+        setGroupSearchTerm("");
+        setShowGroupDropdown(false);
         // clear any fixed discount for this group
         setGroupFixedDiscounts((prev) => {
           const copy = { ...prev };
@@ -274,6 +276,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         removeGroupDiscount(selectedGroupForDiscount);
         setGroupDiscountAmount("");
         setSelectedGroupForDiscount("");
+        setGroupSearchTerm("");
+        setShowGroupDropdown(false);
       } else {
         alert("Please enter a valid discount amount (0 or greater)");
       }
@@ -292,6 +296,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         applyVariantDiscount(selectedVariantForDiscount, value);
         setVariantDiscountAmount("");
         setSelectedVariantForDiscount("");
+        setVariantSearchTerm("");
+        setShowVariantDropdown(false);
         // clear any fixed variant discount
         setVariantFixedDiscounts((prev) => {
           const copy = { ...prev };
@@ -312,6 +318,8 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
         removeVariantDiscount(selectedVariantForDiscount);
         setVariantDiscountAmount("");
         setSelectedVariantForDiscount("");
+        setVariantSearchTerm("");
+        setShowVariantDropdown(false);
       } else {
         alert("Please enter a valid discount amount (0 or greater)");
       }
