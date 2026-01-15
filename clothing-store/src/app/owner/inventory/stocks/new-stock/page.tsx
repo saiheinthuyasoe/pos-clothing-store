@@ -308,7 +308,7 @@ function NewStockContent() {
 
   // Size management functions
   const availableSizes = [
-    "Free Size",
+    "Free",
     "XXS",
     "XS",
     "S",

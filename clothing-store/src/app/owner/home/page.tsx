@@ -393,6 +393,36 @@ function OwnerHomeContent() {
 
         if (!hasColorVariants) {
           // Return item without color variants - UI will handle this appropriately
+          const NEW_DAYS = Number(process.env.NEXT_PUBLIC_NEW_ITEM_DAYS) || 7;
+          const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+          const computeIsNew = (s: StockItem) => {
+            try {
+              const created = (s as { createdAt?: unknown }).createdAt;
+              if (!created) return false;
+              let createdMs = Date.now();
+
+              // Handle Firestore Timestamp-like objects, numbers (ms), or ISO date strings
+              if (
+                created &&
+                typeof (created as { toMillis?: unknown }).toMillis ===
+                  "function"
+              ) {
+                createdMs = (created as { toMillis: () => number }).toMillis();
+              } else if (typeof created === "number") {
+                createdMs = created;
+              } else if (typeof created === "string") {
+                createdMs = new Date(created).getTime();
+              } else {
+                return false;
+              }
+
+              return Date.now() - createdMs <= NEW_DAYS * MS_PER_DAY;
+            } catch (e) {
+              return false;
+            }
+          };
+
           return {
             id: stock.id,
             name: stock.groupName,
@@ -404,7 +434,7 @@ function OwnerHomeContent() {
               stock.groupImage ||
               `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
             category: stock.category || "Uncategorized",
-            isNew: true,
+            isNew: computeIsNew(stock),
             shop: stock.shop,
             wholesaleTiers: stock.wholesaleTiers || [],
             colorVariants: [], // Empty array - no variants available
@@ -412,6 +442,36 @@ function OwnerHomeContent() {
         }
 
         // Use existing colorVariants if they exist
+        const NEW_DAYS = Number(process.env.NEXT_PUBLIC_NEW_ITEM_DAYS) || 7;
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        const computeIsNew = (s: StockItem) => {
+          try {
+            const created = (s as { createdAt?: unknown }).createdAt;
+            if (!created) return false;
+            let createdMs = Date.now();
+
+            // Firestore-like Timestamp with toMillis()
+            if (
+              typeof created === "object" &&
+              created !== null &&
+              typeof (created as { toMillis?: unknown }).toMillis === "function"
+            ) {
+              createdMs = (created as { toMillis: () => number }).toMillis();
+            } else if (typeof created === "number") {
+              createdMs = created;
+            } else if (typeof created === "string") {
+              createdMs = new Date(created).getTime();
+            } else {
+              return false;
+            }
+
+            return Date.now() - createdMs <= NEW_DAYS * MS_PER_DAY;
+          } catch (e) {
+            return false;
+          }
+        };
+
         return {
           id: stock.id,
           name: stock.groupName,
@@ -435,7 +495,7 @@ function OwnerHomeContent() {
             stock.groupImage ||
             `https://via.placeholder.com/200x250/E5E7EB/6B7280?text=${stock.groupName}`,
           category: stock.category || "Uncategorized",
-          isNew: true,
+          isNew: computeIsNew(stock),
           shop: stock.shop,
           wholesaleTiers: stock.wholesaleTiers || [],
           colorVariants: stock.colorVariants.map((variant, index) => {
@@ -1116,7 +1176,7 @@ function OwnerHomeContent() {
                           key={`${item.id}-$
                             selectedColors[item.id] || "no-color"
                           }`}
-                          className={`bg-white border rounded-lg overflow-hidden hover:shadow-lg hover:scale-[1.03] transition-transform transition-shadow duration-200 ${
+                          className={`bg-white border  overflow-hidden hover:shadow-lg hover:scale-[1.03] transition-transform transition-shadow duration-200 ${
                             isOutOfStock
                               ? "border-red-200 opacity-75"
                               : "border-gray-200"
@@ -1248,11 +1308,11 @@ function OwnerHomeContent() {
                                             : variant.color
                                         }
                                       >
-                                        {isSelected && (
+                                        {/* {isSelected && (
                                           <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow-sm">
                                             ×
                                           </span>
-                                        )}
+                                        )} */}
                                       </button>
                                     );
                                   })
