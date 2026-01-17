@@ -1087,7 +1087,7 @@ function EditStockContent() {
                                         e.target.value,
                                       )
                                     }
-                                    className="w-10 h-10 border border-gray-300 rounded-md"
+                                    className="w-10 h-10 border-gray-300"
                                   />
 
                                   {/* Display Barcode */}

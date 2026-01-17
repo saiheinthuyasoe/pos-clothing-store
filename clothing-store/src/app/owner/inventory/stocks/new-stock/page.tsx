@@ -969,7 +969,7 @@ function NewStockContent() {
                                         e.target.value,
                                       )
                                     }
-                                    className="w-10 h-10 border border-gray-300 rounded-md"
+                                    className="w-10 h-10 rounded-md"
                                   />
                                   {/* Display Barcode */}
                                   <div className="flex-1">
