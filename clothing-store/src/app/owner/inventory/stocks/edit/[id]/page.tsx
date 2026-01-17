@@ -367,7 +367,9 @@ function EditStockContent() {
           if (pending !== undefined) {
             setColorVariants((variants) =>
               variants.map((variant) =>
-                variant.id === id ? { ...variant, colorCode: pending } : variant,
+                variant.id === id
+                  ? { ...variant, colorCode: pending }
+                  : variant,
               ),
             );
             delete pendingColorRef.current[id];

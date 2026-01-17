@@ -8,6 +8,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { transactionService, Transaction } from "@/services/transactionService";
 import { ShopService } from "@/services/shopService";
 import { Sidebar } from "@/components/ui/Sidebar";
+import { SettingsService } from "@/services/settingsService";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import {
   Search,
@@ -68,7 +69,7 @@ export default function TransactionsPage() {
     useState<Transaction | null>(null);
   const [refundItems, setRefundItems] = useState<{ [key: string]: number }>({});
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>(
-    []
+    [],
   );
 
   // Pagination state
@@ -125,7 +126,7 @@ export default function TransactionsPage() {
 
         // Check if click is on the dropdown button
         const isDropdownButton = Object.values(buttonRefs.current).some(
-          (button) => button && button.contains(target)
+          (button) => button && button.contains(target),
         );
 
         // Check if click is on the dropdown menu
@@ -205,7 +206,7 @@ export default function TransactionsPage() {
             rangeStartDate = new Date(
               now.getFullYear(),
               now.getMonth(),
-              now.getDate()
+              now.getDate(),
             );
             break;
           case "7d":
@@ -247,7 +248,12 @@ export default function TransactionsPage() {
     (t) =>
       t.status === "completed" ||
       t.status === "partially_refunded" ||
-      t.status === "refunded"
+      t.status === "refunded",
+  );
+
+  // Only transactions sold in MMK
+  const revenueTransactionsMMK = revenueTransactions.filter(
+    (t) => (t.sellingCurrency || "THB").toUpperCase() === "MMK",
   );
 
   // Calculate net revenue (original total minus refunded amounts)
@@ -257,7 +263,7 @@ export default function TransactionsPage() {
       const refundedAmount =
         transaction.refunds?.reduce(
           (sum, refund) => sum + refund.totalAmount,
-          0
+          0,
         ) || 0;
       // Ensure net revenue is never negative (safeguard against data inconsistencies)
       return total + Math.max(0, originalAmount - refundedAmount);
@@ -280,7 +286,7 @@ export default function TransactionsPage() {
           "Qty:",
           item.quantity,
           "Profit:",
-          profitPerItem
+          profitPerItem,
         );
         return itemTotal + profitPerItem;
       }, 0);
@@ -309,8 +315,21 @@ export default function TransactionsPage() {
 
   // Calculate completed transactions count (excluding fully refunded)
   const completedTransactionsCount = revenueTransactions.filter(
-    (t) => t.status !== "refunded"
+    (t) => t.status !== "refunded",
   ).length;
+
+  const formatInMMK = (amount: number) => {
+    const from = (businessSettings?.defaultCurrency as "THB" | "MMK") || "THB";
+    const rate = businessSettings?.currencyRate || 0;
+    const converted = SettingsService.convertPrice(
+      amount,
+      from,
+      "MMK",
+      rate,
+      (businessSettings?.defaultCurrency as "THB" | "MMK" | undefined) || "THB",
+    );
+    return SettingsService.formatPrice(converted, "MMK");
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -421,7 +440,7 @@ export default function TransactionsPage() {
     const confirmed = window.confirm(
       `Are you sure you want to approve this COD transaction?\n\nTransaction ID: ${
         transaction.transactionId
-      }\nTotal: ${formatPrice(transaction.total)}`
+      }\nTotal: ${formatPrice(transaction.total)}`,
     );
 
     if (!confirmed) return;
@@ -429,7 +448,7 @@ export default function TransactionsPage() {
     try {
       await transactionService.approveTransaction(
         transaction.id,
-        user?.email || "Admin"
+        user?.email || "Admin",
       );
       alert("Transaction approved successfully!");
       loadTransactions(); // Reload transactions
@@ -438,7 +457,7 @@ export default function TransactionsPage() {
       alert(
         `Failed to approve transaction: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
     }
     setOpenDropdown(null);
@@ -451,7 +470,7 @@ export default function TransactionsPage() {
     try {
       // Validate that there are items to refund
       const hasItemsToRefund = Object.values(refundItems).some(
-        (quantity) => quantity > 0
+        (quantity) => quantity > 0,
       );
       if (!hasItemsToRefund) {
         alert("Please select at least one item to refund.");
@@ -476,7 +495,7 @@ export default function TransactionsPage() {
             const alreadyRefunded =
               selectedTransaction.refunds?.reduce((total, refund) => {
                 const refundItem = refund.items.find(
-                  (ri) => ri.itemIndex === itemIndex
+                  (ri) => ri.itemIndex === itemIndex,
                 );
                 return total + (refundItem?.quantity || 0);
               }, 0) || 0;
@@ -485,7 +504,7 @@ export default function TransactionsPage() {
 
             if (quantity > availableToRefund) {
               validationErrors.push(
-                `${item.groupName}: Cannot refund ${quantity} items. Only ${availableToRefund} available.`
+                `${item.groupName}: Cannot refund ${quantity} items. Only ${availableToRefund} available.`,
               );
             }
           }
@@ -514,7 +533,7 @@ export default function TransactionsPage() {
           }
           return total + item.unitPrice * quantity;
         },
-        0
+        0,
       );
 
       // Process the refund through the service
@@ -523,13 +542,13 @@ export default function TransactionsPage() {
         refundItems,
         selectedTransaction,
         "Manual refund processed by owner", // reason
-        "Owner" // processedBy
+        "Owner", // processedBy
       );
 
       alert(
         `Refund processed successfully!\nRefund ID: ${refundId}\nAmount: ${formatPrice(
-          refundAmount
-        )}`
+          refundAmount,
+        )}`,
       );
 
       setShowRefundModal(false);
@@ -541,7 +560,7 @@ export default function TransactionsPage() {
       alert(
         `Error processing refund: ${
           error instanceof Error ? error.message : "Please try again."
-        }`
+        }`,
       );
     }
   };
@@ -561,11 +580,11 @@ export default function TransactionsPage() {
         selectedTransaction.id!,
         selectedTransaction,
         "Transaction cancelled by owner",
-        user?.email || "Unknown user"
+        user?.email || "Unknown user",
       );
 
       alert(
-        `Transaction ${selectedTransaction.transactionId} has been cancelled successfully.\nInventory has been restored.`
+        `Transaction ${selectedTransaction.transactionId} has been cancelled successfully.\nInventory has been restored.`,
       );
 
       setShowCancelModal(false);
@@ -584,14 +603,14 @@ export default function TransactionsPage() {
     setSelectedTransactions((prev) =>
       prev.includes(transactionId)
         ? prev.filter((id) => id !== transactionId)
-        : [...prev, transactionId]
+        : [...prev, transactionId],
     );
   };
 
   // Select/deselect all COD transactions
   const toggleSelectAll = () => {
     const codTransactions = filteredTransactions.filter(
-      (t) => t.paymentMethod === "cod" && t.status === "pending"
+      (t) => t.paymentMethod === "cod" && t.status === "pending",
     );
     if (selectedTransactions.length === codTransactions.length) {
       setSelectedTransactions([]);
@@ -605,7 +624,7 @@ export default function TransactionsPage() {
     if (selectedTransactions.length === 0) return;
 
     const confirmed = window.confirm(
-      `Are you sure you want to approve ${selectedTransactions.length} COD transaction(s)?`
+      `Are you sure you want to approve ${selectedTransactions.length} COD transaction(s)?`,
     );
 
     if (!confirmed) return;
@@ -618,7 +637,7 @@ export default function TransactionsPage() {
         try {
           await transactionService.approveTransaction(
             transactionId,
-            user?.email || "Admin"
+            user?.email || "Admin",
           );
           successCount++;
         } catch (error) {
@@ -633,7 +652,7 @@ export default function TransactionsPage() {
             failCount > 0
               ? `\nFailed to approve ${failCount} transaction(s).`
               : ""
-          }`
+          }`,
         );
         setSelectedTransactions([]);
         loadTransactions();
@@ -651,7 +670,7 @@ export default function TransactionsPage() {
     if (selectedTransactions.length === 0) return;
 
     const confirmed = window.confirm(
-      `Are you sure you want to cancel ${selectedTransactions.length} COD transaction(s)?\n\nThis will restore inventory for all items.`
+      `Are you sure you want to cancel ${selectedTransactions.length} COD transaction(s)?\n\nThis will restore inventory for all items.`,
     );
 
     if (!confirmed) return;
@@ -668,14 +687,14 @@ export default function TransactionsPage() {
               transactionId,
               transaction,
               "Bulk cancelled by owner",
-              user?.email || "Unknown user"
+              user?.email || "Unknown user",
             );
             successCount++;
           }
         } catch (error) {
           console.error(
             `Error cancelling transaction ${transactionId}:`,
-            error
+            error,
           );
           failCount++;
         }
@@ -687,7 +706,7 @@ export default function TransactionsPage() {
             failCount > 0
               ? `\nFailed to cancel ${failCount} transaction(s).`
               : ""
-          }`
+          }`,
         );
         setSelectedTransactions([]);
         loadTransactions();
@@ -726,7 +745,7 @@ export default function TransactionsPage() {
       const refundedAmount =
         transaction.refunds?.reduce(
           (sum, refund) => sum + refund.totalAmount,
-          0
+          0,
         ) || 0;
       const netTotal = Math.max(0, transaction.total - refundedAmount);
 
@@ -740,7 +759,7 @@ export default function TransactionsPage() {
         transaction.refunds?.reduce((refundTotal, refund) => {
           return refund.items.reduce((refundItemTotal, refundItem) => {
             const originalItem = transaction.items.find(
-              (item) => item.id === refundItem.itemId
+              (item) => item.id === refundItem.itemId,
             );
             if (originalItem) {
               const refundedProfitPerItem =
@@ -773,7 +792,7 @@ export default function TransactionsPage() {
     const csvContent = [
       headers.join(","),
       ...rows.map((row) =>
-        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(",")
+        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(","),
       ),
     ].join("\n");
 
@@ -789,7 +808,7 @@ export default function TransactionsPage() {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `transactions_${new Date().toISOString().split("T")[0]}.csv`
+      `transactions_${new Date().toISOString().split("T")[0]}.csv`,
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
@@ -874,15 +893,10 @@ export default function TransactionsPage() {
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h3 className="text-sm font-medium text-gray-500">
-                  Average Order
+                  Total Sale
                 </h3>
                 <p className="text-2xl font-bold text-purple-600">
-                  {formatPrice(
-                    completedTransactionsCount > 0
-                      ? calculateNetRevenue(revenueTransactions) /
-                          completedTransactionsCount
-                      : 0
-                  )}
+                  {formatInMMK(calculateNetRevenue(revenueTransactionsMMK))}
                 </p>
               </div>
             </div>
@@ -950,7 +964,7 @@ export default function TransactionsPage() {
                         | "pending"
                         | "cancelled"
                         | "refunded"
-                        | "partially_refunded"
+                        | "partially_refunded",
                     );
                     setCurrentPage(1);
                   }}
@@ -975,7 +989,7 @@ export default function TransactionsPage() {
                         | "cash"
                         | "scan"
                         | "wallet"
-                        | "cod"
+                        | "cod",
                     );
                     setCurrentPage(1);
                   }}
@@ -1119,13 +1133,13 @@ export default function TransactionsPage() {
                               filteredTransactions.filter(
                                 (t) =>
                                   t.paymentMethod === "cod" &&
-                                  t.status === "pending"
+                                  t.status === "pending",
                               ).length > 0 &&
                               selectedTransactions.length ===
                                 filteredTransactions.filter(
                                   (t) =>
                                     t.paymentMethod === "cod" &&
-                                    t.status === "pending"
+                                    t.status === "pending",
                                 ).length
                             }
                             onChange={toggleSelectAll}
@@ -1134,7 +1148,7 @@ export default function TransactionsPage() {
                               filteredTransactions.filter(
                                 (t) =>
                                   t.paymentMethod === "cod" &&
-                                  t.status === "pending"
+                                  t.status === "pending",
                               ).length === 0
                             }
                             aria-label="Select all COD transactions"
@@ -1197,7 +1211,7 @@ export default function TransactionsPage() {
                                 <input
                                   type="checkbox"
                                   checked={selectedTransactions.includes(
-                                    transaction.id!
+                                    transaction.id!,
                                   )}
                                   onChange={() =>
                                     toggleSelectTransaction(transaction.id!)
@@ -1221,7 +1235,7 @@ export default function TransactionsPage() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {transaction.items.reduce(
                                 (total, item) => total + item.quantity,
-                                0
+                                0,
                               )}{" "}
                               items
                             </td>
@@ -1230,7 +1244,7 @@ export default function TransactionsPage() {
                                 const refundedAmount =
                                   transaction.refunds?.reduce(
                                     (sum, refund) => sum + refund.totalAmount,
-                                    0
+                                    0,
                                   ) || 0;
                                 const netTotal =
                                   transaction.total - refundedAmount;
@@ -1304,7 +1318,7 @@ export default function TransactionsPage() {
                                       item.quantity;
                                     return sum + profit;
                                   },
-                                  0
+                                  0,
                                 );
 
                                 // Calculate profit lost from refunds
@@ -1334,11 +1348,11 @@ export default function TransactionsPage() {
                                             }
                                             return refundItemTotal;
                                           },
-                                          0
+                                          0,
                                         )
                                       );
                                     },
-                                    0
+                                    0,
                                   ) || 0;
 
                                 const netProfit = totalProfit - refundedProfit;
@@ -1387,7 +1401,7 @@ export default function TransactionsPage() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 {getPaymentMethodIcon(
-                                  transaction.paymentMethod
+                                  transaction.paymentMethod,
                                 )}
                                 <span className="ml-2 text-sm text-gray-900 capitalize">
                                   {transaction.paymentMethod}
@@ -1543,11 +1557,11 @@ export default function TransactionsPage() {
                           selectedTransaction.refunds?.reduce(
                             (total, refund) => {
                               const refundItem = refund.items.find(
-                                (ri) => ri.itemIndex === index
+                                (ri) => ri.itemIndex === index,
                               );
                               return total + (refundItem?.quantity || 0);
                             },
-                            0
+                            0,
                           ) || 0;
 
                         const availableToRefund =
@@ -1597,7 +1611,7 @@ export default function TransactionsPage() {
                                       parseInt(e.target.value) || 0;
                                     const validatedValue = Math.min(
                                       Math.max(inputValue, 0),
-                                      availableToRefund
+                                      availableToRefund,
                                     );
                                     setRefundItems((prev) => ({
                                       ...prev,
@@ -1645,7 +1659,7 @@ export default function TransactionsPage() {
                       {(() => {
                         // Calculate refund breakdown
                         const totalItemRefundAmount = Object.entries(
-                          refundItems
+                          refundItems,
                         ).reduce((total, [key, quantity]) => {
                           const [, index] = key.split("___");
                           const itemIndex = parseInt(index);
@@ -1657,7 +1671,7 @@ export default function TransactionsPage() {
                             itemIndex >= selectedTransaction.items.length
                           ) {
                             console.warn(
-                              `Invalid item index ${itemIndex} for key ${key}`
+                              `Invalid item index ${itemIndex} for key ${key}`,
                             );
                             return total;
                           }
@@ -1710,7 +1724,7 @@ export default function TransactionsPage() {
                                     <span className="text-orange-600">
                                       -
                                       {formatPrice(
-                                        totalProportionalCartDiscount
+                                        totalProportionalCartDiscount,
                                       )}
                                     </span>
                                   </div>
@@ -1887,7 +1901,7 @@ export default function TransactionsPage() {
                               </span>
                               <span
                                 className={getStatusBadge(
-                                  selectedTransaction.status
+                                  selectedTransaction.status,
                                 )}
                               >
                                 {getStatusText(selectedTransaction.status)}
@@ -1907,7 +1921,7 @@ export default function TransactionsPage() {
                               </span>
                               <div className="flex items-center">
                                 {getPaymentMethodIcon(
-                                  selectedTransaction.paymentMethod
+                                  selectedTransaction.paymentMethod,
                                 )}
                                 <span className="ml-2 text-sm font-medium text-gray-900 capitalize">
                                   {selectedTransaction.paymentMethod}
@@ -2013,7 +2027,7 @@ export default function TransactionsPage() {
                             Items (
                             {selectedTransaction.items.reduce(
                               (total, item) => total + item.quantity,
-                              0
+                              0,
                             )}{" "}
                             items)
                           </h3>
@@ -2076,7 +2090,7 @@ export default function TransactionsPage() {
                                       <div className="text-right">
                                         <div className="text-sm font-medium text-gray-900">
                                           {formatPrice(
-                                            item.unitPrice * item.quantity
+                                            item.unitPrice * item.quantity,
                                           )}
                                         </div>
                                         <div className="text-xs text-gray-500">
@@ -2115,7 +2129,7 @@ export default function TransactionsPage() {
                                               ? formatDate(
                                                   refund.createdAt
                                                     .toDate()
-                                                    .toISOString()
+                                                    .toISOString(),
                                                 )
                                               : "N/A"}
                                           </p>
@@ -2135,7 +2149,7 @@ export default function TransactionsPage() {
                                         </div>
                                       </div>
                                     </div>
-                                  )
+                                  ),
                                 )}
                               </div>
                             </div>
@@ -2157,7 +2171,7 @@ export default function TransactionsPage() {
                                     {formatDate(
                                       selectedTransaction.cancelledAt
                                         .toDate()
-                                        .toISOString()
+                                        .toISOString(),
                                     )}
                                   </span>
                                 </div>
@@ -2218,7 +2232,7 @@ export default function TransactionsPage() {
                     <button
                       onClick={() => {
                         const transaction = transactions.find(
-                          (t) => t.id === openDropdown
+                          (t) => t.id === openDropdown,
                         );
                         if (transaction) handleViewClick(transaction);
                       }}
@@ -2230,7 +2244,7 @@ export default function TransactionsPage() {
 
                     {(() => {
                       const transaction = transactions.find(
-                        (t) => t.id === openDropdown
+                        (t) => t.id === openDropdown,
                       );
 
                       // Show Approve for pending COD transactions
@@ -2272,7 +2286,7 @@ export default function TransactionsPage() {
 
                     {(() => {
                       const transaction = transactions.find(
-                        (t) => t.id === openDropdown
+                        (t) => t.id === openDropdown,
                       );
                       return (
                         transaction?.status !== "cancelled" && (
@@ -2290,7 +2304,7 @@ export default function TransactionsPage() {
                     })()}
                   </div>
                 </div>,
-                document.body
+                document.body,
               )}
           </div>
         </main>

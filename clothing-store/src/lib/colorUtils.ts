@@ -8,7 +8,10 @@ const cssNamedColors: { name: string; hex: string }[] = Object.entries(
 ).map(([hex, name]) => ({ name, hex: hex.toUpperCase() }));
 
 // Precompute Lab values for named colors to avoid recalculating on every call
-const namedColorLabs: { name: string; lab: { L: number; a: number; b: number } }[] = cssNamedColors.map((c) => ({
+const namedColorLabs: {
+  name: string;
+  lab: { L: number; a: number; b: number };
+}[] = cssNamedColors.map((c) => ({
   name: c.name,
   lab: rgbToLab(hexToRgb(c.hex)),
 }));

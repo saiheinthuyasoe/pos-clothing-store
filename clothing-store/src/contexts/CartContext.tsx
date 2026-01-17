@@ -46,13 +46,13 @@ export function CartProvider({ children }: CartProviderProps) {
       stockId: string,
       color: string,
       size: string,
-      quantity: number
+      quantity: number,
     ) => Promise<void> | void;
     restoreStock: (
       stockId: string,
       color: string,
       size: string,
-      quantity: number
+      quantity: number,
     ) => Promise<void> | void;
     checkStock: (stockId: string, color: string, size: string) => number;
   } | null>(null);
@@ -158,14 +158,14 @@ export function CartProvider({ children }: CartProviderProps) {
                 update.stockId,
                 update.color,
                 update.size,
-                update.quantity
+                update.quantity,
               );
             } else {
               await inventoryCallbacks.restoreStock(
                 update.stockId,
                 update.color,
                 update.size,
-                update.quantity
+                update.quantity,
               );
             }
           } catch (error) {
@@ -189,31 +189,41 @@ export function CartProvider({ children }: CartProviderProps) {
       stockId: string,
       color: string,
       size: string,
-      quantity: number
+      quantity: number,
     ) => {
       setInventoryUpdateQueue((prev) => [
         ...prev,
         { type, stockId, color, size, quantity },
       ]);
     },
-    []
+    [],
   );
 
   const addToCart = (newItem: Omit<CartItem, "id">) => {
     // Check available stock before adding
     if (inventoryCallbacks?.checkStock) {
+      console.debug("CartContext.addToCart: calling checkStock with", {
+        stockId: newItem.stockId,
+        selectedColor: newItem.selectedColor,
+        selectedSize: newItem.selectedSize,
+      });
       const stockInDatabase = inventoryCallbacks.checkStock(
         newItem.stockId,
         newItem.selectedColor || "",
-        newItem.selectedSize || ""
+        newItem.selectedSize || "",
       );
+      console.debug("CartContext.addToCart: checkStock returned", {
+        stockInDatabase,
+      });
 
       // Find existing item in cart to calculate total quantity after addition
       const existingItem = cart.items.find(
         (item) =>
           item.stockId === newItem.stockId &&
-          item.selectedColor === newItem.selectedColor &&
-          item.selectedSize === newItem.selectedSize
+          item.selectedSize === newItem.selectedSize &&
+          (item.selectedColor === newItem.selectedColor ||
+            item.colorCode === newItem.colorCode ||
+            newItem.selectedColor === item.colorCode),
       );
 
       const currentCartQuantity = existingItem?.quantity || 0;
@@ -224,8 +234,15 @@ export function CartProvider({ children }: CartProviderProps) {
 
       if (totalQuantityAfterAdd > totalAvailable) {
         const availableToAdd = totalAvailable - currentCartQuantity;
+        console.warn("CartContext.addToCart: stock check failed", {
+          newItem,
+          stockInDatabase,
+          currentCartQuantity,
+          totalAvailable,
+          availableToAdd,
+        });
         alert(
-          `Cannot add ${newItem.quantity} items. Only ${availableToAdd} available to add (${stockInDatabase} in stock + ${currentCartQuantity} already in cart).`
+          `Cannot add ${newItem.quantity} items. Only ${availableToAdd} available to add (${stockInDatabase} in stock + ${currentCartQuantity} already in cart).`,
         );
         return;
       }
@@ -236,7 +253,7 @@ export function CartProvider({ children }: CartProviderProps) {
         (item) =>
           item.stockId === newItem.stockId &&
           item.selectedColor === newItem.selectedColor &&
-          item.selectedSize === newItem.selectedSize
+          item.selectedSize === newItem.selectedSize,
       );
 
       let updatedItems: CartItem[];
@@ -246,7 +263,7 @@ export function CartProvider({ children }: CartProviderProps) {
         updatedItems = prevCart.items.map((item, index) =>
           index === existingItemIndex
             ? { ...item, quantity: item.quantity + newItem.quantity }
-            : item
+            : item,
         );
       } else {
         // Add new item
@@ -261,11 +278,11 @@ export function CartProvider({ children }: CartProviderProps) {
 
       const totalItems = updatedItems.reduce(
         (sum, item) => sum + item.quantity,
-        0
+        0,
       );
       const totalAmount = updatedItems.reduce(
         (sum, item) => sum + item.unitPrice * item.quantity,
-        0
+        0,
       );
 
       return {
@@ -282,7 +299,7 @@ export function CartProvider({ children }: CartProviderProps) {
       newItem.stockId,
       newItem.selectedColor || "",
       newItem.selectedSize || "",
-      newItem.quantity
+      newItem.quantity,
     );
   };
 
@@ -297,18 +314,18 @@ export function CartProvider({ children }: CartProviderProps) {
           itemToRemove.stockId,
           itemToRemove.selectedColor || "",
           itemToRemove.selectedSize || "",
-          itemToRemove.quantity
+          itemToRemove.quantity,
         );
       }
 
       const updatedItems = prevCart.items.filter((item) => item.id !== itemId);
       const totalItems = updatedItems.reduce(
         (sum, item) => sum + item.quantity,
-        0
+        0,
       );
       const totalAmount = updatedItems.reduce(
         (sum, item) => sum + item.unitPrice * item.quantity,
-        0
+        0,
       );
 
       return {
@@ -337,7 +354,7 @@ export function CartProvider({ children }: CartProviderProps) {
       const stockInDatabase = inventoryCallbacks.checkStock(
         currentItem.stockId,
         currentItem.selectedColor || "",
-        currentItem.selectedSize || ""
+        currentItem.selectedSize || "",
       );
 
       // Total available = stock in database + current quantity in cart
@@ -345,7 +362,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
       if (quantity > totalAvailable) {
         alert(
-          `Cannot set quantity to ${quantity}. Only ${totalAvailable} available in total (${stockInDatabase} in stock + ${currentItem.quantity} already in cart).`
+          `Cannot set quantity to ${quantity}. Only ${totalAvailable} available in total (${stockInDatabase} in stock + ${currentItem.quantity} already in cart).`,
         );
         return;
       }
@@ -364,7 +381,7 @@ export function CartProvider({ children }: CartProviderProps) {
             currentItem.stockId,
             currentItem.selectedColor || "",
             currentItem.selectedSize || "",
-            quantityDifference
+            quantityDifference,
           );
         } else if (quantityDifference < 0) {
           // Quantity decreased - queue inventory restoration
@@ -373,21 +390,21 @@ export function CartProvider({ children }: CartProviderProps) {
             currentItem.stockId,
             currentItem.selectedColor || "",
             currentItem.selectedSize || "",
-            Math.abs(quantityDifference)
+            Math.abs(quantityDifference),
           );
         }
       }
 
       const updatedItems = prevCart.items.map((item) =>
-        item.id === itemId ? { ...item, quantity } : item
+        item.id === itemId ? { ...item, quantity } : item,
       );
       const totalItems = updatedItems.reduce(
         (sum, item) => sum + item.quantity,
-        0
+        0,
       );
       const totalAmount = updatedItems.reduce(
         (sum, item) => sum + item.unitPrice * item.quantity,
-        0
+        0,
       );
 
       return {
@@ -407,7 +424,7 @@ export function CartProvider({ children }: CartProviderProps) {
         item.stockId,
         item.selectedColor || "",
         item.selectedSize || "",
-        item.quantity
+        item.quantity,
       );
     });
 
@@ -443,7 +460,7 @@ export function CartProvider({ children }: CartProviderProps) {
   const calculateDiscountedPrice = (
     originalPrice: number,
     groupDiscount?: number,
-    variantDiscount?: number
+    variantDiscount?: number,
   ) => {
     // Sum all discounts first, then apply the total discount
     const totalDiscountPercent = (groupDiscount || 0) + (variantDiscount || 0);
@@ -463,7 +480,7 @@ export function CartProvider({ children }: CartProviderProps) {
           const discountedPrice = calculateDiscountedPrice(
             item.unitPrice,
             newGroupDiscount,
-            item.variantDiscount
+            item.variantDiscount,
           );
 
           return {
@@ -501,7 +518,7 @@ export function CartProvider({ children }: CartProviderProps) {
           const discountedPrice = calculateDiscountedPrice(
             item.unitPrice,
             item.groupDiscount,
-            newVariantDiscount
+            newVariantDiscount,
           );
 
           return {
@@ -516,7 +533,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
       const totalAmount = updatedItems.reduce(
         (sum, item) => sum + item.unitPrice * item.quantity,
-        0
+        0,
       );
 
       return {
@@ -539,7 +556,7 @@ export function CartProvider({ children }: CartProviderProps) {
               ? calculateDiscountedPrice(
                   item.unitPrice,
                   0, // Remove group discount
-                  item.variantDiscount
+                  item.variantDiscount,
                 )
               : undefined;
 
@@ -581,7 +598,7 @@ export function CartProvider({ children }: CartProviderProps) {
               ? calculateDiscountedPrice(
                   item.unitPrice,
                   item.groupDiscount,
-                  0 // Remove variant discount
+                  0, // Remove variant discount
                 )
               : undefined;
 
@@ -614,7 +631,7 @@ export function CartProvider({ children }: CartProviderProps) {
   // Apply wholesale pricing to all items in a group
   const applyWholesalePricing = (
     groupName: string,
-    wholesalePricePerItem: number
+    wholesalePricePerItem: number,
   ) => {
     setCart((prevCart) => {
       const updatedItems = prevCart.items.map((item) => {
@@ -683,19 +700,19 @@ export function CartProvider({ children }: CartProviderProps) {
         stockId: string,
         color: string,
         size: string,
-        quantity: number
+        quantity: number,
       ) => Promise<void> | void;
       restoreStock: (
         stockId: string,
         color: string,
         size: string,
-        quantity: number
+        quantity: number,
       ) => Promise<void> | void;
       checkStock: (stockId: string, color: string, size: string) => number;
     }) => {
       setInventoryCallbacks(callbacks);
     },
-    []
+    [],
   );
 
   // Customer management functions
@@ -706,7 +723,7 @@ export function CartProvider({ children }: CartProviderProps) {
         selectedCustomer: customer,
       }));
     },
-    []
+    [],
   );
 
   const getSelectedCustomer = useCallback((): SelectedCustomer | null => {

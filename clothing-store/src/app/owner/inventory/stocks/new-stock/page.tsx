@@ -342,6 +342,10 @@ function NewStockContent() {
     );
   };
 
+  // Pending color updates and rAF scheduling to batch rapid colorCode changes
+  const pendingColorRef = useRef<Record<string, string>>({});
+  const rafScheduledRef = useRef<Record<string, boolean>>({});
+
   // Debounce timers per-variant for color detection
   const detectionTimersRef = useRef<Record<string, number>>({});
 

@@ -76,10 +76,10 @@ function OwnerHomeContent() {
 
   // Selection state for colors and sizes
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>(
-    {}
+    {},
   );
   const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>(
-    {}
+    {},
   );
 
   // Helper functions for color and size selection
@@ -175,7 +175,7 @@ function OwnerHomeContent() {
   const getStockForSize = (item: ClothingInventoryItem, size: string) => {
     const selectedVariant = getSelectedColorVariant(item);
     const sizeQty = selectedVariant?.sizeQuantities.find(
-      (sq) => sq.size === size
+      (sq) => sq.size === size,
     );
     return sizeQty?.quantity || 0;
   };
@@ -200,7 +200,7 @@ function OwnerHomeContent() {
     // Calculate total stock for the selected color variant
     return selectedVariant.sizeQuantities.reduce(
       (total, sq) => total + (sq.quantity || 0),
-      0
+      0,
     );
   };
 
@@ -216,7 +216,7 @@ function OwnerHomeContent() {
       itemId: string,
       colorId: string,
       size: string,
-      quantity: number = 1
+      quantity: number = 1,
     ) => {
       // Update local state immediately for UI responsiveness
       setClothingInventory((prevInventory) => {
@@ -284,7 +284,7 @@ function OwnerHomeContent() {
         // For now, we'll keep the optimistic update
       }
     },
-    [clothingInventory]
+    [clothingInventory],
   );
 
   // Function to restore inventory stock when item is removed from cart
@@ -293,7 +293,7 @@ function OwnerHomeContent() {
       itemId: string,
       colorId: string,
       size: string,
-      quantity: number = 1
+      quantity: number = 1,
     ) => {
       // Update local state immediately for UI responsiveness
       setClothingInventory((prevInventory) => {
@@ -361,7 +361,7 @@ function OwnerHomeContent() {
         // For now, we'll keep the optimistic update
       }
     },
-    [clothingInventory]
+    [clothingInventory],
   );
 
   // Function to check available stock for a specific item, color, and size
@@ -371,16 +371,16 @@ function OwnerHomeContent() {
       if (!item) return 0;
 
       const colorVariant = item.colorVariants?.find(
-        (variant) => variant.id === colorId
+        (variant) => variant.id === colorId,
       );
       if (!colorVariant) return 0;
 
       const sizeQuantity = colorVariant.sizeQuantities.find(
-        (sizeQty) => sizeQty.size === size
+        (sizeQty) => sizeQty.size === size,
       );
       return sizeQuantity?.quantity || 0;
     },
-    [clothingInventory]
+    [clothingInventory],
   );
 
   // Transform stock data to clothing inventory format
@@ -482,13 +482,13 @@ function OwnerHomeContent() {
               total +
               variant.sizeQuantities.reduce(
                 (sizeTotal, sizeQty) => sizeTotal + sizeQty.quantity,
-                0
+                0,
               ),
-            0
+            0,
           ),
           colors: [
             ...new Set(
-              stock.colorVariants.map((variant) => variant.color.toLowerCase())
+              stock.colorVariants.map((variant) => variant.color.toLowerCase()),
             ),
           ],
           image:
@@ -510,7 +510,7 @@ function OwnerHomeContent() {
         };
       });
     },
-    []
+    [],
   );
 
   // Fetch shops and categories together for better performance
@@ -561,7 +561,7 @@ function OwnerHomeContent() {
         const transformedData = transformStockData(stocks);
         setClothingInventory(transformedData);
         setIsLoading(false);
-      }
+      },
     );
 
     // Fallback: If Firebase is not configured, fetch from API
@@ -578,7 +578,9 @@ function OwnerHomeContent() {
           setClothingInventory(transformedData);
         } catch (err) {
           setError(
-            err instanceof Error ? err.message : "Failed to fetch recent stocks"
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch recent stocks",
           );
           console.error("Error fetching recent stocks:", err);
           setClothingInventory([]);
@@ -624,15 +626,33 @@ function OwnerHomeContent() {
           stockId: string,
           color: string,
           size: string,
-          quantity: number
+          quantity: number,
         ) => {
-          // Find the color variant ID based on the color name
+          console.debug("inventory.reduceStock called", {
+            stockId,
+            color,
+            size,
+            quantity,
+          });
+          // Find the color variant either by id or by color name (case-insensitive)
           const item = clothingInventory.find((item) => item.id === stockId);
-          const colorVariant = item?.colorVariants?.find(
-            (variant) => variant.color.toLowerCase() === color.toLowerCase()
+          if (!item) return;
+
+          let colorVariant = item.colorVariants?.find(
+            (variant) => variant.id === color,
           );
 
+          if (!colorVariant) {
+            colorVariant = item.colorVariants?.find(
+              (variant) => variant.color.toLowerCase() === color.toLowerCase(),
+            );
+          }
+
           if (colorVariant) {
+            console.debug("inventory.reduceStock found variant", {
+              colorVariantId: colorVariant.id,
+              colorVariantName: colorVariant.color,
+            });
             reduceInventoryStock(stockId, colorVariant.id, size, quantity);
           } else {
             console.warn("Color variant not found:", {
@@ -646,15 +666,33 @@ function OwnerHomeContent() {
           stockId: string,
           color: string,
           size: string,
-          quantity: number
+          quantity: number,
         ) => {
-          // Find the color variant ID based on the color name
+          console.debug("inventory.restoreStock called", {
+            stockId,
+            color,
+            size,
+            quantity,
+          });
+          // Find the color variant either by id or by color name (case-insensitive)
           const item = clothingInventory.find((item) => item.id === stockId);
-          const colorVariant = item?.colorVariants?.find(
-            (variant) => variant.color.toLowerCase() === color.toLowerCase()
+          if (!item) return;
+
+          let colorVariant = item.colorVariants?.find(
+            (variant) => variant.id === color,
           );
 
+          if (!colorVariant) {
+            colorVariant = item.colorVariants?.find(
+              (variant) => variant.color.toLowerCase() === color.toLowerCase(),
+            );
+          }
+
           if (colorVariant) {
+            console.debug("inventory.restoreStock found variant", {
+              colorVariantId: colorVariant.id,
+              colorVariantName: colorVariant.color,
+            });
             restoreInventoryStock(stockId, colorVariant.id, size, quantity);
           } else {
             console.warn("Color variant not found:", {
@@ -665,16 +703,33 @@ function OwnerHomeContent() {
           }
         },
         checkStock: (stockId: string, color: string, size: string) => {
-          // Find the color variant ID based on the color name
+          console.debug("inventory.checkStock called", {
+            stockId,
+            color,
+            size,
+          });
+          // Find the color variant either by id or by color name (case-insensitive)
           const item = clothingInventory.find((item) => item.id === stockId);
           if (!item) return 0;
 
-          const colorVariant = item.colorVariants?.find(
-            (variant) => variant.color.toLowerCase() === color.toLowerCase()
+          let colorVariant = item.colorVariants?.find(
+            (variant) => variant.id === color,
           );
 
+          if (!colorVariant) {
+            colorVariant = item.colorVariants?.find(
+              (variant) => variant.color.toLowerCase() === color.toLowerCase(),
+            );
+          }
+
           if (colorVariant) {
-            return checkInventoryStock(stockId, colorVariant.id, size);
+            const qty = checkInventoryStock(stockId, colorVariant.id, size);
+            console.debug("inventory.checkStock found variant", {
+              colorVariantId: colorVariant.id,
+              colorVariantName: colorVariant.color,
+              qty,
+            });
+            return qty;
           } else {
             console.warn("Color variant not found for stock check:", {
               stockId,
@@ -837,7 +892,7 @@ function OwnerHomeContent() {
         unitPrice: item.price,
         originalPrice: item.originalPrice,
         quantity: 1,
-        selectedColor: selectedVariant.color,
+        selectedColor: selectedVariant.id,
         selectedSize: selectedSize,
         colorCode: selectedVariant.colorCode,
         image: item.image,
@@ -849,7 +904,7 @@ function OwnerHomeContent() {
 
       // Optional: Show success message
       console.log(
-        `Added ${item.name} (${selectedVariant.color}, ${selectedSize}) to cart - Stock reduced`
+        `Added ${item.name} (${selectedVariant.color}, ${selectedSize}) to cart - Stock reduced`,
       );
     } catch (error) {
       console.error("Error adding item to cart:", error);
@@ -1167,7 +1222,7 @@ function OwnerHomeContent() {
                   ) : (
                     currentPageItems.map((item) => {
                       const itemStock = getDisplayStock(
-                        item as ClothingInventoryItem
+                        item as ClothingInventoryItem,
                       );
                       const isOutOfStock = itemStock === 0;
 
@@ -1204,7 +1259,7 @@ function OwnerHomeContent() {
                                 selectedColors[item.id] || "default"
                               }`}
                               src={getCurrentImage(
-                                item as ClothingInventoryItem
+                                item as ClothingInventoryItem,
                               )}
                               alt={item.name}
                               width={150}
@@ -1266,8 +1321,8 @@ function OwnerHomeContent() {
                                     isOutOfStock
                                       ? "text-red-600"
                                       : itemStock <= 10
-                                      ? "text-orange-600"
-                                      : "text-green-600"
+                                        ? "text-orange-600"
+                                        : "text-green-600"
                                   }`}
                                 >
                                   {itemStock}
@@ -1338,13 +1393,13 @@ function OwnerHomeContent() {
                                 {(() => {
                                   const availableSizes = item.colorVariants
                                     ? getAvailableSizes(
-                                        item as ClothingInventoryItem
+                                        item as ClothingInventoryItem,
                                       )
                                     : [];
                                   console.log(
                                     `Size rendering for ${item.id}: availableSizes=`,
                                     availableSizes,
-                                    `length=${availableSizes.length}`
+                                    `length=${availableSizes.length}`,
                                   );
                                   return availableSizes.length > 0 ? (
                                     availableSizes.map((sizeQty) => {
@@ -1359,7 +1414,7 @@ function OwnerHomeContent() {
                                             !isOutOfStock &&
                                             handleSizeSelect(
                                               item.id,
-                                              sizeQty.size
+                                              sizeQty.size,
                                             )
                                           }
                                           disabled={isOutOfStock}
@@ -1367,8 +1422,8 @@ function OwnerHomeContent() {
                                             isOutOfStock
                                               ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                                               : isSelected
-                                              ? "bg-blue-600 text-white border-blue-600"
-                                              : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                                                ? "bg-blue-600 text-white border-blue-600"
+                                                : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
                                           }`}
                                           title={`${sizeQty.size} - ${sizeQty.quantity} in stock`}
                                         >
@@ -1412,9 +1467,9 @@ function OwnerHomeContent() {
                                 isOutOfStock
                                   ? "bg-red-100 text-red-400 cursor-not-allowed border border-red-200"
                                   : selectedColors[item.id] &&
-                                    selectedSizes[item.id]
-                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                      selectedSizes[item.id]
+                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                               }`}
                             >
                               <ShoppingCart className="h-4 w-4" />

@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { transactionService, Transaction } from "@/services/transactionService";
 import { ShopService } from "@/services/shopService";
 import { Sidebar } from "@/components/ui/Sidebar";
+import { SettingsService } from "@/services/settingsService";
 import { TopNavBar } from "@/components/ui/TopNavBar";
 import {
   BarChart3,
@@ -30,6 +31,7 @@ import {
 
 interface ReportData {
   totalRevenue: number;
+  totalRevenueMMK: number;
   totalProfit: number;
   totalTransactions: number;
   totalCustomers: number;
@@ -155,12 +157,12 @@ function ReportsPageContent() {
           dateRange === "today"
             ? 0
             : dateRange === "7d"
-            ? 7
-            : dateRange === "30d"
-            ? 30
-            : dateRange === "90d"
-            ? 90
-            : 0;
+              ? 7
+              : dateRange === "30d"
+                ? 30
+                : dateRange === "90d"
+                  ? 90
+                  : 0;
 
         const startDateCalc = new Date(now);
         if (dateRange === "today") {
@@ -170,28 +172,28 @@ function ReportsPageContent() {
         }
 
         filteredTransactions = transactions.filter(
-          (t) => new Date(t.timestamp) >= startDateCalc
+          (t) => new Date(t.timestamp) >= startDateCalc,
         );
       }
 
       // Filter by branch
       if (filterBranch && filterBranch !== "all") {
         filteredTransactions = filteredTransactions.filter(
-          (t) => t.branchName === filterBranch
+          (t) => t.branchName === filterBranch,
         );
       }
 
       // Filter by status
       if (filterStatus !== "all") {
         filteredTransactions = filteredTransactions.filter(
-          (t) => t.status === filterStatus
+          (t) => t.status === filterStatus,
         );
       }
 
       // Filter by payment method
       if (filterPaymentMethod !== "all") {
         filteredTransactions = filteredTransactions.filter(
-          (t) => t.paymentMethod === filterPaymentMethod
+          (t) => t.paymentMethod === filterPaymentMethod,
         );
       }
 
@@ -201,7 +203,7 @@ function ReportsPageContent() {
         filteredTransactions = filteredTransactions.filter(
           (t) =>
             t.transactionId?.toLowerCase().includes(term) ||
-            t.customer?.displayName?.toLowerCase().includes(term)
+            t.customer?.displayName?.toLowerCase().includes(term),
         );
       }
 
@@ -217,26 +219,34 @@ function ReportsPageContent() {
 
   const calculateReportData = (transactions: Transaction[]): ReportData => {
     // Filter for revenue-generating transactions (completed, partially refunded, and refunded)
-    // Exclude pending COD transactions
-    const revenueTransactions = transactions
-      .filter(
-        (t) =>
-          t.status === "completed" ||
-          t.status === "partially_refunded" ||
-          t.status === "refunded"
-      )
-      .filter((t) => t.paymentMethod !== "cod");
+    const revenueTransactions = transactions.filter(
+      (t) =>
+        t.status === "completed" ||
+        t.status === "partially_refunded" ||
+        t.status === "refunded",
+    );
 
     // Calculate net revenue after refunds
     const totalRevenue = revenueTransactions.reduce((sum, t) => {
       const refundedAmount =
         t.refunds?.reduce(
           (refundSum, refund) => refundSum + refund.totalAmount,
-          0
+          0,
         ) || 0;
-      // Ensure net revenue is never negative (safeguard against data inconsistencies)
       return sum + Math.max(0, t.total - refundedAmount);
     }, 0);
+
+    // Calculate net revenue for transactions sold in MMK only
+    const totalRevenueMMK = revenueTransactions
+      .filter((t) => (t.sellingCurrency || "THB").toUpperCase() === "MMK")
+      .reduce((sum, t) => {
+        const refundedAmount =
+          t.refunds?.reduce(
+            (refundSum, refund) => refundSum + refund.totalAmount,
+            0,
+          ) || 0;
+        return sum + Math.max(0, t.total - refundedAmount);
+      }, 0);
 
     // Calculate total profit (Original Price - Unit Price for each item)
     const totalProfit = revenueTransactions.reduce((sum, t) => {
@@ -253,7 +263,7 @@ function ReportsPageContent() {
           "Qty:",
           item.quantity,
           "Profit:",
-          profitPerItem
+          profitPerItem,
         );
         return itemTotal + profitPerItem;
       }, 0);
@@ -281,7 +291,7 @@ function ReportsPageContent() {
 
     const totalTransactions = transactions.length;
     const uniqueCustomers = new Set(
-      transactions.map((t) => t.customer?.uid).filter(Boolean)
+      transactions.map((t) => t.customer?.uid).filter(Boolean),
     ).size;
     const averageOrderValue =
       totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
@@ -355,7 +365,7 @@ function ReportsPageContent() {
           const refundedAmount =
             transaction.refunds?.reduce(
               (sum, refund) => sum + refund.totalAmount,
-              0
+              0,
             ) || 0;
           const netAmount = transaction.total - refundedAmount;
           dailySales[date].revenue += Math.max(0, netAmount);
@@ -382,17 +392,18 @@ function ReportsPageContent() {
         count,
         percentage:
           totalTransactions > 0 ? (count / totalTransactions) * 100 : 0,
-      })
+      }),
     );
 
     // Get recent transactions (sorted by timestamp, pagination will be applied in render)
     const recentTransactions = transactions.sort(
       (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
     return {
       totalRevenue,
+      totalRevenueMMK,
       totalProfit,
       totalTransactions,
       totalCustomers: uniqueCustomers,
@@ -437,7 +448,7 @@ function ReportsPageContent() {
       const refundedAmount =
         transaction.refunds?.reduce(
           (sum, refund) => sum + refund.totalAmount,
-          0
+          0,
         ) || 0;
       const netTotal = Math.max(0, transaction.total - refundedAmount);
 
@@ -451,7 +462,7 @@ function ReportsPageContent() {
         transaction.refunds?.reduce((refundTotal, refund) => {
           return refund.items.reduce((refundItemTotal, refundItem) => {
             const originalItem = transaction.items.find(
-              (item) => item.id === refundItem.itemId
+              (item) => item.id === refundItem.itemId,
             );
             if (originalItem) {
               const refundedProfitPerItem =
@@ -491,7 +502,7 @@ function ReportsPageContent() {
     const csvContent = [
       headers.join(","),
       ...rows.map((row) =>
-        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(",")
+        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(","),
       ),
     ].join("\n");
 
@@ -507,7 +518,7 @@ function ReportsPageContent() {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `reports_${new Date().toISOString().split("T")[0]}.csv`
+      `reports_${new Date().toISOString().split("T")[0]}.csv`,
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
@@ -552,6 +563,19 @@ function ReportsPageContent() {
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
   const currentTransactions = allTransactions.slice(startIndex, endIndex);
+
+  const formatInMMK = (amount: number) => {
+    const from = (businessSettings?.defaultCurrency as "THB" | "MMK") || "THB";
+    const rate = businessSettings?.currencyRate || 0;
+    const converted = SettingsService.convertPrice(
+      amount,
+      from,
+      "MMK",
+      rate,
+      (businessSettings?.defaultCurrency as "THB" | "MMK" | undefined) || "THB",
+    );
+    return SettingsService.formatPrice(converted, "MMK");
+  };
 
   if (loading) {
     return (
@@ -735,10 +759,10 @@ function ReportsPageContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Average Order Value
+                      Total Sale
                     </p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {formatPrice(reportData?.averageOrderValue || 0)}
+                      {formatInMMK(reportData?.totalRevenueMMK || 0)}
                     </p>
                   </div>
                   <div className="p-3 bg-orange-100 rounded-full">
@@ -876,7 +900,7 @@ function ReportsPageContent() {
                                     (item.quantity /
                                       (reportData?.topSellingItems[0]
                                         ?.quantity || 1)) *
-                                      100
+                                      100,
                                   )}%`,
                                 }}
                               ></div>
@@ -886,7 +910,7 @@ function ReportsPageContent() {
                                 (item.quantity /
                                   (reportData?.topSellingItems[0]?.quantity ||
                                     1)) *
-                                  100
+                                  100,
                               )}
                               %
                             </span>
@@ -929,7 +953,7 @@ function ReportsPageContent() {
                         | "pending"
                         | "cancelled"
                         | "refunded"
-                        | "partially_refunded"
+                        | "partially_refunded",
                     );
                     setCurrentPage(1);
                   }}
@@ -954,7 +978,7 @@ function ReportsPageContent() {
                         | "cash"
                         | "scan"
                         | "wallet"
-                        | "cod"
+                        | "cod",
                     );
                     setCurrentPage(1);
                   }}
@@ -1143,7 +1167,7 @@ function ReportsPageContent() {
                             <span className="font-medium">
                               {transaction.items.reduce(
                                 (total, item) => total + item.quantity,
-                                0
+                                0,
                               )}
                             </span>
                             <span className="text-xs text-gray-500">
@@ -1171,7 +1195,7 @@ function ReportsPageContent() {
                             const refundedAmount =
                               transaction.refunds?.reduce(
                                 (sum, refund) => sum + refund.totalAmount,
-                                0
+                                0,
                               ) || 0;
                             const netTotal = transaction.total - refundedAmount;
 
@@ -1203,7 +1227,7 @@ function ReportsPageContent() {
                                   item.quantity;
                                 return sum + profit;
                               },
-                              0
+                              0,
                             );
 
                             // Calculate profit lost from refunds (not the entire refund amount)
@@ -1232,11 +1256,11 @@ function ReportsPageContent() {
                                         }
                                         return refundItemTotal;
                                       },
-                                      0
+                                      0,
                                     )
                                   );
                                 },
-                                0
+                                0,
                               ) || 0;
 
                             const netProfit = totalProfit - refundedProfit;
@@ -1284,25 +1308,26 @@ function ReportsPageContent() {
                               transaction.status === "completed"
                                 ? "bg-green-100 text-green-800"
                                 : transaction.status === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : transaction.status === "cancelled"
-                                ? "bg-red-100 text-red-800"
-                                : transaction.status === "refunded"
-                                ? "bg-gray-100 text-gray-800"
-                                : "bg-blue-100 text-blue-800"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : transaction.status === "cancelled"
+                                    ? "bg-red-100 text-red-800"
+                                    : transaction.status === "refunded"
+                                      ? "bg-gray-100 text-gray-800"
+                                      : "bg-blue-100 text-blue-800"
                             }`}
                           >
                             {transaction.status === "completed"
                               ? "Completed"
                               : transaction.status === "pending"
-                              ? "Pending"
-                              : transaction.status === "cancelled"
-                              ? "Cancelled"
-                              : transaction.status === "refunded"
-                              ? "Refunded"
-                              : transaction.status === "partially_refunded"
-                              ? "Partially Refunded"
-                              : transaction.status}
+                                ? "Pending"
+                                : transaction.status === "cancelled"
+                                  ? "Cancelled"
+                                  : transaction.status === "refunded"
+                                    ? "Refunded"
+                                    : transaction.status ===
+                                        "partially_refunded"
+                                      ? "Partially Refunded"
+                                      : transaction.status}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
