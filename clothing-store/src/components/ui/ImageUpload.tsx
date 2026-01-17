@@ -27,7 +27,7 @@ export function ImageUpload({
   const [error, setError] = useState<string>("");
 
   const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -75,7 +75,7 @@ export function ImageUpload({
       setError(
         error instanceof Error
           ? error.message
-          : "Failed to upload image. Please try again."
+          : "Failed to upload image. Please try again.",
       );
     } finally {
       setIsUploading(false);
@@ -115,41 +115,42 @@ export function ImageUpload({
     <div className={`relative ${className}`}>
       {value ? (
         <div className="flex flex-col items-center">
-          <div className="relative">
-            <div className="relative max-w-xs rounded-lg overflow-hidden border border-gray-300">
+          <div className="relative w-full">
+            <div className="relative w-full h-48 rounded-lg overflow-hidden border border-gray-300 flex items-center justify-center">
               <img
                 src={value}
                 alt="Uploaded image"
-                className="max-h-64 w-auto object-contain"
+                className="h-full w-auto object-contain"
               />
+
+              {!disabled && (
+                <>
+                  <input
+                    aria-label="Change image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    disabled={disabled || isUploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+                  />
+                  <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-sm z-0">
+                    <Upload className="h-4 w-4" />
+                    Select File
+                  </div>
+                </>
+              )}
             </div>
             {!disabled && (
               <button
                 title="Remove image"
                 type="button"
                 onClick={handleRemove}
-                className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors z-10"
+                className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors z-20"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
           </div>
-          {!disabled && (
-            <div className="relative mt-3">
-              <input
-                aria-label="Change image"
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                disabled={disabled || isUploading}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-              />
-              <div className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-sm">
-                <Upload className="h-4 w-4" />
-                Select File
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="relative">

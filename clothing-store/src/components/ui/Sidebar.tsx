@@ -168,7 +168,7 @@ const menuItems: MenuItem[] = [
     icon: "Settings",
     href: "/owner/settings",
     roles: ["owner"], // Only owner
-  }
+  },
 ];
 
 const iconMap = {
@@ -216,6 +216,9 @@ export function Sidebar({
   const [manuallyCollapsed, setManuallyCollapsed] = useState<string[]>([]);
   const [logoError, setLogoError] = useState<boolean>(false);
 
+  // Collapse feature removed — always render expanded sidebar
+  const collapsed = false;
+
   // Use settings context for business name and logo
   const { businessSettings, isLoading } = useSettings();
   const businessName = businessSettings?.businessName;
@@ -261,7 +264,7 @@ export function Sidebar({
     const findParentAndExpand = (
       items: MenuItem[],
       targetId: string,
-      parentId?: string
+      parentId?: string,
     ): string | null => {
       for (const item of items) {
         if (item.id === targetId) {
@@ -271,7 +274,7 @@ export function Sidebar({
           const foundParent = findParentAndExpand(
             item.children,
             targetId,
-            item.id
+            item.id,
           );
           if (foundParent) {
             return foundParent;
@@ -281,7 +284,7 @@ export function Sidebar({
       return null;
     };
 
-    if (activeItem && !isCollapsed) {
+    if (activeItem) {
       const parentId = findParentAndExpand(filteredMenuItems, activeItem);
       if (
         parentId &&
@@ -291,15 +294,9 @@ export function Sidebar({
         setExpandedItems((prev) => [...prev, parentId]);
       }
     }
-  }, [activeItem, isCollapsed, filteredMenuItems, manuallyCollapsed]);
+  }, [activeItem, filteredMenuItems, manuallyCollapsed]);
 
-  // Close all expanded items when sidebar is collapsed
-  useEffect(() => {
-    if (isCollapsed) {
-      setExpandedItems([]);
-      setManuallyCollapsed([]);
-    }
-  }, [isCollapsed]);
+  // Collapse feature removed; no-op effect removed.
 
   const toggleExpanded = (itemId: string) => {
     setExpandedItems((prev) => {
@@ -311,7 +308,7 @@ export function Sidebar({
       } else {
         // User is manually expanding - remove from manually collapsed
         setManuallyCollapsed((collapsed) =>
-          collapsed.filter((id) => id !== itemId)
+          collapsed.filter((id) => id !== itemId),
         );
         return [...prev, itemId];
       }
@@ -356,20 +353,18 @@ export function Sidebar({
 
     const itemClasses = `
       flex items-center w-full text-sm text-gray-700 hover:bg-gray-100 transition-colors
-      ${isCollapsed ? "px-2 py-3 justify-center" : "px-3 py-2"}
+      px-3 py-2
       ${
         isActiveOrHasActiveChild
           ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
           : ""
       }
-      ${level > 0 && !isCollapsed ? "pl-8" : ""}
+      ${level > 0 ? "pl-8" : ""}
     `;
 
-    const iconClasses = isCollapsed
-      ? `w-5 h-5 mx-auto ${isActiveOrHasActiveChild ? "text-blue-700" : ""}`
-      : `w-4 h-4 mr-3 flex-shrink-0 ${
-          isActiveOrHasActiveChild ? "text-blue-700" : ""
-        }`;
+    const iconClasses = `w-4 h-4 mr-3 flex-shrink-0 ${
+      isActiveOrHasActiveChild ? "text-blue-700" : ""
+    }`;
 
     const handleMainClick = () => {
       if (item.href) {
@@ -388,14 +383,11 @@ export function Sidebar({
               href={item.href}
               onClick={() => onItemClick?.(item)}
               className={itemClasses}
-              title={isCollapsed ? item.label : undefined}
             >
               {renderIcon(item.icon, iconClasses)}
-              {!isCollapsed && (
-                <span className="flex-1 text-left">{item.label}</span>
-              )}
+              <span className="flex-1 text-left">{item.label}</span>
             </Link>
-            {!isCollapsed && hasChildren && (
+            {hasChildren && (
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -413,16 +405,10 @@ export function Sidebar({
             )}
           </div>
         ) : (
-          <button
-            onClick={handleMainClick}
-            className={itemClasses}
-            title={isCollapsed ? item.label : undefined}
-          >
+          <button onClick={handleMainClick} className={itemClasses}>
             {renderIcon(item.icon, iconClasses)}
-            {!isCollapsed && (
-              <span className="flex-1 text-left">{item.label}</span>
-            )}
-            {!isCollapsed && hasChildren && (
+            <span className="flex-1 text-left">{item.label}</span>
+            {hasChildren && (
               <div className="ml-2">
                 {isExpanded ? (
                   <ChevronDown className="w-3 h-3" />
@@ -434,7 +420,7 @@ export function Sidebar({
           </button>
         )}
 
-        {!isCollapsed && hasChildren && isExpanded && (
+        {hasChildren && isExpanded && (
           <div className="bg-gray-50">
             {item.children?.map((child) => renderMenuItem(child, level + 1))}
           </div>
@@ -450,9 +436,7 @@ export function Sidebar({
 
   const container = (
     <div
-      className={`${
-        isCollapsed ? "w-16" : "w-64"
-      } bg-white border-r border-gray-200 h-full transition-all duration-300 ${className} relative flex flex-col`}
+      className={`w-64 bg-white border-r border-gray-200 h-screen sticky top-0 transition-all duration-300 ${className} flex flex-col`}
     >
       {/* Shop Header */}
       <div className="px-4 py-7 border-b border-gray-200 flex-shrink-0">
@@ -491,21 +475,7 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Collapse Toggle Button - Positioned on the border */}
-      {!isCartModalOpen && (
-        <button
-          onClick={onToggleCollapse}
-          className="absolute top-6 w-6 h-6 bg-white border border-gray-200 hover:bg-gray-50 text-purple-600 rounded-full flex items-center justify-center transition-colors shadow-md z-20"
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          style={{ right: "-12px" }}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="w-3 h-3" />
-          ) : (
-            <ChevronLeft className="w-3 h-3" />
-          )}
-        </button>
-      )}
+      {/* Collapse button removed — sidebar always expanded */}
 
       {/* Scrollable Navigation Area */}
       <div

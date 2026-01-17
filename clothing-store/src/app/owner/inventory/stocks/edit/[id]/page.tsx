@@ -25,6 +25,7 @@ import {
 import { Shop, ShopListResponse } from "@/types/shop";
 import { SettingsService } from "@/services/settingsService";
 import { CategoryService } from "@/services/categoryService";
+import { detectColorName } from "@/lib/colorUtils";
 
 // Type declaration for BarcodeDetector API
 interface BarcodeDetector {
@@ -136,7 +137,7 @@ function EditStockContent() {
           id: tier.id || `tier-${stock.id}-${index}`, // Use original ID or create unique fallback
           minQuantity: tier.minQuantity,
           price: tier.price,
-        }))
+        })),
       );
 
       // Set color variants with proper IDs
@@ -148,12 +149,12 @@ function EditStockContent() {
           barcode: variant.barcode,
           sizeQuantities: variant.sizeQuantities || [],
           image: variant.image,
-        }))
+        })),
       );
     } catch (error) {
       console.error("Error fetching stock data:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to load stock data"
+        error instanceof Error ? error.message : "Failed to load stock data",
       );
     } finally {
       setIsLoadingStock(false);
@@ -166,7 +167,7 @@ function EditStockContent() {
       const settings = await SettingsService.getBusinessSettings();
       setDefaultCurrency(settings?.defaultCurrency || "THB");
       const currencyInfo = SettingsService.getCurrencyInfo(
-        (settings?.defaultCurrency as "THB" | "MMK") || "THB"
+        (settings?.defaultCurrency as "THB" | "MMK") || "THB",
       );
       setCurrencySymbol(currencyInfo.symbol);
     } catch (error) {
@@ -219,10 +220,12 @@ function EditStockContent() {
   const updateWholesaleTier = (
     id: string,
     field: keyof WholesaleTier,
-    value: number
+    value: number,
   ) => {
     setWholesaleTiers((tiers) =>
-      tiers.map((tier) => (tier.id === id ? { ...tier, [field]: value } : tier))
+      tiers.map((tier) =>
+        tier.id === id ? { ...tier, [field]: value } : tier,
+      ),
     );
   };
 
@@ -351,18 +354,23 @@ function EditStockContent() {
   const updateColorVariant = (
     id: string,
     field: keyof ColorVariant,
-    value: string | number
+    value: string | number,
   ) => {
     setColorVariants((variants) =>
-      variants.map((variant) =>
-        variant.id === id ? { ...variant, [field]: value } : variant
-      )
+      variants.map((variant) => {
+        if (variant.id !== id) return variant;
+        if (field === "colorCode" && typeof value === "string") {
+          const detected = detectColorName(value);
+          return { ...variant, colorCode: value, color: detected };
+        }
+        return { ...variant, [field]: value };
+      }),
     );
   };
 
   const removeColorVariant = (id: string) => {
     setColorVariants((variants) =>
-      variants.filter((variant) => variant.id !== id)
+      variants.filter((variant) => variant.id !== id),
     );
   };
 
@@ -385,7 +393,7 @@ function EditStockContent() {
         if (variant.id === variantId) {
           // Check if size already exists
           const existingSize = variant.sizeQuantities.find(
-            (sq) => sq.size === size
+            (sq) => sq.size === size,
           );
           if (existingSize) {
             return variant; // Don't add duplicate size
@@ -401,14 +409,14 @@ function EditStockContent() {
           };
         }
         return variant;
-      })
+      }),
     );
   };
 
   const updateSizeQuantity = (
     variantId: string,
     size: string,
-    quantity: number
+    quantity: number,
   ) => {
     setColorVariants((variants) =>
       variants.map((variant) => {
@@ -416,12 +424,12 @@ function EditStockContent() {
           return {
             ...variant,
             sizeQuantities: variant.sizeQuantities.map((sq) =>
-              sq.size === size ? { ...sq, quantity } : sq
+              sq.size === size ? { ...sq, quantity } : sq,
             ),
           };
         }
         return variant;
-      })
+      }),
     );
   };
 
@@ -432,12 +440,12 @@ function EditStockContent() {
           return {
             ...variant,
             sizeQuantities: variant.sizeQuantities.filter(
-              (sq) => sq.size !== size
+              (sq) => sq.size !== size,
             ),
           };
         }
         return variant;
-      })
+      }),
     );
   };
 
@@ -514,19 +522,19 @@ function EditStockContent() {
 
         document.body.appendChild(modal);
         const videoElement = modal.querySelector(
-          "#scanner-video"
+          "#scanner-video",
         ) as HTMLVideoElement;
         videoElement.srcObject = stream;
 
         // Handle manual input
         const manualInput = modal.querySelector(
-          "#manual-barcode"
+          "#manual-barcode",
         ) as HTMLInputElement;
         const manualSubmit = modal.querySelector(
-          "#manual-submit"
+          "#manual-submit",
         ) as HTMLButtonElement;
         const cancelButton = modal.querySelector(
-          "#cancel-scan"
+          "#cancel-scan",
         ) as HTMLButtonElement;
 
         let cleanup = () => {
@@ -674,7 +682,7 @@ function EditStockContent() {
 
           if (!response.ok || !result.success) {
             throw new Error(
-              result.error || `Failed to create stock item for shop ${shopId}`
+              result.error || `Failed to create stock item for shop ${shopId}`,
             );
           }
 
@@ -694,7 +702,7 @@ function EditStockContent() {
     } catch (error) {
       console.error("Error updating stock:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to update stock item"
+        error instanceof Error ? error.message : "Failed to update stock item",
       );
     } finally {
       setIsLoading(false);
@@ -725,7 +733,7 @@ function EditStockContent() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar
         activeItem={activeItem}
         onItemClick={(item) => setActiveItem(item.id)}
@@ -734,7 +742,7 @@ function EditStockContent() {
         isCartModalOpen={isCartModalOpen}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col">
         {/* Top Navigation Bar */}
         <TopNavBar onCartModalStateChange={setIsCartModalOpen} />
 
@@ -757,8 +765,8 @@ function EditStockContent() {
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1">
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Success Message */}
             {successMessage && (
               <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
@@ -894,7 +902,7 @@ function EditStockContent() {
                                     ]);
                                   } else {
                                     setSelectedShops((prev) =>
-                                      prev.filter((id) => id !== shop.id)
+                                      prev.filter((id) => id !== shop.id),
                                     );
                                   }
                                 }}
@@ -972,7 +980,7 @@ function EditStockContent() {
                               updateWholesaleTier(
                                 tier.id,
                                 "minQuantity",
-                                parseInt(e.target.value) || 0
+                                parseInt(e.target.value) || 0,
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
@@ -990,7 +998,7 @@ function EditStockContent() {
                               updateWholesaleTier(
                                 tier.id,
                                 "price",
-                                parseFloat(e.target.value) || 0
+                                parseFloat(e.target.value) || 0,
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
@@ -1065,28 +1073,9 @@ function EditStockContent() {
                               {/* Color Detection Display */}
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Color (Detected)
+                                  Color
                                 </label>
                                 <div className="flex items-center space-x-3">
-                                  <div
-                                    className="w-8 h-8 rounded border border-gray-300"
-                                    style={{
-                                      backgroundColor: variant.colorCode,
-                                    }}
-                                  ></div>
-                                  <input
-                                    type="text"
-                                    value={variant.color}
-                                    onChange={(e) =>
-                                      updateColorVariant(
-                                        variant.id,
-                                        "color",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Color name"
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                  />
                                   <input
                                     aria-label="Select color code"
                                     type="color"
@@ -1095,49 +1084,49 @@ function EditStockContent() {
                                       updateColorVariant(
                                         variant.id,
                                         "colorCode",
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                     className="w-10 h-10 border border-gray-300 rounded-md"
                                   />
-                                </div>
-                              </div>
 
-                              {/* Barcode Number */}
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Barcode Number
-                                </label>
-                                <div className="flex space-x-2">
-                                  <input
-                                    type="text"
-                                    value={variant.barcode}
-                                    onChange={(e) =>
-                                      updateColorVariant(
-                                        variant.id,
-                                        "barcode",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Enter EAN-13 Barcode"
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => generateBarcode(variant.id)}
-                                    className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                                    title="Generate barcode automatically"
-                                  >
-                                    <BarChart3 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => scanBarcode(variant.id)}
-                                    className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                                    title="Scan existing barcode"
-                                  >
-                                    <ScanLine className="w-4 h-4" />
-                                  </button>
+                                  {/* Display Barcode */}
+                                  <div className="flex-1">
+                                    <label className="sr-only">Barcode</label>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={variant.barcode}
+                                        onChange={(e) =>
+                                          updateColorVariant(
+                                            variant.id,
+                                            "barcode",
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder="Enter EAN-13 Barcode"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          generateBarcode(variant.id)
+                                        }
+                                        className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                                        title="Generate barcode automatically"
+                                      >
+                                        <BarChart3 className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => scanBarcode(variant.id)}
+                                        className="p-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                                        title="Scan existing barcode"
+                                      >
+                                        <ScanLine className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
 
@@ -1146,11 +1135,11 @@ function EditStockContent() {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                   Available Sizes
                                 </label>
-                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div className="flex flex-wrap items-center gap-2 mb-3">
                                   {availableSizes.map((size) => {
                                     const isSelected =
                                       variant.sizeQuantities.some(
-                                        (sq) => sq.size === size
+                                        (sq) => sq.size === size,
                                       );
                                     return (
                                       <button
@@ -1160,13 +1149,13 @@ function EditStockContent() {
                                           if (isSelected) {
                                             removeSizeFromVariant(
                                               variant.id,
-                                              size
+                                              size,
                                             );
                                           } else {
                                             addSizeToVariant(variant.id, size);
                                           }
                                         }}
-                                        className={`flex items-center justify-center p-3 border-2 rounded-md cursor-pointer transition-colors min-h-[44px] ${
+                                        className={`flex items-center justify-center px-3 py-2 border border-gray-300 rounded-md cursor-pointer transition-colors min-h-[38px] ${
                                           isSelected
                                             ? "bg-blue-500 border-blue-500 text-white font-semibold"
                                             : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:border-gray-400"
@@ -1180,49 +1169,38 @@ function EditStockContent() {
                                   })}
                                 </div>
 
-                                {/* Quantity inputs for selected sizes */}
+                                {/* Quantity inputs for selected sizes - grid 4 per row */}
                                 {variant.sizeQuantities.length > 0 && (
-                                  <div className="space-y-2">
-                                    <h4 className="text-sm font-medium text-gray-700">
+                                  <div>
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">
                                       Quantities by Size
                                     </h4>
-                                    {variant.sizeQuantities.map((sizeQty) => (
-                                      <div
-                                        key={sizeQty.size}
-                                        className="flex items-center space-x-2"
-                                      >
-                                        <span className="text-sm font-medium text-gray-600 w-16">
-                                          {sizeQty.size}:
-                                        </span>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          value={sizeQty.quantity}
-                                          onChange={(e) =>
-                                            updateSizeQuantity(
-                                              variant.id,
-                                              sizeQty.size,
-                                              parseInt(e.target.value) || 0
-                                            )
-                                          }
-                                          className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                          placeholder="0"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            removeSizeFromVariant(
-                                              variant.id,
-                                              sizeQty.size
-                                            )
-                                          }
-                                          className="p-1 text-red-600 hover:bg-red-50 rounded-md"
-                                          aria-label={`Remove ${sizeQty.size} size`}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                      {variant.sizeQuantities.map((sizeQty) => (
+                                        <div
+                                          key={sizeQty.size}
+                                          className="flex items-center space-x-2 p-2 "
                                         >
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      </div>
-                                    ))}
+                                          <span className="text-sm font-medium text-gray-600 w-12">
+                                            {sizeQty.size}:
+                                          </span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            value={sizeQty.quantity}
+                                            onChange={(e) =>
+                                              updateSizeQuantity(
+                                                variant.id,
+                                                sizeQty.size,
+                                                parseInt(e.target.value) || 0,
+                                              )
+                                            }
+                                            className="w-16 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                                            placeholder="0"
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1318,7 +1296,7 @@ function EditStockContent() {
                         onClick={async () => {
                           if (
                             confirm(
-                              `Are you sure you want to delete "${cat}" category?`
+                              `Are you sure you want to delete "${cat}" category?`,
                             )
                           ) {
                             try {
@@ -1331,7 +1309,7 @@ function EditStockContent() {
                             } catch (error) {
                               console.error("Error deleting category:", error);
                               alert(
-                                "Failed to delete category. Please try again."
+                                "Failed to delete category. Please try again.",
                               );
                             }
                           }
@@ -1366,7 +1344,7 @@ function EditStockContent() {
                       try {
                         const updatedCategories =
                           await CategoryService.addCategory(
-                            newCategoryName.trim()
+                            newCategoryName.trim(),
                           );
                         setCategories(updatedCategories);
                         setCategory(newCategoryName.trim());
@@ -1391,7 +1369,7 @@ function EditStockContent() {
                     try {
                       const updatedCategories =
                         await CategoryService.addCategory(
-                          newCategoryName.trim()
+                          newCategoryName.trim(),
                         );
                       setCategories(updatedCategories);
                       setCategory(newCategoryName.trim());
