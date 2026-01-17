@@ -27,7 +27,7 @@ export function ImageUpload({
   const [error, setError] = useState<string>("");
 
   const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -75,7 +75,7 @@ export function ImageUpload({
       setError(
         error instanceof Error
           ? error.message
-          : "Failed to upload image. Please try again.",
+          : "Failed to upload image. Please try again."
       );
     } finally {
       setIsUploading(false);

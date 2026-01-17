@@ -7,6 +7,15 @@ const cssNamedColors: { name: string; hex: string }[] = Object.entries(
   colorNames as Record<string, string>,
 ).map(([hex, name]) => ({ name, hex: hex.toUpperCase() }));
 
+// Precompute Lab values for named colors to avoid recalculating on every call
+const namedColorLabs: { name: string; lab: { L: number; a: number; b: number } }[] = cssNamedColors.map((c) => ({
+  name: c.name,
+  lab: rgbToLab(hexToRgb(c.hex)),
+}));
+
+// Simple memoization cache for recent lookups
+const detectCache = new Map<string, string>();
+
 function hexToRgb(hex: string): RGB {
   const clean = hex.replace("#", "");
   const bigint = parseInt(clean, 16);
@@ -32,9 +41,9 @@ function xyzToLab({ X, Y, Z }: { X: number; Y: number; Z: number }) {
   const refY = 100.0;
   const refZ = 108.883;
 
-  let x = X / refX;
-  let y = Y / refY;
-  let z = Z / refZ;
+  const x = X / refX;
+  const y = Y / refY;
+  const z = Z / refZ;
 
   const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
 
@@ -60,15 +69,19 @@ function deltaE(
 
 export function detectColorName(hex: string): string {
   try {
-    const target = rgbToLab(hexToRgb(hex));
+    const key = hex.toUpperCase();
+    if (detectCache.has(key)) return detectCache.get(key)!;
+
+    const target = rgbToLab(hexToRgb(key));
     let best = { name: "", dist: Number.POSITIVE_INFINITY };
-    for (const c of cssNamedColors) {
-      const lab = rgbToLab(hexToRgb(c.hex));
-      const d = deltaE(target, lab);
+    for (const c of namedColorLabs) {
+      const d = deltaE(target, c.lab);
       if (d < best.dist) {
         best = { name: c.name, dist: d };
       }
     }
+
+    detectCache.set(key, best.name);
     return best.name;
   } catch (e) {
     return "";

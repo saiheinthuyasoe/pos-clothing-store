@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Sidebar } from "@/components/ui/Sidebar";
@@ -296,18 +296,54 @@ function NewStockContent() {
     field: keyof ColorVariant,
     value: string | number,
   ) => {
+    // For colorCode updates, batch commits via rAF to avoid rapid re-renders
+    if (field === "colorCode" && typeof value === "string") {
+      pendingColorRef.current[id] = value;
+      if (!rafScheduledRef.current[id]) {
+        rafScheduledRef.current[id] = true;
+        requestAnimationFrame(() => {
+          const pending = pendingColorRef.current[id];
+          if (pending !== undefined) {
+            setColorVariants((variants) =>
+              variants.map((variant) =>
+                variant.id === id ? { ...variant, colorCode: pending } : variant,
+              ),
+            );
+            delete pendingColorRef.current[id];
+          }
+          rafScheduledRef.current[id] = false;
+        });
+      }
+
+      const key = id;
+      const timers = detectionTimersRef.current;
+      if (timers[key]) clearTimeout(timers[key]);
+      timers[key] = window.setTimeout(() => {
+        try {
+          const detected = detectColorName(value);
+          setColorVariants((variants) =>
+            variants.map((variant) =>
+              variant.id === id ? { ...variant, color: detected } : variant,
+            ),
+          );
+        } catch (e) {
+          // ignore
+        }
+        delete timers[key];
+      }, 150);
+      return;
+    }
+
     setColorVariants((variants) =>
       variants.map((variant) => {
         if (variant.id !== id) return variant;
-        // If user changed colorCode, also set a detected color name
-        if (field === "colorCode" && typeof value === "string") {
-          const detected = detectColorName(value);
-          return { ...variant, colorCode: value, color: detected };
-        }
-        return { ...variant, [field]: value };
+        return { ...variant, [field]: value } as ColorVariant;
       }),
     );
   };
+
+  // Debounce timers per-variant for color detection
+  const detectionTimersRef = useRef<Record<string, number>>({});
 
   const removeColorVariant = (id: string) => {
     setColorVariants((variants) =>
