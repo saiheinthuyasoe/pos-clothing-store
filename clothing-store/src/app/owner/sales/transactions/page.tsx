@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { detectColorName } from "@/lib/colorUtils";
 
 export default function TransactionsPage() {
   const { user } = useAuth();
@@ -71,6 +72,20 @@ export default function TransactionsPage() {
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>(
     [],
   );
+
+  const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
+
+  const getDisplayColor = (item: any) => {
+    const hex = item.colorCode || "#000000";
+    if (item.selectedColor && !isProbablyId(item.selectedColor)) {
+      return item.selectedColor;
+    }
+    try {
+      return detectColorName(hex) || hex;
+    } catch (e) {
+      return hex;
+    }
+  };
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1577,8 +1592,8 @@ export default function TransactionsPage() {
                                 {item.groupName}
                               </h4>
                               <p className="text-sm text-gray-600">
-                                {item.selectedColor &&
-                                  `Color: ${item.selectedColor}`}{" "}
+                                {(item.selectedColor || item.colorCode) &&
+                                  `Color: ${getDisplayColor(item)}`}{" "}
                                 {item.selectedSize &&
                                   `Size: ${item.selectedSize}`}
                               </p>
@@ -2063,7 +2078,7 @@ export default function TransactionsPage() {
                                             }}
                                           />
                                           <span className="text-xs text-gray-700">
-                                            {item.selectedColor}
+                                            {getDisplayColor(item)}
                                           </span>
                                         </div>
                                       )}
