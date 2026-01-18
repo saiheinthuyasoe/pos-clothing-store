@@ -126,7 +126,7 @@ class TransactionService {
 
           // Format: TXN-0000000000001 (13 digits, zero-padded)
           return `TXN-${newCount.toString().padStart(13, "0")}`;
-        }
+        },
       );
 
       console.log("Generated transaction ID:", newTransactionId);
@@ -147,7 +147,7 @@ class TransactionService {
    * Record a completed transaction
    */
   async recordTransaction(
-    transactionData: Omit<Transaction, "id" | "createdAt">
+    transactionData: Omit<Transaction, "id" | "createdAt">,
   ): Promise<string> {
     try {
       console.log("TransactionService: Starting transaction recording...");
@@ -158,7 +158,7 @@ class TransactionService {
       if (!db) {
         console.error("TransactionService: Firestore instance is null");
         throw new Error(
-          "Firestore database is not initialized. Please check your Firebase configuration."
+          "Firestore database is not initialized. Please check your Firebase configuration.",
         );
       }
 
@@ -167,6 +167,25 @@ class TransactionService {
         ...transactionData,
         createdAt: Timestamp.now(),
       };
+
+      // Sanitize data: remove or convert undefined values recursively so Firestore doesn't reject the document
+      const sanitize = (val: unknown): unknown => {
+        if (val === undefined) return null;
+        if (val === null) return null;
+        if (Array.isArray(val)) return val.map((v) => sanitize(v));
+        if (typeof val === "object" && val !== null) {
+          const out: Record<string, unknown> = {};
+          Object.entries(val as Record<string, unknown>).forEach(([k, v]) => {
+            if (v !== undefined) {
+              out[k] = sanitize(v);
+            }
+          });
+          return out;
+        }
+        return val;
+      };
+
+      const sanitizedData = sanitize(dataToRecord);
 
       console.log("TransactionService: Transaction data prepared:", {
         transactionId: dataToRecord.transactionId,
@@ -177,16 +196,16 @@ class TransactionService {
 
       console.log(
         "TransactionService: Adding document to collection:",
-        this.collectionName
+        this.collectionName,
       );
       const docRef = await addDoc(
         collection(db, this.collectionName),
-        dataToRecord
+        sanitizedData,
       );
 
       console.log(
         "TransactionService: Transaction recorded successfully with ID:",
-        docRef.id
+        docRef.id,
       );
       return docRef.id;
     } catch (error) {
@@ -214,12 +233,12 @@ class TransactionService {
     shopId?: string,
     startDate?: Date,
     endDate?: Date,
-    limit?: number
+    limit?: number,
   ): Promise<Transaction[]> {
     try {
       let q = query(
         collection(db!, this.collectionName),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
       );
 
       if (shopId) {
@@ -257,13 +276,13 @@ class TransactionService {
   async getTransactionSummary(
     shopId?: string,
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): Promise<TransactionSummary> {
     try {
       const transactions = await this.getTransactions(
         shopId,
         startDate,
-        endDate
+        endDate,
       );
 
       const summary: TransactionSummary = {
@@ -290,7 +309,7 @@ class TransactionService {
           const refundedAmount =
             transaction.refunds?.reduce(
               (sum, refund) => sum + refund.totalAmount,
-              0
+              0,
             ) || 0;
           // Ensure net revenue is never negative (safeguard against data inconsistencies)
           const netRevenue = Math.max(0, transaction.total - refundedAmount);
@@ -336,13 +355,13 @@ class TransactionService {
    */
   async getCustomerTransactions(
     customerEmail: string,
-    shopId?: string
+    shopId?: string,
   ): Promise<Transaction[]> {
     try {
       let q = query(
         collection(db!, this.collectionName),
         where("customer.email", "==", customerEmail),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
       );
 
       if (shopId) {
@@ -371,7 +390,7 @@ class TransactionService {
    */
   async updateTransactionStatus(
     transactionId: string,
-    status: Transaction["status"]
+    status: Transaction["status"],
   ): Promise<void> {
     try {
       const transactionRef = doc(db!, this.collectionName, transactionId);
@@ -389,26 +408,26 @@ class TransactionService {
   async getRevenue(
     startDate: Date,
     endDate: Date,
-    shopId?: string
+    shopId?: string,
   ): Promise<number> {
     try {
       const transactions = await this.getTransactions(
         shopId,
         startDate,
-        endDate
+        endDate,
       );
       return transactions
         .filter(
           (t) =>
             t.status === "completed" ||
             t.status === "partially_refunded" ||
-            t.status === "refunded"
+            t.status === "refunded",
         )
         .reduce((total, transaction) => {
           const refundedAmount =
             transaction.refunds?.reduce(
               (sum, refund) => sum + refund.totalAmount,
-              0
+              0,
             ) || 0;
           // Ensure net revenue is never negative (safeguard against data inconsistencies)
           return total + Math.max(0, transaction.total - refundedAmount);
@@ -427,7 +446,7 @@ class TransactionService {
     refundItems: { [key: string]: number },
     transaction: Transaction,
     reason?: string,
-    processedBy?: string
+    processedBy?: string,
   ): Promise<string> {
     try {
       // Generate unique refund ID
@@ -480,7 +499,7 @@ class TransactionService {
 
             if (quantity > availableToRefund) {
               throw new Error(
-                `Cannot refund ${quantity} of item "${item.groupName}". Only ${availableToRefund} available to refund (${alreadyRefundedQty} already refunded).`
+                `Cannot refund ${quantity} of item "${item.groupName}". Only ${availableToRefund} available to refund (${alreadyRefundedQty} already refunded).`,
               );
             }
 
@@ -542,17 +561,17 @@ class TransactionService {
       const currentTotalRefunded =
         transaction.refunds?.reduce(
           (sum, refund) => sum + refund.totalAmount,
-          0
+          0,
         ) || 0;
       const newTotalRefunded = currentTotalRefunded + totalRefundAmount;
 
       if (newTotalRefunded > maxRefundableAmount) {
         throw new Error(
           `Cannot process refund. Total refund amount (${newTotalRefunded.toFixed(
-            2
+            2,
           )}) would exceed refundable amount (${maxRefundableAmount.toFixed(
-            2
-          )}, excluding tax)`
+            2,
+          )}, excluding tax)`,
         );
       }
 
@@ -588,7 +607,7 @@ class TransactionService {
 
         console.log(
           "Processing refund inventory restoration:",
-          inventoryRestorations
+          inventoryRestorations,
         );
         await StockService.restoreMultipleItems(inventoryRestorations);
         console.log("Inventory restored for refunded items");
@@ -608,7 +627,7 @@ class TransactionService {
       // Calculate total refunded amount
       const totalRefunded = updatedRefunds.reduce(
         (sum, r) => sum + r.totalAmount,
-        0
+        0,
       );
 
       // Determine new transaction status
@@ -646,7 +665,7 @@ class TransactionService {
       const q = query(
         collection(db!, "refunds"),
         where("transactionId", "==", transactionId),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
       );
 
       const querySnapshot = await getDocs(q);
@@ -672,7 +691,7 @@ class TransactionService {
   async getRefunds(
     shopId?: string,
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): Promise<Refund[]> {
     try {
       let q = query(collection(db!, "refunds"), orderBy("createdAt", "desc"));
@@ -709,7 +728,7 @@ class TransactionService {
     transactionId: string,
     transaction: Transaction,
     reason?: string,
-    cancelledBy?: string
+    cancelledBy?: string,
   ): Promise<void> {
     if (!db) {
       throw new Error("Database not initialized");
@@ -717,7 +736,7 @@ class TransactionService {
 
     try {
       console.log(
-        `Starting cancellation for transaction ${transactionId} with ${transaction.items.length} items`
+        `Starting cancellation for transaction ${transactionId} with ${transaction.items.length} items`,
       );
       console.log(
         "Transaction items:",
@@ -728,7 +747,7 @@ class TransactionService {
           selectedColor: item.selectedColor,
           selectedSize: item.selectedSize,
           quantity: item.quantity,
-        }))
+        })),
       );
 
       // Calculate already refunded quantities for each item
@@ -764,7 +783,7 @@ class TransactionService {
             originalQuantity: item.quantity,
             alreadyRefunded: alreadyRefundedQty,
             remainingToRestore: remainingQuantity,
-          }
+          },
         );
 
         if (remainingQuantity > 0) {
@@ -781,17 +800,17 @@ class TransactionService {
 
       console.log(
         `Processing cancellation inventory restoration for ${inventoryRestorations.length} remaining items:`,
-        inventoryRestorations
+        inventoryRestorations,
       );
 
       if (inventoryRestorations.length > 0) {
         await StockService.restoreMultipleItems(inventoryRestorations);
         console.log(
-          `Inventory restored for ${inventoryRestorations.length} remaining items in cancelled transaction`
+          `Inventory restored for ${inventoryRestorations.length} remaining items in cancelled transaction`,
         );
       } else {
         console.log(
-          "No inventory to restore - all items were already refunded"
+          "No inventory to restore - all items were already refunded",
         );
       }
 
@@ -816,7 +835,7 @@ class TransactionService {
    */
   async approveTransaction(
     transactionId: string,
-    approvedBy?: string
+    approvedBy?: string,
   ): Promise<void> {
     if (!db) {
       throw new Error("Database not initialized");
@@ -844,7 +863,7 @@ class TransactionService {
     transactionId: string,
     transaction: Transaction,
     reason?: string,
-    rejectedBy?: string
+    rejectedBy?: string,
   ): Promise<void> {
     if (!db) {
       throw new Error("Database not initialized");
@@ -852,7 +871,7 @@ class TransactionService {
 
     try {
       console.log(
-        `Starting rejection for transaction ${transactionId} with ${transaction.items.length} items`
+        `Starting rejection for transaction ${transactionId} with ${transaction.items.length} items`,
       );
 
       // Restore inventory for all items
@@ -871,7 +890,7 @@ class TransactionService {
             colorName: item.selectedColor,
             size: item.selectedSize,
             quantity: item.quantity,
-          }
+          },
         );
 
         inventoryRestorations.push({
@@ -884,13 +903,13 @@ class TransactionService {
 
       console.log(
         `Processing rejection inventory restoration for ${inventoryRestorations.length} items:`,
-        inventoryRestorations
+        inventoryRestorations,
       );
 
       if (inventoryRestorations.length > 0) {
         await StockService.restoreMultipleItems(inventoryRestorations);
         console.log(
-          `Inventory restored for ${inventoryRestorations.length} items in rejected transaction`
+          `Inventory restored for ${inventoryRestorations.length} items in rejected transaction`,
         );
       }
 

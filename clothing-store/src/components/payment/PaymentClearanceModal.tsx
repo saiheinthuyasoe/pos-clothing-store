@@ -17,6 +17,7 @@ import { SelectedCustomer } from "@/types/cart";
 import { CartItem } from "@/types/cart";
 import { transactionService } from "@/services/transactionService";
 import { SettingsService } from "@/services/settingsService";
+import { detectColorName } from "@/lib/colorUtils";
 
 interface PaymentClearanceModalProps {
   isOpen: boolean;
@@ -80,7 +81,7 @@ export function PaymentClearanceModal({
           defaultCurrency,
           selectedCurrency,
           currencyRate,
-          defaultCurrency
+          defaultCurrency,
         );
   const change = amountPaid - totalInSellingCurrency;
 
@@ -120,6 +121,19 @@ export function PaymentClearanceModal({
         calculatorDisplay === "0" ? value : calculatorDisplay + value;
       setCalculatorDisplay(newDisplay);
       setAmountPaid(parseFloat(newDisplay) || 0);
+    }
+  };
+
+  const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
+  const getDisplayColor = (item: CartItem) => {
+    const hex = (item.colorCode as string) || "#000000";
+    if (item.selectedColor && !isProbablyId(item.selectedColor)) {
+      return item.selectedColor;
+    }
+    try {
+      return detectColorName(hex) || hex;
+    } catch (e) {
+      return hex;
     }
   };
 
@@ -181,7 +195,7 @@ export function PaymentClearanceModal({
           defaultCurrency,
           selectedCurrency,
           currencyRate,
-          defaultCurrency
+          defaultCurrency,
         );
 
         // Calculate the effective exchange rate for display
@@ -218,7 +232,7 @@ export function PaymentClearanceModal({
 
       console.log(
         "Transaction recorded successfully with ID:",
-        recordedTransactionId
+        recordedTransactionId,
       );
 
       onPaymentComplete({
@@ -247,7 +261,7 @@ export function PaymentClearanceModal({
       alert(
         `Error processing payment: ${
           error instanceof Error ? error.message : "Unknown error"
-        }. Please try again.`
+        }. Please try again.`,
       );
     }
   };
@@ -343,7 +357,7 @@ export function PaymentClearanceModal({
                       <p className="text-gray-800 truncate">{item.groupName}</p>
                       {(item.selectedColor || item.selectedSize) && (
                         <p className="text-gray-500 text-xs">
-                          {item.selectedColor && `${item.selectedColor}`}
+                          {item.selectedColor && `${getDisplayColor(item)}`}
                           {item.selectedColor && item.selectedSize && " • "}
                           {item.selectedSize && `Size ${item.selectedSize}`}
                         </p>
@@ -611,8 +625,10 @@ export function PaymentClearanceModal({
                           {item.groupName}
                         </p>
                         <p className="text-xs text-gray-600">
-                          {item.selectedColor} • {item.selectedSize} • Qty:{" "}
-                          {item.quantity}
+                          {getDisplayColor(item)}{" "}
+                          {item.selectedColor || item.selectedSize ? "•" : ""}{" "}
+                          {item.selectedSize} {item.selectedSize ? "•" : ""}{" "}
+                          Qty: {item.quantity}
                         </p>
                       </div>
                       <div className="text-right">
@@ -622,7 +638,7 @@ export function PaymentClearanceModal({
                         <p className="text-xs text-gray-500">
                           {formatPrice(
                             item.unitPrice * item.quantity,
-                            defaultCurrency
+                            defaultCurrency,
                           )}
                         </p>
                       </div>
@@ -663,9 +679,9 @@ export function PaymentClearanceModal({
                           selectedCurrency,
                           defaultCurrency,
                           currencyRate,
-                          defaultCurrency
+                          defaultCurrency,
                         ),
-                        defaultCurrency
+                        defaultCurrency,
                       )}
                     </p>
                   </div>
@@ -691,9 +707,9 @@ export function PaymentClearanceModal({
                           selectedCurrency,
                           defaultCurrency,
                           currencyRate,
-                          defaultCurrency
+                          defaultCurrency,
                         ),
-                        defaultCurrency
+                        defaultCurrency,
                       )}
                     </p>
                   </div>

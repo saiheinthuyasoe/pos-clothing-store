@@ -196,7 +196,7 @@ function OwnerDashboardContent() {
   const calculateDailyRevenue = (
     transactions: Transaction[],
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): DailyRevenue[] => {
     const dailyData = new Map<
       string,
@@ -227,14 +227,14 @@ function OwnerDashboardContent() {
           const totalRefunded =
             transaction.refunds?.reduce(
               (sum, refund) => sum + refund.totalAmount,
-              0
+              0,
             ) || 0;
           const netAmount = Math.max(0, transaction.total - totalRefunded);
 
           const transactionProfit = transaction.items.reduce(
             (sum, item) =>
               sum + (item.unitPrice - item.originalPrice) * item.quantity,
-            0
+            0,
           );
 
           const refundedProfit =
@@ -283,7 +283,7 @@ function OwnerDashboardContent() {
   // Calculate payment method chart data
   const calculatePaymentMethodChart = (
     methods: RevenueByMethod,
-    totalRevenue: number
+    totalRevenue: number,
   ): PaymentMethodChart[] => {
     return [
       {
@@ -312,7 +312,7 @@ function OwnerDashboardContent() {
 
   // Calculate order status chart data
   const calculateOrderStatusChart = (
-    stats: DashboardStats
+    stats: DashboardStats,
   ): OrderStatusChart[] => {
     const total = stats.totalOrders;
     return [
@@ -362,7 +362,7 @@ function OwnerDashboardContent() {
               calcStartDate = new Date(
                 now.getFullYear(),
                 now.getMonth(),
-                now.getDate()
+                now.getDate(),
               );
               break;
             case "7d":
@@ -370,17 +370,17 @@ function OwnerDashboardContent() {
               break;
             case "30d":
               calcStartDate = new Date(
-                now.getTime() - 30 * 24 * 60 * 60 * 1000
+                now.getTime() - 30 * 24 * 60 * 60 * 1000,
               );
               break;
             case "90d":
               calcStartDate = new Date(
-                now.getTime() - 90 * 24 * 60 * 60 * 1000
+                now.getTime() - 90 * 24 * 60 * 60 * 1000,
               );
               break;
             default:
               calcStartDate = new Date(
-                now.getTime() - 30 * 24 * 60 * 60 * 1000
+                now.getTime() - 30 * 24 * 60 * 60 * 1000,
               );
           }
         }
@@ -402,22 +402,22 @@ function OwnerDashboardContent() {
       let filteredTransactions = transactions.filter(
         (t) =>
           new Date(t.timestamp) >= rangeStartDate &&
-          new Date(t.timestamp) <= rangeEndDate
+          new Date(t.timestamp) <= rangeEndDate,
       );
 
       if (filterBranch && filterBranch !== "all") {
         filteredTransactions = filteredTransactions.filter(
-          (t) => t.branchName === filterBranch
+          (t) => t.branchName === filterBranch,
         );
       }
 
       // Calculate previous period for growth comparison
       const periodDays = Math.ceil(
         (rangeEndDate.getTime() - rangeStartDate.getTime()) /
-          (1000 * 60 * 60 * 24)
+          (1000 * 60 * 60 * 24),
       );
       const previousStartDate = new Date(
-        rangeStartDate.getTime() - periodDays * 24 * 60 * 60 * 1000
+        rangeStartDate.getTime() - periodDays * 24 * 60 * 60 * 1000,
       );
 
       const previousTransactions = transactions.filter((t) => {
@@ -431,25 +431,25 @@ function OwnerDashboardContent() {
         previousTransactions,
         stocks,
         customers,
-        rangeStartDate
+        rangeStartDate,
       );
 
       const paymentMethods = calculateRevenueByMethod(filteredTransactions);
       const products = calculateTopProducts(filteredTransactions);
       const activities = generateRecentActivity(
         filteredTransactions,
-        customers
+        customers,
       );
 
       // Calculate chart data
       const dailyRevenue = calculateDailyRevenue(
         filteredTransactions,
         rangeStartDate,
-        rangeEndDate
+        rangeEndDate,
       );
       const paymentChart = calculatePaymentMethodChart(
         paymentMethods,
-        dashboardStats.totalRevenue
+        dashboardStats.totalRevenue,
       );
       const statusChart = calculateOrderStatusChart(dashboardStats);
 
@@ -483,7 +483,7 @@ function OwnerDashboardContent() {
     previousTransactions: Transaction[],
     stocks: StockItem[],
     customers: Customer[],
-    startDate: Date
+    startDate: Date,
   ): DashboardStats => {
     let totalRevenue = 0;
     let totalProfit = 0;
@@ -497,16 +497,15 @@ function OwnerDashboardContent() {
       const totalRefunded =
         transaction.refunds?.reduce(
           (sum, refund) => sum + refund.totalAmount,
-          0
+          0,
         ) || 0;
       const netAmount = Math.max(0, transaction.total - totalRefunded);
 
       // Only count completed, partially_refunded, and refunded for revenue
       if (
-        (transaction.status === "completed" ||
-          transaction.status === "partially_refunded" ||
-          transaction.status === "refunded") &&
-        transaction.paymentMethod !== "cod"
+        transaction.status === "completed" ||
+        transaction.status === "partially_refunded" ||
+        transaction.status === "refunded"
       ) {
         totalRevenue += netAmount;
 
@@ -517,7 +516,7 @@ function OwnerDashboardContent() {
               itemTotal + (item.unitPrice - item.originalPrice) * item.quantity
             );
           },
-          0
+          0,
         );
 
         const refundedProfit =
@@ -568,15 +567,14 @@ function OwnerDashboardContent() {
     let previousRevenue = 0;
     previousTransactions.forEach((transaction) => {
       if (
-        (transaction.status === "completed" ||
-          transaction.status === "partially_refunded" ||
-          transaction.status === "refunded") &&
-        transaction.paymentMethod !== "cod"
+        transaction.status === "completed" ||
+        transaction.status === "partially_refunded" ||
+        transaction.status === "refunded"
       ) {
         const totalRefunded =
           transaction.refunds?.reduce(
             (sum, refund) => sum + refund.totalAmount,
-            0
+            0,
           ) || 0;
         previousRevenue += Math.max(0, transaction.total - totalRefunded);
       }
@@ -586,8 +584,8 @@ function OwnerDashboardContent() {
       previousRevenue > 0
         ? ((totalRevenue - previousRevenue) / previousRevenue) * 100
         : totalRevenue > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     const ordersGrowth =
       previousTransactions.length > 0
@@ -595,21 +593,21 @@ function OwnerDashboardContent() {
             previousTransactions.length) *
           100
         : transactions.length > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     // Customer stats
     const newCustomers = customers.filter(
-      (c) => new Date(c.createdAt) >= startDate
+      (c) => new Date(c.createdAt) >= startDate,
     ).length;
 
     const previousNewCustomers = customers.filter((c) => {
       const createdDate = new Date(c.createdAt);
       const periodDays = Math.ceil(
-        (new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+        (new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
       );
       const previousStartDate = new Date(
-        startDate.getTime() - periodDays * 24 * 60 * 60 * 1000
+        startDate.getTime() - periodDays * 24 * 60 * 60 * 1000,
       );
       return createdDate >= previousStartDate && createdDate < startDate;
     }).length;
@@ -618,8 +616,8 @@ function OwnerDashboardContent() {
       previousNewCustomers > 0
         ? ((newCustomers - previousNewCustomers) / previousNewCustomers) * 100
         : newCustomers > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     // Stock stats
     const lowStockProducts = stocks.filter((stock) => {
@@ -628,9 +626,9 @@ function OwnerDashboardContent() {
           sum +
           variant.sizeQuantities.reduce(
             (sizeSum, sq) => sizeSum + sq.quantity,
-            0
+            0,
           ),
-        0
+        0,
       );
       return totalQuantity <= 10;
     }).length;
@@ -660,7 +658,7 @@ function OwnerDashboardContent() {
 
   // Calculate revenue by payment method
   const calculateRevenueByMethod = (
-    transactions: Transaction[]
+    transactions: Transaction[],
   ): RevenueByMethod => {
     const methods: RevenueByMethod = { cash: 0, scan: 0, wallet: 0, cod: 0 };
 
@@ -673,7 +671,7 @@ function OwnerDashboardContent() {
         const totalRefunded =
           transaction.refunds?.reduce(
             (sum, refund) => sum + refund.totalAmount,
-            0
+            0,
           ) || 0;
         const netAmount = Math.max(0, transaction.total - totalRefunded);
 
@@ -750,7 +748,7 @@ function OwnerDashboardContent() {
         quantitySold: data.quantity,
         revenue: data.revenue,
         profit: data.profit,
-      })
+      }),
     );
 
     return products.sort((a, b) => b.revenue - a.revenue).slice(0, 10);
@@ -759,7 +757,7 @@ function OwnerDashboardContent() {
   // Generate recent activity
   const generateRecentActivity = (
     transactions: Transaction[],
-    customers: Customer[]
+    customers: Customer[],
   ): RecentActivity[] => {
     const activities: RecentActivity[] = [];
 
@@ -767,7 +765,7 @@ function OwnerDashboardContent() {
     transactions
       .sort(
         (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
       )
       .slice(0, 5)
       .forEach((transaction) => {
@@ -793,7 +791,7 @@ function OwnerDashboardContent() {
     customers
       .sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       )
       .slice(0, 3)
       .forEach((customer) => {
@@ -976,7 +974,6 @@ function OwnerDashboardContent() {
                     aria-label="End Date"
                   />
                 </div>
-
               </div>
             </div>
 
@@ -1686,7 +1683,7 @@ function OwnerDashboardContent() {
                               <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
                                 {getActivityIcon(
                                   activity.type,
-                                  activity.status
+                                  activity.status,
                                 )}
                               </div>
                             </div>

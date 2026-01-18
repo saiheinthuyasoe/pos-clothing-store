@@ -373,8 +373,40 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   );
 
   // Filtered variants based on search
+  // Helper to produce a user-friendly color label for variants
+  type CartItemForLabel = {
+    id: string;
+    groupName: string;
+    selectedColor?: string;
+    colorCode?: string;
+    selectedSize?: string;
+    discountedPrice?: number;
+    unitPrice: number;
+    quantity: number;
+    groupDiscount?: number;
+    variantDiscount?: number;
+    isWholesalePricing?: boolean;
+    wholesaleTiers?: { minQuantity: number; price: number }[];
+    image?: string;
+    shop?: string;
+  };
+
+  const getVariantColorLabel = (item: CartItemForLabel) => {
+    const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
+    const hex = item.colorCode || "#000000";
+    if (item.selectedColor && !isProbablyId(item.selectedColor)) {
+      return item.selectedColor;
+    }
+    try {
+      return detectColorName(hex) || hex;
+    } catch (e) {
+      return hex;
+    }
+  };
+
   const filteredVariants = cart.items.filter((item) => {
-    const variantLabel = `${item.groupName} - ${item.selectedColor} / ${item.selectedSize}`;
+    const colorLabel = getVariantColorLabel(item);
+    const variantLabel = `${item.groupName} - ${colorLabel} / ${item.selectedSize}`;
     return variantLabel.toLowerCase().includes(variantSearchTerm.toLowerCase());
   });
 
@@ -1375,22 +1407,25 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                         />
                         {showVariantDropdown && filteredVariants.length > 0 && (
                           <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            {filteredVariants.map((item) => (
-                              <button
-                                key={item.id}
-                                onClick={() => {
-                                  setSelectedVariantForDiscount(item.id);
-                                  setVariantSearchTerm(
-                                    `${item.groupName} - ${item.selectedColor} / ${item.selectedSize}`,
-                                  );
-                                  setShowVariantDropdown(false);
-                                }}
-                                className="w-full text-left px-3 py-2 text-sm text-gray-900 font-medium hover:bg-blue-50 focus:bg-blue-50 border-b border-gray-100 last:border-b-0"
-                              >
-                                {item.groupName} - {item.selectedColor} /{" "}
-                                {item.selectedSize}
-                              </button>
-                            ))}
+                            {filteredVariants.map((item) => {
+                              const colorLabel = getVariantColorLabel(item);
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    setSelectedVariantForDiscount(item.id);
+                                    setVariantSearchTerm(
+                                      `${item.groupName} - ${colorLabel} / ${item.selectedSize}`,
+                                    );
+                                    setShowVariantDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-gray-900 font-medium hover:bg-blue-50 focus:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                                >
+                                  {item.groupName} - {colorLabel} /{" "}
+                                  {item.selectedSize}
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

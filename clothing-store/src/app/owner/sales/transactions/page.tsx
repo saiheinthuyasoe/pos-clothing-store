@@ -75,7 +75,7 @@ export default function TransactionsPage() {
 
   const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
 
-  const getDisplayColor = (item: any) => {
+  const getDisplayColor = (item: Transaction['items'][number]): string => {
     const hex = item.colorCode || "#000000";
     if (item.selectedColor && !isProbablyId(item.selectedColor)) {
       return item.selectedColor;

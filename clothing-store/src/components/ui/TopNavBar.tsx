@@ -131,7 +131,7 @@ export function TopNavBar({
             </div>
 
             {/* Current Branch/Shop Display */}
-            <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 ">
+            <div className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg">
               <Store className="w-4 h-4 text-gray-600" />
               <span className="text-sm font-medium text-gray-700">
                 {businessSettings?.currentBranch === "No Branch"
@@ -141,7 +141,7 @@ export function TopNavBar({
             </div>
 
             {/* Main Currency Title */}
-            <div className="flex items-center space-x-1 px-3 py-2 bg-white  border-gray-300 ">
+            <div className="flex items-center space-x-1 px-3 py-2 bg-white  border-gray-300 rounded-lg">
               <span className="text-sm font-semibold text-gray-800">
                 Main Currency:
               </span>
@@ -153,7 +153,7 @@ export function TopNavBar({
             {/* Currency Selector */}
             <div className="relative" ref={currencyDropdownRef}>
               <div
-                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300  hover:bg-gray-50 cursor-pointer"
+                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
                 onClick={() =>
                   setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)
                 }
@@ -206,7 +206,7 @@ export function TopNavBar({
             {/* Language Selector */}
             <div className="relative" ref={languageDropdownRef}>
               <div
-                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300  hover:bg-gray-50 cursor-pointer"
+                className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
                 onClick={() =>
                   setIsLanguageDropdownOpen(!isLanguageDropdownOpen)
                 }
