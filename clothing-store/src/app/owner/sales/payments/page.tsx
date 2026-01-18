@@ -539,20 +539,13 @@ function PaymentsPageContent() {
                     <p className="text-sm font-medium text-gray-500">
                       Total Sales
                     </p>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-green-600">
                       {formatPrice(paymentStats.totalAmount)}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <DollarSign className="h-6 w-6 text-green-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4 flex items-center">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">
-                    +12.5% from last period
-                  </span>
-                </div>
+                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -565,23 +558,9 @@ function PaymentsPageContent() {
                       {formatPrice(paymentStats.totalProfit)}
                     </p>
                   </div>
-                  <div className="p-3 bg-orange-100 rounded-full">
-                    <TrendingUp className="h-6 w-6 text-orange-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4">
-                  <span className="text-sm text-gray-600">
-                    Margin:{" "}
-                    {paymentStats.totalAmount > 0
-                      ? (
-                          (paymentStats.totalProfit /
-                            paymentStats.totalAmount) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    %
-                  </span>
-                </div>
+                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -594,22 +573,9 @@ function PaymentsPageContent() {
                       {paymentStats.successfulPayments}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4">
-                  <span className="text-sm text-gray-600">
-                    {paymentStats.totalCount > 0
-                      ? (
-                          (paymentStats.successfulPayments /
-                            paymentStats.totalCount) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    % success rate
-                  </span>
-                </div>
+                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -622,22 +588,9 @@ function PaymentsPageContent() {
                       {paymentStats.refundPayments}
                     </p>
                   </div>
-                  <div className="p-3 bg-purple-100 rounded-full">
-                    <XCircle className="h-6 w-6 text-purple-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4">
-                  <span className="text-sm text-gray-600">
-                    {paymentStats.totalCount > 0
-                      ? (
-                          (paymentStats.refundPayments /
-                            paymentStats.totalCount) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    % of total
-                  </span>
-                </div>
+                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -650,22 +603,9 @@ function PaymentsPageContent() {
                       {paymentStats.partialRefundPayments}
                     </p>
                   </div>
-                  <div className="p-3 bg-yellow-100 rounded-full">
-                    <AlertCircle className="h-6 w-6 text-yellow-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4">
-                  <span className="text-sm text-gray-600">
-                    {paymentStats.totalCount > 0
-                      ? (
-                          (paymentStats.partialRefundPayments /
-                            paymentStats.totalCount) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    % of total
-                  </span>
-                </div>
+                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -678,22 +618,9 @@ function PaymentsPageContent() {
                       {paymentStats.cancelledPayments}
                     </p>
                   </div>
-                  <div className="p-3 bg-red-100 rounded-full">
-                    <XCircle className="h-6 w-6 text-red-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4">
-                  <span className="text-sm text-gray-600">
-                    {paymentStats.totalCount > 0
-                      ? (
-                          (paymentStats.cancelledPayments /
-                            paymentStats.totalCount) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    % of total
-                  </span>
-                </div>
+                
               </div>
             </div>
 
@@ -747,14 +674,14 @@ function PaymentsPageContent() {
               </div>
             </div>
 
-            {/* Transactions List */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            {/* Transactions List
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200  mb-1">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">
                   Recent Transactions
                 </h2>
               </div>
-            </div>
+            </div> */}
 
             {/* Payment Methods Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -768,13 +695,13 @@ function PaymentsPageContent() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Count:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-gray-600">
                       {paymentStats.cashPayments.count}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Amount:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-gray-600">
                       {formatPrice(paymentStats.cashPayments.amount)}
                     </span>
                   </div>
@@ -791,13 +718,13 @@ function PaymentsPageContent() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Count:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-gray-600">
                       {paymentStats.scanPayments.count}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Amount:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-gray-600">
                       {formatPrice(paymentStats.scanPayments.amount)}
                     </span>
                   </div>
@@ -814,13 +741,13 @@ function PaymentsPageContent() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Count:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-gray-600  ">
                       {paymentStats.walletPayments.count}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Amount:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-gray-600">
                       {formatPrice(paymentStats.walletPayments.amount)}
                     </span>
                   </div>

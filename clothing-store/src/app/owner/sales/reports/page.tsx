@@ -667,19 +667,10 @@ function ReportsPageContent() {
                     <p className="text-sm font-medium text-gray-500">
                       Total Sales
                     </p>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-green-600">
                       {formatPrice(reportData?.totalRevenue || 0)}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <DollarSign className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">
-                    +12.5% from last period
-                  </span>
                 </div>
               </div>
 
@@ -693,22 +684,9 @@ function ReportsPageContent() {
                       {formatPrice(reportData?.totalProfit || 0)}
                     </p>
                   </div>
-                  <div className="p-3 bg-orange-100 rounded-full">
-                    <TrendingUp className="h-6 w-6 text-orange-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4">
-                  <span className="text-sm text-gray-600">
-                    Margin:{" "}
-                    {reportData && reportData.totalRevenue > 0
-                      ? (
-                          (reportData.totalProfit / reportData.totalRevenue) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    %
-                  </span>
-                </div>
+                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -721,16 +699,9 @@ function ReportsPageContent() {
                       {reportData?.totalTransactions || 0}
                     </p>
                   </div>
-                  <div className="p-3 bg-blue-100 rounded-full">
-                    <ShoppingBag className="h-6 w-6 text-blue-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4 flex items-center">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">
-                    +8.2% from last period
-                  </span>
-                </div>
+                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -743,38 +714,24 @@ function ReportsPageContent() {
                       {reportData?.totalCustomers || 0}
                     </p>
                   </div>
-                  <div className="p-3 bg-purple-100 rounded-full">
-                    <Users className="h-6 w-6 text-purple-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4 flex items-center">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">
-                    +15.3% from last period
-                  </span>
-                </div>
+               
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Total Sale
+                      Total Sale (Ks)
                     </p>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-purple-600">
                       {formatInMMK(reportData?.totalRevenueMMK || 0)}
                     </p>
                   </div>
-                  <div className="p-3 bg-orange-100 rounded-full">
-                    <BarChart3 className="h-6 w-6 text-orange-600" />
-                  </div>
+                  
                 </div>
-                <div className="mt-4 flex items-center">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">
-                    +5.7% from last period
-                  </span>
-                </div>
+                
               </div>
             </div>
 

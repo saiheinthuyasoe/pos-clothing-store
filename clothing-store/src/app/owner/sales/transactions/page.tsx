@@ -75,7 +75,7 @@ export default function TransactionsPage() {
 
   const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
 
-  const getDisplayColor = (item: Transaction['items'][number]): string => {
+  const getDisplayColor = (item: Transaction["items"][number]): string => {
     const hex = item.colorCode || "#000000";
     if (item.selectedColor && !isProbablyId(item.selectedColor)) {
       return item.selectedColor;
@@ -908,7 +908,7 @@ export default function TransactionsPage() {
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h3 className="text-sm font-medium text-gray-500">
-                  Total Sale
+                  Total Sales (Ks)
                 </h3>
                 <p className="text-2xl font-bold text-purple-600">
                   {formatInMMK(calculateNetRevenue(revenueTransactionsMMK))}
