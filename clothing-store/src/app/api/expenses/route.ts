@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     console.error("Error in GET /api/expenses:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       if (!name) {
         return NextResponse.json(
           { success: false, error: "Category name is required" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       const category = await addExpenseCategory(name);
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       if (!name) {
         return NextResponse.json(
           { success: false, error: "Spending menu name is required" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       const spendingMenu = await addSpendingMenu(name);
@@ -72,16 +72,17 @@ export async function POST(request: NextRequest) {
         currency,
       } = body;
 
-      if (!categoryId || !spendingMenuId || !date || !amount || !currency) {
+      // spendingMenuId is optional (feature removed in UI), validate required fields only
+      if (!categoryId || !date || !amount || !currency) {
         return NextResponse.json(
           { success: false, error: "Missing required fields" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       const expense = await addExpense({
         categoryId,
-        spendingMenuId,
+        spendingMenuId: spendingMenuId || undefined,
         note: note || "",
         imageUrl: imageUrl || "",
         date: new Date(date),
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
     console.error("Error in POST /api/expenses:", error);
     return NextResponse.json(
       { success: false, error: "Failed to create data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -109,7 +110,7 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json(
         { success: false, error: "ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -126,7 +127,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Error in DELETE /api/expenses:", error);
     return NextResponse.json(
       { success: false, error: "Failed to delete data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -140,7 +141,7 @@ export async function PUT(request: NextRequest) {
     if (!id) {
       return NextResponse.json(
         { success: false, error: "ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -169,7 +170,7 @@ export async function PUT(request: NextRequest) {
     console.error("Error in PUT /api/expenses:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update expense" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

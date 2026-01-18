@@ -14,8 +14,8 @@ export interface Expense {
   id: string;
   categoryId: string;
   categoryName: string;
-  spendingMenuId: string;
-  spendingMenuName: string;
+  spendingMenuId?: string;
+  spendingMenuName?: string;
   note: string;
   imageUrl?: string;
   date: Date;
@@ -27,7 +27,7 @@ export interface Expense {
 
 export interface CreateExpenseData {
   categoryId: string;
-  spendingMenuId: string;
+  spendingMenuId?: string;
   note: string;
   imageUrl?: string;
   date: Date;

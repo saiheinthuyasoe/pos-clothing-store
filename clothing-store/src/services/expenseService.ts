@@ -24,7 +24,7 @@ const SPENDING_MENUS_COLLECTION = "spendingMenus";
 
 // Category functions
 export const addExpenseCategory = async (
-  name: string
+  name: string,
 ): Promise<ExpenseCategory> => {
   try {
     if (!db) {
@@ -55,7 +55,7 @@ export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
 
     const q = query(
       collection(db, CATEGORIES_COLLECTION),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     const querySnapshot = await getDocs(q);
 
@@ -114,7 +114,7 @@ export const getSpendingMenus = async (): Promise<SpendingMenu[]> => {
 
     const q = query(
       collection(db, SPENDING_MENUS_COLLECTION),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     const querySnapshot = await getDocs(q);
 
@@ -151,21 +151,29 @@ export const addExpense = async (data: CreateExpenseData): Promise<Expense> => {
 
     // Get category and spending menu names
     const categoryDoc = await getDoc(
-      doc(db, CATEGORIES_COLLECTION, data.categoryId)
+      doc(db, CATEGORIES_COLLECTION, data.categoryId),
     );
-    const spendingMenuDoc = await getDoc(
-      doc(db, SPENDING_MENUS_COLLECTION, data.spendingMenuId)
-    );
-
-    if (!categoryDoc.exists() || !spendingMenuDoc.exists()) {
-      throw new Error("Category or Spending Menu not found");
+    // spendingMenuId is optional — only fetch if provided
+    let spendingMenuName = "";
+    if (data.spendingMenuId) {
+      const spendingMenuDoc = await getDoc(
+        doc(db, SPENDING_MENUS_COLLECTION, data.spendingMenuId),
+      );
+      if (spendingMenuDoc.exists()) {
+        spendingMenuName = spendingMenuDoc.data().name;
+      } else {
+        // If provided id does not exist, clear it to avoid errors
+        data.spendingMenuId = undefined as unknown as string;
+      }
     }
 
-    const expenseData = {
+    if (!categoryDoc.exists()) {
+      throw new Error("Category not found");
+    }
+
+    const expenseData: Record<string, unknown> = {
       categoryId: data.categoryId,
       categoryName: categoryDoc.data().name,
-      spendingMenuId: data.spendingMenuId,
-      spendingMenuName: spendingMenuDoc.data().name,
       note: data.note,
       imageUrl: data.imageUrl || "",
       date: Timestamp.fromDate(data.date),
@@ -175,14 +183,19 @@ export const addExpense = async (data: CreateExpenseData): Promise<Expense> => {
       updatedAt: Timestamp.now(),
     };
 
+    if (data.spendingMenuId) {
+      expenseData.spendingMenuId = data.spendingMenuId;
+      expenseData.spendingMenuName = spendingMenuName;
+    }
+
     const docRef = await addDoc(
       collection(db, EXPENSES_COLLECTION),
-      expenseData
+      expenseData,
     );
 
     return {
       id: docRef.id,
-      ...expenseData,
+      ...(expenseData as any),
       date: data.date,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -201,7 +214,7 @@ export const getExpenses = async (): Promise<Expense[]> => {
 
     const q = query(
       collection(db, EXPENSES_COLLECTION),
-      orderBy("date", "desc")
+      orderBy("date", "desc"),
     );
     const querySnapshot = await getDocs(q);
 
@@ -264,7 +277,7 @@ export const getExpenseById = async (id: string): Promise<Expense | null> => {
 
 export const updateExpense = async (
   id: string,
-  data: Partial<CreateExpenseData>
+  data: Partial<CreateExpenseData>,
 ): Promise<void> => {
   try {
     if (!db) {
@@ -277,7 +290,7 @@ export const updateExpense = async (
 
     if (data.categoryId) {
       const categoryDoc = await getDoc(
-        doc(db, CATEGORIES_COLLECTION, data.categoryId)
+        doc(db, CATEGORIES_COLLECTION, data.categoryId),
       );
       if (categoryDoc.exists()) {
         updateData.categoryId = data.categoryId;
@@ -287,7 +300,7 @@ export const updateExpense = async (
 
     if (data.spendingMenuId) {
       const spendingMenuDoc = await getDoc(
-        doc(db, SPENDING_MENUS_COLLECTION, data.spendingMenuId)
+        doc(db, SPENDING_MENUS_COLLECTION, data.spendingMenuId),
       );
       if (spendingMenuDoc.exists()) {
         updateData.spendingMenuId = data.spendingMenuId;
