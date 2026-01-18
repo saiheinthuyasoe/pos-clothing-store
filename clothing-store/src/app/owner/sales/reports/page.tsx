@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Search,
 } from "lucide-react";
+import { detectColorName } from "@/lib/colorUtils";
 
 interface ReportData {
   totalRevenue: number;
@@ -300,6 +301,19 @@ function ReportsPageContent() {
     const itemSales: { [key: string]: { quantity: number; revenue: number } } =
       {};
 
+    const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
+    const getDisplayColor = (item: { colorCode?: string; selectedColor?: string }) => {
+      const hex = item?.colorCode || "#000000";
+      if (item?.selectedColor && !isProbablyId(item.selectedColor)) {
+        return item.selectedColor;
+      }
+      try {
+        return detectColorName(hex) || hex;
+      } catch (e) {
+        return hex;
+      }
+    };
+
     // Only include items from revenue-generating transactions
     revenueTransactions.forEach((transaction) => {
       // Calculate refunded quantities for each item in this transaction
@@ -315,7 +329,8 @@ function ReportsPageContent() {
       }
 
       transaction.items.forEach((item, index) => {
-        const key = `${item.groupName} - ${item.selectedColor} - ${item.selectedSize}`;
+        const colorLabel = getDisplayColor(item);
+        const key = `${item.groupName} - ${colorLabel} - ${item.selectedSize}`;
         if (!itemSales[key]) {
           itemSales[key] = { quantity: 0, revenue: 0 };
         }
@@ -684,9 +699,7 @@ function ReportsPageContent() {
                       {formatPrice(reportData?.totalProfit || 0)}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -699,9 +712,7 @@ function ReportsPageContent() {
                       {reportData?.totalTransactions || 0}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -714,9 +725,7 @@ function ReportsPageContent() {
                       {reportData?.totalCustomers || 0}
                     </p>
                   </div>
-                  
                 </div>
-               
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -729,9 +738,7 @@ function ReportsPageContent() {
                       {formatInMMK(reportData?.totalRevenueMMK || 0)}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
             </div>
 
