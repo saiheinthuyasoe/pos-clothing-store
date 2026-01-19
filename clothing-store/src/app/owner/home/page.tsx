@@ -808,9 +808,10 @@ function OwnerHomeContent() {
           item.category.toLowerCase() === selectedCategory.toLowerCase());
 
       // Stock status filter
+      // Treat "in-stock" as any positive stock (includes low-stock)
       const matchesStockStatus =
         selectedStockStatus === "all" ||
-        (selectedStockStatus === "in-stock" && item.stock > 10) ||
+        (selectedStockStatus === "in-stock" && item.stock > 0) ||
         (selectedStockStatus === "low-stock" &&
           item.stock > 0 &&
           item.stock <= 10) ||
@@ -1228,9 +1229,7 @@ function OwnerHomeContent() {
 
                       return (
                         <div
-                          key={`${item.id}-$
-                            selectedColors[item.id] || "no-color"
-                          }`}
+                          key={`${item.id}-${selectedColors[item.id] || "no-color"}`}
                           className={`bg-white border  overflow-hidden hover:shadow-lg hover:scale-[1.03] transition-transform transition-shadow duration-200 ${
                             isOutOfStock
                               ? "border-red-200 opacity-75"
@@ -1255,9 +1254,7 @@ function OwnerHomeContent() {
                               </>
                             )}
                             <Image
-                              key={`${item.id}-image-$
-                                selectedColors[item.id] || "default"
-                              }`}
+                              key={`${item.id}-image-${selectedColors[item.id] || "default"}`}
                               src={getCurrentImage(
                                 item as ClothingInventoryItem,
                               )}

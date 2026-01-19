@@ -195,8 +195,15 @@ export const addExpense = async (data: CreateExpenseData): Promise<Expense> => {
 
     return {
       id: docRef.id,
-      ...(expenseData as any),
+      categoryId: data.categoryId,
+      categoryName: expenseData.categoryName as string,
+      spendingMenuId: (expenseData.spendingMenuId as string) || undefined,
+      spendingMenuName: (expenseData.spendingMenuName as string) || undefined,
+      note: (expenseData.note as string) || "",
+      imageUrl: (expenseData.imageUrl as string) || "",
       date: data.date,
+      amount: expenseData.amount as number,
+      currency: data.currency,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

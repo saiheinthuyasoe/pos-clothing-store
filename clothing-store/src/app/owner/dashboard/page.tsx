@@ -44,17 +44,23 @@ import { transactionService, Transaction } from "@/services/transactionService";
 import { StockService } from "@/services/stockService";
 import { CustomerService } from "@/services/customerService";
 import { ShopService } from "@/services/shopService";
+import { SettingsService } from "@/services/settingsService";
 import { StockItem } from "@/types/stock";
 import { Customer } from "@/types/customer";
 
 interface DashboardStats {
   totalRevenue: number;
+  totalRevenueMMK: number;
+  totalRevenueTHB: number;
   totalProfit: number;
   totalOrders: number;
   completedOrders: number;
   pendingOrders: number;
   cancelledOrders: number;
-  refundedOrders: number;
+  refundPayments: number;
+  partialRefunds: number;
+  totalExpenseTHB: number;
+  totalExpenseMMK: number;
   totalCustomers: number;
   newCustomers: number;
   totalProducts: number;
@@ -110,6 +116,12 @@ interface OrderStatusChart {
   percentage: number;
 }
 
+interface Expense {
+  date: string;
+  currency?: "THB" | "MMK" | string;
+  amount?: number;
+}
+
 function OwnerDashboardContent() {
   const { formatPrice } = useCurrency();
   const { businessSettings } = useSettings();
@@ -125,12 +137,17 @@ function OwnerDashboardContent() {
   // Data states
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
+    totalRevenueMMK: 0,
+    totalRevenueTHB: 0,
     totalProfit: 0,
     totalOrders: 0,
     completedOrders: 0,
     pendingOrders: 0,
     cancelledOrders: 0,
-    refundedOrders: 0,
+    refundPayments: 0,
+    partialRefunds: 0,
+    totalExpenseTHB: 0,
+    totalExpenseMMK: 0,
     totalCustomers: 0,
     newCustomers: 0,
     totalProducts: 0,
@@ -332,9 +349,14 @@ function OwnerDashboardContent() {
         percentage: total > 0 ? (stats.cancelledOrders / total) * 100 : 0,
       },
       {
-        name: "Refunded",
-        value: stats.refundedOrders,
-        percentage: total > 0 ? (stats.refundedOrders / total) * 100 : 0,
+        name: "Refund Payments",
+        value: stats.refundPayments,
+        percentage: total > 0 ? (stats.refundPayments / total) * 100 : 0,
+      },
+      {
+        name: "Partial Refunds",
+        value: stats.partialRefunds,
+        percentage: total > 0 ? (stats.partialRefunds / total) * 100 : 0,
       },
     ].filter((item) => item.value > 0);
   };
@@ -388,12 +410,22 @@ function OwnerDashboardContent() {
         return { startDate: calcStartDate, endDate: calcEndDate };
       };
 
-      // Fetch all data in parallel
-      const [transactions, stocks, customers] = await Promise.all([
-        transactionService.getTransactions(),
-        StockService.getAllStocks(),
-        CustomerService.getAllCustomers(),
-      ]);
+      // Fetch all data in parallel (include shops to resolve branch names/ids)
+      const [transactions, stocks, customers, expensesRes, shopsData] =
+        await Promise.all([
+          transactionService.getTransactions(),
+          StockService.getAllStocks(),
+          CustomerService.getAllCustomers(),
+          fetch("/api/expenses"),
+          ShopService.getAllShops(),
+        ]);
+
+      const expensesJson = await expensesRes.json();
+      const expenses = expensesJson?.success ? expensesJson.data : [];
+      // Ensure local shops state is up-to-date for the UI
+      if (shopsData && Array.isArray(shopsData)) {
+        setShops(shopsData || []);
+      }
 
       const { startDate: rangeStartDate, endDate: rangeEndDate } =
         getDateRange(dateRange);
@@ -425,13 +457,36 @@ function OwnerDashboardContent() {
         return date >= previousStartDate && date < rangeStartDate;
       });
 
+      // Filter expenses by date range
+      const filteredExpenses = expenses.filter((e: { date: string }) => {
+        const d = new Date(e.date);
+        return d >= rangeStartDate && d <= rangeEndDate;
+      });
+
+      // Filter stocks by selected branch so low-stock counts respect branch filter
+      let stocksForStats = stocks;
+      if (filterBranch && filterBranch !== "all") {
+        const branchShop = (shopsData || shops).find(
+          (s) => s.name === filterBranch || s.id === filterBranch,
+        );
+        const branchId = branchShop?.id;
+        stocksForStats = stocks.filter(
+          (s) =>
+            s.shop === filterBranch ||
+            s.shop === branchId ||
+            (!s.shop && filterBranch === "Main Branch") ||
+            (s.shop === "" && filterBranch === "Main Branch"),
+        );
+      }
+
       // Calculate stats
       const dashboardStats = calculateStats(
         filteredTransactions,
         previousTransactions,
-        stocks,
+        stocksForStats,
         customers,
         rangeStartDate,
+        filteredExpenses,
       );
 
       const paymentMethods = calculateRevenueByMethod(filteredTransactions);
@@ -484,14 +539,20 @@ function OwnerDashboardContent() {
     stocks: StockItem[],
     customers: Customer[],
     startDate: Date,
+    expenses: Expense[] = [],
   ): DashboardStats => {
     let totalRevenue = 0;
+    let totalRevenueMMK = 0;
+    let totalRevenueTHB = 0;
     let totalProfit = 0;
     let totalItemsSold = 0;
     let completedOrders = 0;
     let pendingOrders = 0;
     let cancelledOrders = 0;
-    let refundedOrders = 0;
+    let refundPayments = 0;
+    let partialRefunds = 0;
+    let totalExpenseTHB = 0;
+    let totalExpenseMMK = 0;
 
     transactions.forEach((transaction) => {
       const totalRefunded =
@@ -508,6 +569,10 @@ function OwnerDashboardContent() {
         transaction.status === "refunded"
       ) {
         totalRevenue += netAmount;
+
+        const currency = (transaction.sellingCurrency || "THB").toUpperCase();
+        if (currency === "MMK") totalRevenueMMK += netAmount;
+        else totalRevenueTHB += netAmount;
 
         // Calculate profit
         const transactionProfit = transaction.items.reduce(
@@ -557,8 +622,10 @@ function OwnerDashboardContent() {
           cancelledOrders++;
           break;
         case "refunded":
+          refundPayments++;
+          break;
         case "partially_refunded":
-          refundedOrders++;
+          partialRefunds++;
           break;
       }
     });
@@ -620,30 +687,43 @@ function OwnerDashboardContent() {
           : 0;
 
     // Stock stats
-    const lowStockProducts = stocks.filter((stock) => {
-      const totalQuantity = stock.colorVariants.reduce(
-        (sum, variant) =>
-          sum +
-          variant.sizeQuantities.reduce(
-            (sizeSum, sq) => sizeSum + sq.quantity,
-            0,
-          ),
-        0,
-      );
-      return totalQuantity <= 10;
-    }).length;
+    // Count low-stock at variant level (variants with total quantity >0 and <=10)
+    const lowStockVariantCount = stocks.reduce((count, stock) => {
+      const variantLowCount = stock.colorVariants.reduce((vCount, variant) => {
+        const variantTotal = variant.sizeQuantities.reduce(
+          (sizeSum, sq) => sizeSum + sq.quantity,
+          0,
+        );
+        return vCount + (variantTotal > 0 && variantTotal <= 10 ? 1 : 0);
+      }, 0);
+      return count + variantLowCount;
+    }, 0);
+
+    const lowStockProducts = lowStockVariantCount;
 
     const averageOrderValue =
       transactions.length > 0 ? totalRevenue / transactions.length : 0;
 
+    // Sum expenses by currency
+    (expenses || []).forEach((exp) => {
+      if (!exp) return;
+      if (exp.currency === "THB") totalExpenseTHB += exp.amount || 0;
+      else if (exp.currency === "MMK") totalExpenseMMK += exp.amount || 0;
+    });
+
     return {
       totalRevenue,
+      totalRevenueMMK,
+      totalRevenueTHB,
       totalProfit,
       totalOrders: transactions.length,
       completedOrders,
       pendingOrders,
       cancelledOrders,
-      refundedOrders,
+      refundPayments,
+      partialRefunds,
+      totalExpenseTHB,
+      totalExpenseMMK,
       totalCustomers: customers.length,
       newCustomers,
       totalProducts: stocks.length,
@@ -876,7 +956,7 @@ function OwnerDashboardContent() {
           <div className="max-w-screen-2xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <div className="mb-4">
+              {/* <div className="mb-4">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   Owner Dashboard
                 </h1>
@@ -884,7 +964,7 @@ function OwnerDashboardContent() {
                   Comprehensive analytics and performance metrics for your
                   clothing store
                 </p>
-              </div>
+              </div> */}
 
               {/* Filters */}
               <div className="flex flex-wrap gap-4">
@@ -983,6 +1063,66 @@ function OwnerDashboardContent() {
               </div>
             ) : (
               <>
+                {/* Currency Specific Totals */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Sales (฿)
+                        </p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {formatPrice(stats.totalRevenueTHB || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Sale (Ks)
+                        </p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {SettingsService.formatPrice(
+                            stats.totalRevenueMMK || 0,
+                            "MMK",
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Expense (฿)
+                        </p>
+                        <p className="text-2xl font-bold text-red-600">
+                          {formatPrice(stats.totalExpenseTHB || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Expense (Ks)
+                        </p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {SettingsService.formatPrice(
+                            stats.totalExpenseMMK || 0,
+                            "MMK",
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 {/* Key Performance Indicators */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                   {/* Total Revenue */}
@@ -990,32 +1130,12 @@ function OwnerDashboardContent() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="text-sm font-medium text-gray-500">
-                          Total Sale
+                          Total Sales
                         </p>
                         <p className="text-3xl font-bold text-gray-900">
                           {formatPrice(stats.totalRevenue)}
                         </p>
                       </div>
-                      <div className="p-3 bg-blue-100 rounded-full">
-                        <DollarSign className="h-8 w-8 text-blue-600" />
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {stats.revenueGrowth >= 0 ? (
-                        <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
-                      )}
-                      <span
-                        className={`text-sm ${
-                          stats.revenueGrowth >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {stats.revenueGrowth >= 0 ? "+" : ""}
-                        {stats.revenueGrowth.toFixed(1)}% from previous period
-                      </span>
                     </div>
                   </div>
 
@@ -1030,19 +1150,6 @@ function OwnerDashboardContent() {
                           {formatPrice(stats.totalProfit)}
                         </p>
                       </div>
-                      <div className="p-3 bg-green-100 rounded-full">
-                        <TrendingUp className="h-8 w-8 text-green-600" />
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Margin:{" "}
-                      {stats.totalRevenue > 0
-                        ? (
-                            (stats.totalProfit / stats.totalRevenue) *
-                            100
-                          ).toFixed(1)
-                        : 0}
-                      %
                     </div>
                   </div>
 
@@ -1057,26 +1164,6 @@ function OwnerDashboardContent() {
                           {stats.totalOrders}
                         </p>
                       </div>
-                      <div className="p-3 bg-purple-100 rounded-full">
-                        <ShoppingCart className="h-8 w-8 text-purple-600" />
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {stats.ordersGrowth >= 0 ? (
-                        <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
-                      )}
-                      <span
-                        className={`text-sm ${
-                          stats.ordersGrowth >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {stats.ordersGrowth >= 0 ? "+" : ""}
-                        {stats.ordersGrowth.toFixed(1)}% from previous period
-                      </span>
                     </div>
                   </div>
 
@@ -1091,14 +1178,6 @@ function OwnerDashboardContent() {
                           {stats.totalCustomers}
                         </p>
                       </div>
-                      <div className="p-3 bg-orange-100 rounded-full">
-                        <Users className="h-8 w-8 text-orange-600" />
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      New: {stats.newCustomers} (
-                      {stats.customersGrowth >= 0 ? "+" : ""}
-                      {stats.customersGrowth.toFixed(1)}%)
                     </div>
                   </div>
                 </div>
@@ -1171,7 +1250,7 @@ function OwnerDashboardContent() {
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Order Status Breakdown
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                     <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
                       <div>
                         <p className="text-sm font-medium text-gray-500">
@@ -1234,19 +1313,18 @@ function OwnerDashboardContent() {
                       </div>
                       <XCircle className="h-8 w-8 text-red-600" />
                     </div>
-
                     <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
                       <div>
                         <p className="text-sm font-medium text-gray-500">
-                          Refunded
+                          Refund Payments
                         </p>
                         <p className="text-2xl font-bold text-purple-600">
-                          {stats.refundedOrders}
+                          {stats.refundPayments}
                         </p>
                         <p className="text-xs text-gray-600">
                           {stats.totalOrders > 0
                             ? (
-                                (stats.refundedOrders / stats.totalOrders) *
+                                (stats.refundPayments / stats.totalOrders) *
                                 100
                               ).toFixed(1)
                             : 0}
@@ -1254,6 +1332,27 @@ function OwnerDashboardContent() {
                         </p>
                       </div>
                       <AlertCircle className="h-8 w-8 text-purple-600" />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-indigo-50 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Partial Refunds
+                        </p>
+                        <p className="text-2xl font-bold text-indigo-600">
+                          {stats.partialRefunds}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {stats.totalOrders > 0
+                            ? (
+                                (stats.partialRefunds / stats.totalOrders) *
+                                100
+                              ).toFixed(1)
+                            : 0}
+                          % of total
+                        </p>
+                      </div>
+                      <XCircle className="h-8 w-8 text-indigo-600" />
                     </div>
                   </div>
                 </div>

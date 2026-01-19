@@ -60,7 +60,9 @@ function NewStockContent() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
-  const [releaseDate, setReleaseDate] = useState("");
+  const [releaseDate, setReleaseDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [selectedShops, setSelectedShops] = useState<string[]>([]);
 
   const [isColorless, setIsColorless] = useState(false);
@@ -306,7 +308,9 @@ function NewStockContent() {
           if (pending !== undefined) {
             setColorVariants((variants) =>
               variants.map((variant) =>
-                variant.id === id ? { ...variant, colorCode: pending } : variant,
+                variant.id === id
+                  ? { ...variant, colorCode: pending }
+                  : variant,
               ),
             );
             delete pendingColorRef.current[id];
@@ -1119,7 +1123,6 @@ function NewStockContent() {
                                             className="w-16 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                                             placeholder="0"
                                           />
-                                          
                                         </div>
                                       ))}
                                     </div>

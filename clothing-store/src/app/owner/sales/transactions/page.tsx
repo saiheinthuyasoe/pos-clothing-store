@@ -271,6 +271,11 @@ export default function TransactionsPage() {
     (t) => (t.sellingCurrency || "THB").toUpperCase() === "MMK",
   );
 
+  // Only transactions sold in THB
+  const revenueTransactionsTHB = revenueTransactions.filter(
+    (t) => (t.sellingCurrency || "THB").toUpperCase() === "THB",
+  );
+
   // Calculate net revenue (original total minus refunded amounts)
   const calculateNetRevenue = (transactions: Transaction[]) => {
     return transactions.reduce((total, transaction) => {
@@ -864,7 +869,7 @@ export default function TransactionsPage() {
 
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-screen-2xl mx-auto">
-            {/* Header */}
+            {/* Header
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Transactions
@@ -872,10 +877,10 @@ export default function TransactionsPage() {
               <p className="text-gray-600">
                 View and manage all sales transactions
               </p>
-            </div>
+            </div> */}
 
             {/* Summary Stats */}
-            <div className="mb-6 grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-6 gap-4">
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h3 className="text-sm font-medium text-gray-500">
                   Total Transactions
@@ -904,6 +909,14 @@ export default function TransactionsPage() {
                 <h3 className="text-sm font-medium text-gray-500">Completed</h3>
                 <p className="text-2xl font-bold text-blue-600">
                   {completedTransactionsCount}
+                </p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 className="text-sm font-medium text-gray-500">
+                  Total Sales (฿)
+                </h3>
+                <p className="text-2xl font-bold text-green-600">
+                  {formatPrice(calculateNetRevenue(revenueTransactionsTHB))}
                 </p>
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">

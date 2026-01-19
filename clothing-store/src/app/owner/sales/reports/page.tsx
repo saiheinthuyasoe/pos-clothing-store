@@ -33,7 +33,10 @@ import { detectColorName } from "@/lib/colorUtils";
 interface ReportData {
   totalRevenue: number;
   totalRevenueMMK: number;
+  totalRevenueTHB: number;
   totalProfit: number;
+  totalExpenseTHB: number;
+  totalExpenseMMK: number;
   totalTransactions: number;
   totalCustomers: number;
   averageOrderValue: number;
@@ -53,6 +56,13 @@ interface ReportData {
     percentage: number;
   }>;
   recentTransactions: Transaction[];
+}
+
+interface Expense {
+  date: string;
+  currency?: string;
+  amount?: number;
+  [key: string]: unknown;
 }
 
 function ReportsPageContent() {
@@ -135,10 +145,17 @@ function ReportsPageContent() {
   const loadReportData = async () => {
     try {
       setLoading(true);
-      const transactions = await transactionService.getTransactions();
+      const [transactions, expensesRes] = await Promise.all([
+        transactionService.getTransactions(),
+        fetch("/api/expenses"),
+      ]);
+
+      const expensesJson = await expensesRes.json();
+      const expenses = expensesJson?.success ? expensesJson.data : [];
 
       // Filter transactions based on date range
       let filteredTransactions = transactions;
+      let filteredExpenses = expenses;
 
       if (dateRange === "custom") {
         // Use custom date range
@@ -175,6 +192,10 @@ function ReportsPageContent() {
         filteredTransactions = transactions.filter(
           (t) => new Date(t.timestamp) >= startDateCalc,
         );
+        // apply same date filter to expenses
+        filteredExpenses = expenses.filter(
+          (e: { date: string }) => new Date(e.date) >= startDateCalc,
+        );
       }
 
       // Filter by branch
@@ -209,7 +230,7 @@ function ReportsPageContent() {
       }
 
       // Calculate report data
-      const data = calculateReportData(filteredTransactions);
+      const data = calculateReportData(filteredTransactions, filteredExpenses);
       setReportData(data);
     } catch (error) {
       console.error("Error loading report data:", error);
@@ -218,7 +239,10 @@ function ReportsPageContent() {
     }
   };
 
-  const calculateReportData = (transactions: Transaction[]): ReportData => {
+  const calculateReportData = (
+    transactions: Transaction[],
+    expenses: Expense[] = [],
+  ): ReportData => {
     // Filter for revenue-generating transactions (completed, partially refunded, and refunded)
     const revenueTransactions = transactions.filter(
       (t) =>
@@ -240,6 +264,18 @@ function ReportsPageContent() {
     // Calculate net revenue for transactions sold in MMK only
     const totalRevenueMMK = revenueTransactions
       .filter((t) => (t.sellingCurrency || "THB").toUpperCase() === "MMK")
+      .reduce((sum, t) => {
+        const refundedAmount =
+          t.refunds?.reduce(
+            (refundSum, refund) => refundSum + refund.totalAmount,
+            0,
+          ) || 0;
+        return sum + Math.max(0, t.total - refundedAmount);
+      }, 0);
+
+    // Calculate net revenue for transactions sold in THB only
+    const totalRevenueTHB = revenueTransactions
+      .filter((t) => (t.sellingCurrency || "THB").toUpperCase() === "THB")
       .reduce((sum, t) => {
         const refundedAmount =
           t.refunds?.reduce(
@@ -302,7 +338,10 @@ function ReportsPageContent() {
       {};
 
     const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
-    const getDisplayColor = (item: { colorCode?: string; selectedColor?: string }) => {
+    const getDisplayColor = (item: {
+      colorCode?: string;
+      selectedColor?: string;
+    }) => {
       const hex = item?.colorCode || "#000000";
       if (item?.selectedColor && !isProbablyId(item.selectedColor)) {
         return item.selectedColor;
@@ -416,10 +455,23 @@ function ReportsPageContent() {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
+    // Calculate expenses totals by currency for the given date range
+    const totalsByCurrency = (expenses || []).reduce(
+      (acc: { THB: number; MMK: number }, exp: Expense) => {
+        if (exp.currency === "THB") acc.THB += exp.amount || 0;
+        else if (exp.currency === "MMK") acc.MMK += exp.amount || 0;
+        return acc;
+      },
+      { THB: 0, MMK: 0 },
+    );
+
     return {
       totalRevenue,
       totalRevenueMMK,
+      totalRevenueTHB,
       totalProfit,
+      totalExpenseTHB: totalsByCurrency.THB,
+      totalExpenseMMK: totalsByCurrency.MMK,
       totalTransactions,
       totalCustomers: uniqueCustomers,
       averageOrderValue,
@@ -664,7 +716,7 @@ function ReportsPageContent() {
 
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-screen-2xl mx-auto">
-            {/* Header */}
+            {/* Header
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Reports & Analytics
@@ -672,10 +724,10 @@ function ReportsPageContent() {
               <p className="text-gray-600">
                 Comprehensive business insights and performance metrics
               </p>
-            </div>
+            </div> */}
 
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            {/* Key Metrics - row 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -727,7 +779,22 @@ function ReportsPageContent() {
                   </div>
                 </div>
               </div>
+            </div>
 
+            {/* Key Metrics - row 2 */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Total Sales (฿)
+                    </p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {formatPrice(reportData?.totalRevenue || 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -736,6 +803,35 @@ function ReportsPageContent() {
                     </p>
                     <p className="text-2xl font-bold text-purple-600">
                       {formatInMMK(reportData?.totalRevenueMMK || 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Total Expense (฿)
+                    </p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {formatPrice(reportData?.totalExpenseTHB || 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Total Expense (Ks)
+                    </p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {SettingsService.formatPrice(
+                        reportData?.totalExpenseMMK || 0,
+                        "MMK",
+                      )}
                     </p>
                   </div>
                 </div>

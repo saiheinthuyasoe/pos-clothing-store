@@ -369,12 +369,12 @@ function CustomerPageContent() {
                     Manage your customer database and relationships
                   </p>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className= "flex items-center space-x-3">
                   <Button
                     variant="outline"
                     onClick={handleRefresh}
                     disabled={isRefreshing}
-                    className="flex items-center"
+                    className="flex items-center "
                   >
                     <RefreshCw
                       className={`h-4 w-4 mr-2 ${

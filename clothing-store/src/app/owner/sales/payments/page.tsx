@@ -103,7 +103,7 @@ function PaymentsPageContent() {
             startDateCalc = new Date(
               now.getFullYear(),
               now.getMonth(),
-              now.getDate()
+              now.getDate(),
             );
             break;
           case "7d":
@@ -120,14 +120,14 @@ function PaymentsPageContent() {
         }
 
         filteredData = data.filter(
-          (t) => new Date(t.timestamp) >= startDateCalc
+          (t) => new Date(t.timestamp) >= startDateCalc,
         );
       }
 
       // Filter by branch
       if (filterBranch && filterBranch !== "all") {
         filteredData = filteredData.filter(
-          (t) => t.branchName === filterBranch
+          (t) => t.branchName === filterBranch,
         );
       }
 
@@ -206,7 +206,7 @@ function PaymentsPageContent() {
       const refundedAmount =
         transaction.refunds?.reduce(
           (sum, refund) => sum + refund.totalAmount,
-          0
+          0,
         ) || 0;
       const netTotal = Math.max(0, transaction.total - refundedAmount);
 
@@ -220,7 +220,7 @@ function PaymentsPageContent() {
         transaction.refunds?.reduce((refundTotal, refund) => {
           return refund.items.reduce((refundItemTotal, refundItem) => {
             const originalItem = transaction.items.find(
-              (item) => item.id === refundItem.itemId
+              (item) => item.id === refundItem.itemId,
             );
             if (originalItem) {
               const refundedProfitPerItem =
@@ -260,7 +260,7 @@ function PaymentsPageContent() {
     const csvContent = [
       headers.join(","),
       ...rows.map((row) =>
-        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(",")
+        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(","),
       ),
     ].join("\n");
 
@@ -276,7 +276,7 @@ function PaymentsPageContent() {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `payments_${new Date().toISOString().split("T")[0]}.csv`
+      `payments_${new Date().toISOString().split("T")[0]}.csv`,
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
@@ -304,7 +304,7 @@ function PaymentsPageContent() {
       const totalRefunded =
         transaction.refunds?.reduce(
           (sum, refund) => sum + refund.totalAmount,
-          0
+          0,
         ) || 0;
       const netAmount = Math.max(0, transaction.total - totalRefunded);
 
@@ -333,11 +333,11 @@ function PaymentsPageContent() {
               "Qty:",
               item.quantity,
               "Profit:",
-              profitPerItem
+              profitPerItem,
             );
             return itemTotal + profitPerItem;
           },
-          0
+          0,
         );
 
         // Subtract refunded profit
@@ -521,7 +521,7 @@ function PaymentsPageContent() {
 
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-screen-2xl mx-auto">
-            {/* Header */}
+            {/* Header
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Payment Management
@@ -529,10 +529,10 @@ function PaymentsPageContent() {
               <p className="text-gray-600">
                 Monitor and manage all payment transactions
               </p>
-            </div>
+            </div> */}
 
             {/* Payment Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -543,9 +543,7 @@ function PaymentsPageContent() {
                       {formatPrice(paymentStats.totalAmount)}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -558,9 +556,7 @@ function PaymentsPageContent() {
                       {formatPrice(paymentStats.totalProfit)}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -573,9 +569,7 @@ function PaymentsPageContent() {
                       {paymentStats.successfulPayments}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -588,9 +582,7 @@ function PaymentsPageContent() {
                       {paymentStats.refundPayments}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -603,9 +595,7 @@ function PaymentsPageContent() {
                       {paymentStats.partialRefundPayments}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -618,18 +608,16 @@ function PaymentsPageContent() {
                       {paymentStats.cancelledPayments}
                     </p>
                   </div>
-                  
                 </div>
-                
               </div>
             </div>
 
-            {/* Payment Methods Breakdown */}
+            Payment Methods Breakdown
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Payment Methods Breakdown
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
@@ -671,6 +659,20 @@ function PaymentsPageContent() {
                     </p>
                   </div>
                 </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      COD Payments
+                    </p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {formatPrice(paymentStats.codPayments.amount)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {paymentStats.codPayments.count} transactions
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -684,7 +686,7 @@ function PaymentsPageContent() {
             </div> */}
 
             {/* Payment Methods Breakdown */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">
@@ -694,7 +696,7 @@ function PaymentsPageContent() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Count:</span>
+                    <span className="text-sm text-gray-600">Transaction:</span>
                     <span className="text-sm font-medium text-gray-600">
                       {paymentStats.cashPayments.count}
                     </span>
@@ -717,7 +719,7 @@ function PaymentsPageContent() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Count:</span>
+                    <span className="text-sm text-gray-600">Transaction:</span>
                     <span className="text-sm font-medium text-gray-600">
                       {paymentStats.scanPayments.count}
                     </span>
@@ -740,7 +742,7 @@ function PaymentsPageContent() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Count:</span>
+                    <span className="text-sm text-gray-600">Transaction:</span>
                     <span className="text-sm font-medium text-gray-600  ">
                       {paymentStats.walletPayments.count}
                     </span>
@@ -749,6 +751,29 @@ function PaymentsPageContent() {
                     <span className="text-sm text-gray-600">Amount:</span>
                     <span className="text-sm font-medium text-gray-600">
                       {formatPrice(paymentStats.walletPayments.amount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    COD Payments
+                  </h3>
+                  <Truck className="h-6 w-6 text-gray-700" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Transaction:</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      {paymentStats.codPayments.count}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Amount:</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      {formatPrice(paymentStats.codPayments.amount)}
                     </span>
                   </div>
                 </div>
@@ -785,7 +810,7 @@ function PaymentsPageContent() {
                         | "pending"
                         | "cancelled"
                         | "refunded"
-                        | "partially_refunded"
+                        | "partially_refunded",
                     );
                     setCurrentPage(1);
                   }}
@@ -810,7 +835,7 @@ function PaymentsPageContent() {
                         | "cash"
                         | "scan"
                         | "wallet"
-                        | "cod"
+                        | "cod",
                     );
                     setCurrentPage(1);
                   }}
@@ -1026,7 +1051,7 @@ function PaymentsPageContent() {
                               {getStatusIcon(transaction.status)}
                               <span
                                 className={`ml-2 ${getStatusBadge(
-                                  transaction.status
+                                  transaction.status,
                                 )}`}
                               >
                                 {transaction.status}
@@ -1108,7 +1133,7 @@ function PaymentsPageContent() {
                           title="Go to next page"
                           onClick={() =>
                             setCurrentPage(
-                              Math.min(totalPages, currentPage + 1)
+                              Math.min(totalPages, currentPage + 1),
                             )
                           }
                           disabled={currentPage === totalPages}
