@@ -923,7 +923,7 @@ function ReportsPageContent() {
 
             {/* Charts and Tables */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Daily Sales Chart */}
+              {/* Daily Sales Chart
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Daily Sales (Last 7 Days)
@@ -951,10 +951,10 @@ function ReportsPageContent() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </div> */}
 
               {/* Payment Methods */}
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              {/* <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Payment Methods
                 </h3>
@@ -981,7 +981,7 @@ function ReportsPageContent() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </div> */}
             </div>
 
             {/* Daily Status Table */}
@@ -1014,33 +1014,33 @@ function ReportsPageContent() {
                       .slice()
                       .sort((a, b) => b.date.localeCompare(a.date))
                       .map((row) => (
-                      <tr key={row.date} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {(() => {
-                            const d = new Date(row.date);
-                            return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
-                          })()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>{formatPrice(row.profitTHB || 0)}</div>
-                          <div className="text-xs text-gray-500">
-                            {formatInMMK(row.profitMMK || 0)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>{formatPrice(row.expenseTHB || 0)}</div>
-                          <div className="text-xs text-gray-500">
-                            {formatInMMK(row.expenseMMK || 0)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>{formatPrice(row.netTHB || 0)}</div>
-                          <div className="text-xs text-gray-500">
-                            {formatInMMK(row.netMMK || 0)}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                        <tr key={row.date} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {(() => {
+                              const d = new Date(row.date);
+                              return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+                            })()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>{formatPrice(row.profitTHB || 0)}</div>
+                            <div className="text-xs text-gray-500">
+                              {formatInMMK(row.profitMMK || 0)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>{formatPrice(row.expenseTHB || 0)}</div>
+                            <div className="text-xs text-gray-500">
+                              {formatInMMK(row.expenseMMK || 0)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>{formatPrice(row.netTHB || 0)}</div>
+                            <div className="text-xs text-gray-500">
+                              {formatInMMK(row.netMMK || 0)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
