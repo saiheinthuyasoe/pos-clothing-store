@@ -56,6 +56,10 @@ interface ReportData {
     profitMMK: number;
     expenseTHB: number;
     expenseMMK: number;
+    totalSalesTHB: number;
+    totalSalesMMK: number;
+    originalPriceTHB: number;
+    originalPriceMMK: number;
     netTHB: number;
     netMMK: number;
   }>;
@@ -87,6 +91,12 @@ function ReportsPageContent() {
   >("30d");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  // Daily Status specific filters
+  const [dailyRange, setDailyRange] = useState<
+    "today" | "7d" | "30d" | "90d" | "all" | "custom"
+  >("7d");
+  const [dailyStartDate, setDailyStartDate] = useState<string>("");
+  const [dailyEndDate, setDailyEndDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
     | "all"
@@ -107,6 +117,9 @@ function ReportsPageContent() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  // Daily Status pagination
+  const [dailyCurrentPage, setDailyCurrentPage] = useState(1);
+  const [dailyRowsPerPage, setDailyRowsPerPage] = useState(10);
 
   useEffect(() => {
     loadReportData();
@@ -442,22 +455,37 @@ function ReportsPageContent() {
       ...data,
     }));
 
-    // Daily status: profit, expense, net (THB and MMK) for last 7 days
+    // Daily status: profit, expense, net (THB and MMK) for a wider range
+    const maxDailyDays = 90;
+    const lastNDays = Array.from({ length: maxDailyDays }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      return date.toISOString().split("T")[0];
+    }).reverse();
+
     const dailyStatusMap: {
       [key: string]: {
         profitTHB: number;
         profitMMK: number;
         expenseTHB: number;
         expenseMMK: number;
+        totalSalesTHB: number;
+        totalSalesMMK: number;
+        originalPriceTHB: number;
+        originalPriceMMK: number;
       };
     } = {};
 
-    last7Days.forEach((d) => {
+    lastNDays.forEach((d) => {
       dailyStatusMap[d] = {
         profitTHB: 0,
         profitMMK: 0,
         expenseTHB: 0,
         expenseMMK: 0,
+        totalSalesTHB: 0,
+        totalSalesMMK: 0,
+        originalPriceTHB: 0,
+        originalPriceMMK: 0,
       };
     });
 
@@ -487,10 +515,19 @@ function ReportsPageContent() {
         const refundedQty = refundedQuantities[idx] || 0;
         const netQty = Math.max(0, item.quantity - refundedQty);
         const profit = (item.unitPrice - item.originalPrice) * netQty;
-        if ((transaction.sellingCurrency || "THB").toUpperCase() === "THB") {
+        const sellingCurrency = (
+          transaction.sellingCurrency || "THB"
+        ).toUpperCase();
+        const salesAmount = item.unitPrice * netQty;
+        const originalAmount = item.originalPrice * netQty;
+        if (sellingCurrency === "THB") {
           dailyStatusMap[dateKey].profitTHB += profit;
+          dailyStatusMap[dateKey].totalSalesTHB += salesAmount;
+          dailyStatusMap[dateKey].originalPriceTHB += originalAmount;
         } else {
           dailyStatusMap[dateKey].profitMMK += profit;
+          dailyStatusMap[dateKey].totalSalesMMK += salesAmount;
+          dailyStatusMap[dateKey].originalPriceMMK += originalAmount;
         }
       });
     });
@@ -511,6 +548,10 @@ function ReportsPageContent() {
       profitMMK: v.profitMMK,
       expenseTHB: v.expenseTHB,
       expenseMMK: v.expenseMMK,
+      totalSalesTHB: v.totalSalesTHB,
+      totalSalesMMK: v.totalSalesMMK,
+      originalPriceTHB: v.originalPriceTHB,
+      originalPriceMMK: v.originalPriceMMK,
       netTHB: v.profitTHB - v.expenseTHB,
       netMMK: v.profitMMK - v.expenseMMK,
     }));
@@ -726,6 +767,43 @@ function ReportsPageContent() {
     );
     return SettingsService.formatPrice(converted, "MMK");
   };
+
+  // Compute displayed daily status based on `dailyRange` and custom dates
+  const displayedDailyStatus = (() => {
+    const allDaily = reportData?.dailyStatus || [];
+    if (!allDaily || allDaily.length === 0) return [] as typeof allDaily;
+
+    let start: Date | null = null;
+    let end: Date | null = null;
+
+    if (dailyRange === "all") {
+      start = null;
+      end = null;
+    } else if (dailyRange === "custom") {
+      if (dailyStartDate) start = new Date(dailyStartDate);
+      if (dailyEndDate) {
+        end = new Date(dailyEndDate);
+        end.setHours(23, 59, 59, 999);
+      }
+    } else {
+      end = new Date();
+      end.setHours(23, 59, 59, 999);
+      start = new Date();
+      if (dailyRange === "today") start.setHours(0, 0, 0, 0);
+      else if (dailyRange === "7d") start.setDate(start.getDate() - 6);
+      else if (dailyRange === "30d") start.setDate(start.getDate() - 29);
+      else if (dailyRange === "90d") start.setDate(start.getDate() - 89);
+      if (start) start.setHours(0, 0, 0, 0);
+    }
+
+    const filtered = allDaily.filter((row) => {
+      if (!start || !end) return true;
+      const d = new Date(row.date);
+      return d >= start && d <= end;
+    });
+
+    return filtered.slice().sort((a, b) => b.date.localeCompare(a.date));
+  })();
 
   if (loading) {
     return (
@@ -987,16 +1065,130 @@ function ReportsPageContent() {
             {/* Daily Status Table */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Daily Status (Last 7 Days)
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Daily Status
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <select
+                      aria-label="Daily status range"
+                      value={dailyRange}
+                      onChange={(e) => {
+                        const v = e.target.value as
+                          | "today"
+                          | "7d"
+                          | "30d"
+                          | "90d"
+                          | "all"
+                          | "custom";
+                        setDailyRange(v);
+                        if (v !== "custom") {
+                          const end = new Date();
+                          const start = new Date();
+                          if (v === "today") start.setHours(0, 0, 0, 0);
+                          else if (v === "7d")
+                            start.setDate(start.getDate() - 6);
+                          else if (v === "30d")
+                            start.setDate(start.getDate() - 29);
+                          else if (v === "90d")
+                            start.setDate(start.getDate() - 89);
+                          setDailyStartDate(start.toISOString().split("T")[0]);
+                          setDailyEndDate(end.toISOString().split("T")[0]);
+                        }
+                      }}
+                      className="px-3 py-2 border border-gray-300 bg-white text-sm text-gray-900"
+                    >
+                      <option value="today">Today</option>
+                      <option value="7d">Last 7 Days</option>
+                      <option value="30d">Last 30 Days</option>
+                      <option value="90d">Last 90 Days</option>
+                      <option value="all">All</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    {dailyRange === "custom" && (
+                      <>
+                        <input
+                          title="Start date"
+                          type="date"
+                          value={dailyStartDate}
+                          onChange={(e) => setDailyStartDate(e.target.value)}
+                          className="px-2 py-2 border border-gray-300 text-gray-900 text-sm"
+                        />
+                        <span className="text-gray-500">to</span>
+                        <input
+                          title="End date"
+                          type="date"
+                          value={dailyEndDate}
+                          onChange={(e) => setDailyEndDate(e.target.value)}
+                          className="px-2 py-2 border border-gray-300 text-sm text-gray-900"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="overflow-x-auto">
+                {/* Compute displayed daily status based on dailyRange/dates */}
+                {(() => {
+                  const allDaily = reportData?.dailyStatus || [];
+                  let start: Date | null = null;
+                  let end: Date | null = null;
+
+                  if (dailyRange === "all") {
+                    start = null;
+                    end = null;
+                  } else if (dailyRange === "custom") {
+                    if (dailyStartDate) start = new Date(dailyStartDate);
+                    if (dailyEndDate) {
+                      end = new Date(dailyEndDate);
+                      end.setHours(23, 59, 59, 999);
+                    }
+                  } else {
+                    end = new Date();
+                    end.setHours(23, 59, 59, 999);
+                    start = new Date();
+                    if (dailyRange === "today") {
+                      start.setHours(0, 0, 0, 0);
+                    } else if (dailyRange === "7d") {
+                      start.setDate(start.getDate() - 6);
+                      start.setHours(0, 0, 0, 0);
+                    } else if (dailyRange === "30d") {
+                      start.setDate(start.getDate() - 29);
+                      start.setHours(0, 0, 0, 0);
+                    } else if (dailyRange === "90d") {
+                      start.setDate(start.getDate() - 89);
+                      start.setHours(0, 0, 0, 0);
+                    }
+                  }
+
+                  // Filter rows by date range if start/end provided
+                  const filtered = allDaily.filter((row) => {
+                    if (!start || !end) return true;
+                    const d = new Date(row.date);
+                    return d >= start! && d <= end!;
+                  });
+
+                  // Attach filtered list to a ref on window so JSX mapping below can access it via a variable
+                  (
+                    window as Window & {
+                      __displayedDailyStatus?: ReportData["dailyStatus"];
+                    }
+                  ).__displayedDailyStatus = filtered
+                    .slice()
+                    .sort((a, b) => b.date.localeCompare(a.date));
+                  return null;
+                })()}
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Sales
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Original Price
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Profit
@@ -1010,10 +1202,20 @@ function ReportsPageContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {reportData?.dailyStatus
-                      .slice()
-                      .sort((a, b) => b.date.localeCompare(a.date))
-                      .map((row) => (
+                    {(() => {
+                      const total = displayedDailyStatus.length;
+                      const dailyTotalPages = Math.max(
+                        1,
+                        Math.ceil(total / dailyRowsPerPage),
+                      );
+                      const dailyStartIndex =
+                        (dailyCurrentPage - 1) * dailyRowsPerPage;
+                      const dailyEndIndex = dailyStartIndex + dailyRowsPerPage;
+                      const dailyPageRows = displayedDailyStatus.slice(
+                        dailyStartIndex,
+                        dailyEndIndex,
+                      );
+                      return dailyPageRows.map((row) => (
                         <tr key={row.date} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {(() => {
@@ -1022,27 +1224,166 @@ function ReportsPageContent() {
                             })()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>{formatPrice(row.totalSalesTHB || 0)}</div>
+                            <div className="text-xs text-gray-500">
+                              {SettingsService.formatPrice(
+                                row.totalSalesMMK || 0,
+                                "MMK",
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>{formatPrice(row.originalPriceTHB || 0)}</div>
+                            <div className="text-xs text-gray-500">
+                              {SettingsService.formatPrice(
+                                row.originalPriceMMK || 0,
+                                "MMK",
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             <div>{formatPrice(row.profitTHB || 0)}</div>
                             <div className="text-xs text-gray-500">
-                              {formatInMMK(row.profitMMK || 0)}
+                              {SettingsService.formatPrice(
+                                row.profitMMK || 0,
+                                "MMK",
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             <div>{formatPrice(row.expenseTHB || 0)}</div>
                             <div className="text-xs text-gray-500">
-                              {formatInMMK(row.expenseMMK || 0)}
+                              {SettingsService.formatPrice(
+                                row.expenseMMK || 0,
+                                "MMK",
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             <div>{formatPrice(row.netTHB || 0)}</div>
                             <div className="text-xs text-gray-500">
-                              {formatInMMK(row.netMMK || 0)}
+                              {SettingsService.formatPrice(
+                                row.netMMK || 0,
+                                "MMK",
+                              )}
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      ));
+                    })()}
                   </tbody>
                 </table>
+                {/* Daily Status Pagination */}
+                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={() =>
+                        setDailyCurrentPage(Math.max(1, dailyCurrentPage - 1))
+                      }
+                      disabled={dailyCurrentPage === 1}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() =>
+                        setDailyCurrentPage((p) =>
+                          Math.min(
+                            Math.ceil(
+                              (displayedDailyStatus.length || 1) /
+                                dailyRowsPerPage,
+                            ),
+                            p + 1,
+                          ),
+                        )
+                      }
+                      disabled={
+                        dailyCurrentPage ===
+                        Math.ceil(
+                          (displayedDailyStatus.length || 1) / dailyRowsPerPage,
+                        )
+                      }
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm text-gray-700">Rows per page:</p>
+                      <select
+                        title="Select number of rows per page"
+                        value={dailyRowsPerPage}
+                        onChange={(e) => {
+                          setDailyRowsPerPage(Number(e.target.value));
+                          setDailyCurrentPage(1);
+                        }}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <p className="text-sm text-gray-700">
+                        Showing{" "}
+                        {Math.min(
+                          displayedDailyStatus.length,
+                          (dailyCurrentPage - 1) * dailyRowsPerPage + 1,
+                        )}
+                        –
+                        {Math.min(
+                          dailyCurrentPage * dailyRowsPerPage,
+                          displayedDailyStatus.length,
+                        )}{" "}
+                        of {displayedDailyStatus.length} days
+                      </p>
+                    </div>
+                    <div>
+                      <nav
+                        className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                        aria-label="Pagination"
+                      >
+                        <button
+                          title="Go to previous page"
+                          onClick={() =>
+                            setDailyCurrentPage(
+                              Math.max(1, dailyCurrentPage - 1),
+                            )
+                          }
+                          disabled={dailyCurrentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                          title="Go to next page"
+                          onClick={() =>
+                            setDailyCurrentPage((p) =>
+                              Math.min(
+                                Math.ceil(
+                                  (displayedDailyStatus.length || 1) /
+                                    dailyRowsPerPage,
+                                ),
+                                p + 1,
+                              ),
+                            )
+                          }
+                          disabled={
+                            dailyCurrentPage ===
+                            Math.ceil(
+                              (displayedDailyStatus.length || 1) /
+                                dailyRowsPerPage,
+                            )
+                          }
+                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
