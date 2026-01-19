@@ -30,7 +30,7 @@ const generateId = () =>
 export class StockService {
   static async createStock(
     stockData: CreateStockRequest,
-    userId: string
+    userId: string,
   ): Promise<StockItem> {
     if (!db || !isFirebaseConfigured) {
       throw new Error("Firebase is not configured");
@@ -42,14 +42,14 @@ export class StockService {
         (tier) => ({
           ...tier,
           id: generateId(),
-        })
+        }),
       );
 
       const colorVariants: ColorVariant[] = stockData.colorVariants.map(
         (variant) => ({
           ...variant,
           id: generateId(),
-        })
+        }),
       );
 
       const stockItem: Omit<StockItem, "id"> = {
@@ -86,7 +86,7 @@ export class StockService {
     try {
       const q = query(
         collection(db, COLLECTION_NAME),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
       );
 
       const querySnapshot = await getDocs(q);
@@ -125,7 +125,7 @@ export class StockService {
       const q = query(
         collection(db, COLLECTION_NAME),
         orderBy("createdAt", "desc"),
-        limit(limitCount)
+        limit(limitCount),
       );
 
       const querySnapshot = await getDocs(q);
@@ -163,7 +163,7 @@ export class StockService {
       const q = query(
         collection(db, COLLECTION_NAME),
         where("shop", "==", shop),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
       );
 
       const querySnapshot = await getDocs(q);
@@ -194,7 +194,7 @@ export class StockService {
 
   static async updateStock(
     id: string,
-    updates: Partial<StockItem>
+    updates: Partial<StockItem>,
   ): Promise<void> {
     if (!db || !isFirebaseConfigured) {
       throw new Error("Firebase is not configured");
@@ -216,13 +216,13 @@ export class StockService {
     if (!db || !isFirebaseConfigured) {
       // Return mock data when Firebase is not configured
       const mockStocks = this.getMockStocks();
-      return mockStocks.find(stock => stock.id === id) || null;
+      return mockStocks.find((stock) => stock.id === id) || null;
     }
 
     try {
       const stockRef = doc(db, COLLECTION_NAME, id);
       const stockDoc = await getDoc(stockRef);
-      
+
       if (!stockDoc.exists()) {
         return null;
       }
@@ -345,7 +345,8 @@ export class StockService {
     stockId: string,
     colorName: string,
     size: string,
-    quantity: number
+    quantity: number,
+    variantHint?: string,
   ): Promise<void> {
     if (!db || !isFirebaseConfigured) {
       console.warn("Firebase not configured, skipping inventory restoration");
@@ -353,59 +354,135 @@ export class StockService {
     }
 
     try {
-      console.log(`Attempting to restore inventory: stockId=${stockId}, color=${colorName}, size=${size}, quantity=${quantity}`);
-      
+      console.log(
+        `Attempting to restore inventory: stockId=${stockId}, color=${colorName}, size=${size}, quantity=${quantity}`,
+      );
+
       // Get the current stock item
       const stockRef = doc(db, COLLECTION_NAME, stockId);
       const stockDoc = await getDoc(stockRef);
-      
+
       if (!stockDoc.exists()) {
         console.error(`Stock item ${stockId} not found`);
         return;
       }
 
       const stockData = stockDoc.data() as StockItem;
-      console.log(`Found stock item: ${stockData.groupName}, variants:`, stockData.colorVariants?.map(v => ({ id: v.id, color: v.color })));
-      
-      // Find the color variant by color name (case-insensitive)
-      const targetVariant = stockData.colorVariants?.find(variant => 
-        variant.color.toLowerCase() === colorName.toLowerCase()
+      console.log(
+        `Found stock item: ${stockData.groupName}, variants:`,
+        stockData.colorVariants?.map((v) => ({ id: v.id, color: v.color })),
       );
-      
+
+      // Try to find variant by several strategies in order of likelihood:
+      // 1) exact id match, 2) id contains colorName, 3) exact color name match (case-insensitive),
+      // 4) barcode match, 5) colorCode match, 6) size match, 7) fallback single variant.
+      const variants = stockData.colorVariants || [];
+      const normalizedColorName = (colorName || "").trim();
+      const normalizedVariantHint = (variantHint || "").trim();
+
+      let targetVariant = normalizedVariantHint
+        ? variants.find((v) => v.id === normalizedVariantHint)
+        : undefined;
+
+      if (!targetVariant && normalizedColorName) {
+        // id contains (covers cases where ids were prefixed/suffixed)
+        targetVariant = variants.find(
+          (v) => v.id && v.id.includes(normalizedColorName),
+        );
+      }
+
+      if (!targetVariant && normalizedColorName) {
+        targetVariant = variants.find(
+          (v) =>
+            (v.color || "").toLowerCase() === normalizedColorName.toLowerCase(),
+        );
+      }
+
+      if (!targetVariant && normalizedColorName) {
+        targetVariant = variants.find(
+          (v) => (v.barcode || "") === normalizedColorName,
+        );
+      }
+
+      if (!targetVariant && normalizedColorName) {
+        targetVariant = variants.find(
+          (v) => (v.colorCode || "") === normalizedColorName,
+        );
+      }
+
+      // If still not found, try to find a variant that has the requested size
+      if (!targetVariant && size) {
+        targetVariant = variants.find((v) =>
+          v.sizeQuantities?.some((sq) => sq.size === size),
+        );
+      }
+
+      // If no color specified and only one variant exists, pick it
+      if (!targetVariant && !normalizedColorName && variants.length === 1) {
+        targetVariant = variants[0];
+      }
+
       if (!targetVariant) {
-        console.error(`Color variant "${colorName}" not found in stock item ${stockId}. Available colors:`, 
-          stockData.colorVariants?.map(v => v.color));
+        console.error(
+          `Color variant "${colorName}" not found in stock item ${stockId}. Available variants:`,
+          variants.map((v) => ({
+            id: v.id,
+            color: v.color,
+            barcode: v.barcode,
+            colorCode: v.colorCode,
+          })),
+        );
         return;
       }
-      
-      console.log(`Found color variant: ${targetVariant.id} (${targetVariant.color})`);
-      
+
+      console.log(
+        `Found color variant: ${targetVariant.id} (${targetVariant.color})`,
+      );
+
       // Log current inventory state before restoration
-      const currentSizeQty = targetVariant.sizeQuantities.find(sq => sq.size === size);
-      console.log(`BEFORE RESTORATION - ${stockId} (${colorName}, ${size}): current quantity = ${currentSizeQty?.quantity || 0}`);
-      
+      const currentSizeQty = targetVariant.sizeQuantities.find(
+        (sq) => sq.size === size,
+      );
+      console.log(
+        `BEFORE RESTORATION - ${stockId} (${targetVariant.id || targetVariant.color}, ${size}): current quantity = ${
+          currentSizeQty?.quantity || 0
+        }`,
+      );
+
       // Find and update the specific color variant and size
-      const updatedColorVariants = stockData.colorVariants?.map(variant => {
-        if (variant.id === targetVariant.id) {
-          const updatedSizeQuantities = variant.sizeQuantities.map(sizeQty => {
-            if (sizeQty.size === size) {
-              const newQuantity = sizeQty.quantity + quantity;
-              console.log(`DURING RESTORATION - ${stockId} (${colorName}, ${size}): ${sizeQty.quantity} + ${quantity} = ${newQuantity}`);
-              return {
-                ...sizeQty,
-                quantity: newQuantity
-              };
-            }
-            return sizeQty;
-          });
-          
-          return {
-            ...variant,
-            sizeQuantities: updatedSizeQuantities
-          };
-        }
-        return variant;
-      }) || [];
+      const updatedColorVariants =
+        stockData.colorVariants?.map((variant) => {
+          if (variant.id === targetVariant.id) {
+            let foundSize = false;
+            const updatedSizeQuantities = variant.sizeQuantities.map(
+              (sizeQty) => {
+                if (sizeQty.size === size) {
+                  foundSize = true;
+                  const newQuantity = sizeQty.quantity + quantity;
+                  console.log(
+                    `DURING RESTORATION - ${stockId} (${targetVariant.id || targetVariant.color}, ${size}): ${sizeQty.quantity} + ${quantity} = ${newQuantity}`,
+                  );
+                  return {
+                    ...sizeQty,
+                    quantity: newQuantity,
+                  };
+                }
+                return sizeQty;
+              },
+            );
+
+            // If the size did not exist, add it with the restored quantity
+            const finalSizeQuantities = foundSize
+              ? updatedSizeQuantities
+              : [...updatedSizeQuantities, { size, quantity }];
+
+            return {
+              ...variant,
+              sizeQuantities: updatedSizeQuantities,
+            };
+          }
+          return variant;
+        }) || [];
 
       // Update the stock in the database
       await updateDoc(stockRef, {
@@ -414,10 +491,18 @@ export class StockService {
       });
 
       // Verify the update by checking the final state
-      const updatedVariant = updatedColorVariants.find(v => v.id === targetVariant.id);
-      const finalSizeQty = updatedVariant?.sizeQuantities.find(sq => sq.size === size);
-      console.log(`AFTER RESTORATION - ${stockId} (${colorName}, ${size}): final quantity = ${finalSizeQty?.quantity || 0}`);
-      console.log(`✓ Successfully restored ${quantity} units of ${stockId} (${colorName}, ${size})`);
+      const updatedVariant = updatedColorVariants.find(
+        (v) => v.id === targetVariant.id,
+      );
+      const finalSizeQty = updatedVariant?.sizeQuantities.find(
+        (sq) => sq.size === size,
+      );
+      console.log(
+        `AFTER RESTORATION - ${stockId} (${colorName}, ${size}): final quantity = ${finalSizeQty?.quantity || 0}`,
+      );
+      console.log(
+        `✓ Successfully restored ${quantity} units of ${stockId} (${colorName}, ${size})`,
+      );
     } catch (error) {
       console.error("Error restoring inventory:", error);
       throw new Error("Failed to restore inventory");
@@ -433,7 +518,8 @@ export class StockService {
       colorName: string;
       size: string;
       quantity: number;
-    }>
+      variantHint?: string; // Added optional variantHint field
+    }>,
   ): Promise<void> {
     if (!db || !isFirebaseConfigured) {
       console.warn("Firebase not configured, skipping inventory restoration");
@@ -442,57 +528,97 @@ export class StockService {
 
     try {
       console.log(`Restoring inventory for ${items.length} items:`, items);
-      
+
       // Group items by stockId to avoid race conditions
-      const itemsByStockId = items.reduce((groups, item) => {
-        if (!groups[item.stockId]) {
-          groups[item.stockId] = [];
-        }
-        groups[item.stockId].push(item);
-        return groups;
-      }, {} as Record<string, typeof items>);
-      
-      console.log(`Grouped items into ${Object.keys(itemsByStockId).length} stock groups:`, 
-        Object.entries(itemsByStockId).map(([stockId, items]) => ({ stockId, count: items.length })));
-      
+      const itemsByStockId = items.reduce(
+        (groups, item) => {
+          if (!groups[item.stockId]) {
+            groups[item.stockId] = [];
+          }
+          groups[item.stockId].push(item);
+          return groups;
+        },
+        {} as Record<string, typeof items>,
+      );
+
+      console.log(
+        `Grouped items into ${Object.keys(itemsByStockId).length} stock groups:`,
+        Object.entries(itemsByStockId).map(([stockId, items]) => ({
+          stockId,
+          count: items.length,
+        })),
+      );
+
       // Process each stock group sequentially to avoid race conditions
-      const restorationResults: Array<{ success: boolean; item: { stockId: string; colorName: string; size: string; quantity: number }; error?: unknown }> = [];
-      
+      const restorationResults: Array<{
+        success: boolean;
+        item: {
+          stockId: string;
+          colorName: string;
+          size: string;
+          quantity: number;
+        };
+        error?: unknown;
+      }> = [];
+
       for (const [stockId, stockItems] of Object.entries(itemsByStockId)) {
-        console.log(`Processing ${stockItems.length} items for stock ${stockId}`);
-        
+        console.log(
+          `Processing ${stockItems.length} items for stock ${stockId}`,
+        );
+
         // Process items for this stock sequentially
         for (let i = 0; i < stockItems.length; i++) {
           const item = stockItems[i];
           try {
-            console.log(`Restoring item ${i + 1}/${stockItems.length} for stock ${stockId}: (${item.colorName}, ${item.size}) x${item.quantity}`);
-            await this.restoreInventory(item.stockId, item.colorName, item.size, item.quantity);
-            console.log(`✓ Successfully restored item ${i + 1} for stock ${stockId}`);
+            console.log(
+              `Restoring item ${i + 1}/${stockItems.length} for stock ${stockId}: (${item.colorName}, ${item.size}) x${item.quantity}`,
+            );
+            await this.restoreInventory(
+              item.stockId,
+              item.colorName,
+              item.size,
+              item.quantity,
+              item.variantHint, // Pass variantHint to restoreInventory
+            );
+            console.log(
+              `✓ Successfully restored item ${i + 1} for stock ${stockId}`,
+            );
             restorationResults.push({ success: true, item });
           } catch (error) {
-            console.error(`✗ Failed to restore item ${i + 1} for stock ${stockId}:`, error);
+            console.error(
+              `✗ Failed to restore item ${i + 1} for stock ${stockId}:`,
+              error,
+            );
             restorationResults.push({ success: false, item, error });
           }
         }
       }
 
       // Count successful and failed restorations
-      const successful = restorationResults.filter(result => result.success).length;
-      const failed = restorationResults.filter(result => !result.success).length;
+      const successful = restorationResults.filter(
+        (result) => result.success,
+      ).length;
+      const failed = restorationResults.filter(
+        (result) => !result.success,
+      ).length;
 
-      console.log(`Inventory restoration completed: ${successful} successful, ${failed} failed out of ${items.length} items`);
+      console.log(
+        `Inventory restoration completed: ${successful} successful, ${failed} failed out of ${items.length} items`,
+      );
 
       // Log failed items for debugging
       if (failed > 0) {
         const failedItems = restorationResults
-          .filter(result => !result.success)
-          .map(result => result.item);
-        console.warn('Failed to restore these items:', failedItems);
+          .filter((result) => !result.success)
+          .map((result) => result.item);
+        console.warn("Failed to restore these items:", failedItems);
       }
 
       // Only throw error if ALL items failed
       if (successful === 0 && failed > 0) {
-        throw new Error(`Failed to restore inventory for all ${items.length} items`);
+        throw new Error(
+          `Failed to restore inventory for all ${items.length} items`,
+        );
       }
     } catch (error) {
       console.error("Error restoring multiple items:", error);

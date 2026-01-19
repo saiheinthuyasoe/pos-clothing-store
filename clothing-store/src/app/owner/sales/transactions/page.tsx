@@ -72,6 +72,8 @@ export default function TransactionsPage() {
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>(
     [],
   );
+  const [isProcessingRefund, setIsProcessingRefund] = useState(false);
+  const [isProcessingCancel, setIsProcessingCancel] = useState(false);
 
   const isProbablyId = (s?: string) => !!s && /(^cv|[-_].+-)/.test(s);
 
@@ -263,7 +265,10 @@ export default function TransactionsPage() {
   const totalPages = Math.ceil(sortedFilteredTransactions.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const currentTransactions = sortedFilteredTransactions.slice(startIndex, endIndex);
+  const currentTransactions = sortedFilteredTransactions.slice(
+    startIndex,
+    endIndex,
+  );
 
   // Filter for revenue-generating transactions (completed, partially refunded, and refunded)
   const revenueTransactions = sortedFilteredTransactions.filter(
@@ -494,6 +499,10 @@ export default function TransactionsPage() {
   const handleRefundSubmit = async () => {
     if (!selectedTransaction || !selectedTransaction.id) return;
 
+    // Prevent double submissions
+    if (isProcessingRefund) return;
+    setIsProcessingRefund(true);
+
     try {
       // Validate that there are items to refund
       const hasItemsToRefund = Object.values(refundItems).some(
@@ -589,11 +598,17 @@ export default function TransactionsPage() {
           error instanceof Error ? error.message : "Please try again."
         }`,
       );
+    } finally {
+      setIsProcessingRefund(false);
     }
   };
 
   const handleCancelTransaction = async () => {
     if (!selectedTransaction) return;
+
+    // Prevent double submissions
+    if (isProcessingCancel) return;
+    setIsProcessingCancel(true);
 
     try {
       // Validate that the transaction can be cancelled
@@ -622,6 +637,8 @@ export default function TransactionsPage() {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
       alert(`Failed to cancel transaction: ${errorMessage}. Please try again.`);
+    } finally {
+      setIsProcessingCancel(false);
     }
   };
 
@@ -1880,9 +1897,12 @@ export default function TransactionsPage() {
                       </button>
                       <button
                         onClick={handleCancelTransaction}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        disabled={isProcessingCancel}
+                        className={`px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors ${
+                          isProcessingCancel ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
                       >
-                        Cancel Transaction
+                        {isProcessingCancel ? "Cancelling..." : "Cancel Transaction"}
                       </button>
                     </div>
                   </div>

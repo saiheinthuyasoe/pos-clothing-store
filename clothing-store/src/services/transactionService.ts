@@ -602,6 +602,7 @@ class TransactionService {
             colorName: originalItem.selectedColor || "",
             size: originalItem.selectedSize || "",
             quantity: refundItem.quantity,
+            variantHint: originalItem.id || "",
           };
         });
 
@@ -768,6 +769,7 @@ class TransactionService {
         colorName: string;
         size: string;
         quantity: number;
+        variantHint?: string;
       }> = [];
 
       transaction.items.forEach((item, index) => {
@@ -792,6 +794,7 @@ class TransactionService {
             colorName: item.selectedColor || "",
             size: item.selectedSize || "",
             quantity: remainingQuantity,
+            variantHint: item.id || "",
           });
         } else {
           console.log(`Skipping item ${index + 1} - already fully refunded`);
@@ -880,6 +883,7 @@ class TransactionService {
         colorName: string;
         size: string;
         quantity: number;
+        variantHint?: string;
       }> = [];
 
       transaction.items.forEach((item, index) => {
@@ -898,6 +902,7 @@ class TransactionService {
           colorName: item.selectedColor || "",
           size: item.selectedSize || "",
           quantity: item.quantity,
+          variantHint: item.id || "",
         });
       });
 
