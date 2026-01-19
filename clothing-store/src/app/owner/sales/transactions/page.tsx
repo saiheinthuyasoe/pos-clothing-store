@@ -252,14 +252,21 @@ export default function TransactionsPage() {
     );
   });
 
+  // Sort filtered transactions by timestamp (newest first) and then paginate
+  const sortedFilteredTransactions = [...filteredTransactions].sort((a, b) => {
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
+    return bTime - aTime;
+  });
+
   // Pagination calculations
-  const totalPages = Math.ceil(filteredTransactions.length / rowsPerPage);
+  const totalPages = Math.ceil(sortedFilteredTransactions.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const currentTransactions = filteredTransactions.slice(startIndex, endIndex);
+  const currentTransactions = sortedFilteredTransactions.slice(startIndex, endIndex);
 
   // Filter for revenue-generating transactions (completed, partially refunded, and refunded)
-  const revenueTransactions = filteredTransactions.filter(
+  const revenueTransactions = sortedFilteredTransactions.filter(
     (t) =>
       t.status === "completed" ||
       t.status === "partially_refunded" ||
