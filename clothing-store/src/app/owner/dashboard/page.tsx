@@ -1063,6 +1063,70 @@ function OwnerDashboardContent() {
               </div>
             ) : (
               <>
+                
+                {/* Key Performance Indicators */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  {/* Total Revenue */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Sales
+                        </p>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {formatPrice(stats.totalRevenue)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total Profit */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Profit
+                        </p>
+                        <p className="text-3xl font-bold text-green-600">
+                          {formatPrice(stats.totalProfit)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total Orders */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Orders
+                        </p>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {stats.totalOrders}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total Customers */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">
+                          Total Customers
+                        </p>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {stats.totalCustomers}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <hr className="text-gray-300 p-3"></hr>
+                </div>
+
                 {/* Currency Specific Totals */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                   <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -1123,63 +1187,9 @@ function OwnerDashboardContent() {
                     </div>
                   </div>
                 </div>
-                {/* Key Performance Indicators */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                  {/* Total Revenue */}
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Sales
-                        </p>
-                        <p className="text-3xl font-bold text-gray-900">
-                          {formatPrice(stats.totalRevenue)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Total Profit */}
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Profit
-                        </p>
-                        <p className="text-3xl font-bold text-green-600">
-                          {formatPrice(stats.totalProfit)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Total Orders */}
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Orders
-                        </p>
-                        <p className="text-3xl font-bold text-gray-900">
-                          {stats.totalOrders}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Total Customers */}
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Customers
-                        </p>
-                        <p className="text-3xl font-bold text-gray-900">
-                          {stats.totalCustomers}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <hr className="text-gray-300 p-3"></hr>
                 </div>
 
                 {/* Secondary Metrics */}
@@ -1243,6 +1253,10 @@ function OwnerDashboardContent() {
                       <AlertCircle className="h-6 w-6 text-orange-600" />
                     </div>
                   </div>
+                </div>
+                
+                <div>
+                  <hr className="text-gray-300 p-3"></hr>
                 </div>
 
                 {/* Order Status Breakdown */}

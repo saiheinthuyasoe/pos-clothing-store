@@ -1899,10 +1899,14 @@ export default function TransactionsPage() {
                         onClick={handleCancelTransaction}
                         disabled={isProcessingCancel}
                         className={`px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors ${
-                          isProcessingCancel ? "opacity-60 cursor-not-allowed" : ""
+                          isProcessingCancel
+                            ? "opacity-60 cursor-not-allowed"
+                            : ""
                         }`}
                       >
-                        {isProcessingCancel ? "Cancelling..." : "Cancel Transaction"}
+                        {isProcessingCancel
+                          ? "Cancelling..."
+                          : "Cancel Transaction"}
                       </button>
                     </div>
                   </div>

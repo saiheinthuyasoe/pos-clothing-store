@@ -50,6 +50,15 @@ interface ReportData {
     revenue: number;
     transactions: number;
   }>;
+  dailyStatus: Array<{
+    date: string;
+    profitTHB: number;
+    profitMMK: number;
+    expenseTHB: number;
+    expenseMMK: number;
+    netTHB: number;
+    netMMK: number;
+  }>;
   paymentMethodBreakdown: Array<{
     method: string;
     count: number;
@@ -433,6 +442,79 @@ function ReportsPageContent() {
       ...data,
     }));
 
+    // Daily status: profit, expense, net (THB and MMK) for last 7 days
+    const dailyStatusMap: {
+      [key: string]: {
+        profitTHB: number;
+        profitMMK: number;
+        expenseTHB: number;
+        expenseMMK: number;
+      };
+    } = {};
+
+    last7Days.forEach((d) => {
+      dailyStatusMap[d] = {
+        profitTHB: 0,
+        profitMMK: 0,
+        expenseTHB: 0,
+        expenseMMK: 0,
+      };
+    });
+
+    // Compute profit per transaction per day
+    const isRevenueStatus = (s: string) =>
+      s === "completed" || s === "partially_refunded" || s === "refunded";
+
+    transactions.forEach((transaction) => {
+      const dateKey = new Date(transaction.timestamp)
+        .toISOString()
+        .split("T")[0];
+      if (!dailyStatusMap[dateKey]) return;
+      if (!isRevenueStatus(transaction.status)) return;
+
+      // Compute refunded quantities map for this transaction
+      const refundedQuantities: { [itemIndex: number]: number } = {};
+      if (transaction.refunds) {
+        transaction.refunds.forEach((refund) => {
+          refund.items.forEach((ri) => {
+            refundedQuantities[ri.itemIndex] =
+              (refundedQuantities[ri.itemIndex] || 0) + ri.quantity;
+          });
+        });
+      }
+
+      transaction.items.forEach((item, idx) => {
+        const refundedQty = refundedQuantities[idx] || 0;
+        const netQty = Math.max(0, item.quantity - refundedQty);
+        const profit = (item.unitPrice - item.originalPrice) * netQty;
+        if ((transaction.sellingCurrency || "THB").toUpperCase() === "THB") {
+          dailyStatusMap[dateKey].profitTHB += profit;
+        } else {
+          dailyStatusMap[dateKey].profitMMK += profit;
+        }
+      });
+    });
+
+    // Compute expenses per day
+    (expenses || []).forEach((exp: Expense) => {
+      const dateKey = new Date(exp.date).toISOString().split("T")[0];
+      if (!dailyStatusMap[dateKey]) return;
+      if (exp.currency === "THB")
+        dailyStatusMap[dateKey].expenseTHB += exp.amount || 0;
+      else if (exp.currency === "MMK")
+        dailyStatusMap[dateKey].expenseMMK += exp.amount || 0;
+    });
+
+    const dailyStatus = Object.entries(dailyStatusMap).map(([date, v]) => ({
+      date,
+      profitTHB: v.profitTHB,
+      profitMMK: v.profitMMK,
+      expenseTHB: v.expenseTHB,
+      expenseMMK: v.expenseMMK,
+      netTHB: v.profitTHB - v.expenseTHB,
+      netMMK: v.profitMMK - v.expenseMMK,
+    }));
+
     // Payment method breakdown
     const paymentMethods: { [key: string]: number } = {};
     transactions.forEach((transaction) => {
@@ -477,6 +559,7 @@ function ReportsPageContent() {
       averageOrderValue,
       topSellingItems,
       dailySales: dailySalesArray,
+      dailyStatus,
       paymentMethodBreakdown,
       recentTransactions,
     };
@@ -898,6 +981,68 @@ function ReportsPageContent() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Daily Status Table */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Daily Status (Last 7 Days)
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Profit
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Expense
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Net Profit
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData?.dailyStatus
+                      .slice()
+                      .sort((a, b) => b.date.localeCompare(a.date))
+                      .map((row) => (
+                      <tr key={row.date} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {(() => {
+                            const d = new Date(row.date);
+                            return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+                          })()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div>{formatPrice(row.profitTHB || 0)}</div>
+                          <div className="text-xs text-gray-500">
+                            {formatInMMK(row.profitMMK || 0)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div>{formatPrice(row.expenseTHB || 0)}</div>
+                          <div className="text-xs text-gray-500">
+                            {formatInMMK(row.expenseMMK || 0)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div>{formatPrice(row.netTHB || 0)}</div>
+                          <div className="text-xs text-gray-500">
+                            {formatInMMK(row.netMMK || 0)}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
