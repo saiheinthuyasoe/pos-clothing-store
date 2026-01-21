@@ -1128,7 +1128,7 @@ function ReportsPageContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Total Stock (Unit Price)
+                      Remaining Stock Value (Unit Price)
                     </p>
                     <p className="text-2xl font-bold text-green-600">
                       {formatPrice(reportData?.totalStockSellValueTHB || 0)}
@@ -1147,7 +1147,7 @@ function ReportsPageContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Total Stock (Original Price)
+                      Remaining Stock Value (Original Price)
                     </p>
                     <p className="text-2xl font-bold text-purple-600">
                       {formatPrice(reportData?.totalStockOriginalTHB || 0)}
@@ -1290,6 +1290,24 @@ function ReportsPageContent() {
                       <option value="90d">Last 90 Days</option>
                       <option value="all">All</option>
                       <option value="custom">Custom</option>
+                    </select>
+                    <select
+                      aria-label="Daily status branch"
+                      value={filterBranch || "all"}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setFilterBranch(v);
+                        setDailyCurrentPage(1);
+                        setCurrentPage(1);
+                      }}
+                      className="px-3 py-2 border border-gray-300 bg-white text-sm text-gray-900"
+                    >
+                      <option value="all">All Branches</option>
+                      {shops.map((shop) => (
+                        <option key={shop.id} value={shop.name}>
+                          {shop.name}
+                        </option>
+                      ))}
                     </select>
                     {dailyRange === "custom" && (
                       <>
