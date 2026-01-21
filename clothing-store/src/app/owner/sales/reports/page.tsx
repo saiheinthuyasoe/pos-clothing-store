@@ -7,6 +7,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { transactionService, Transaction } from "@/services/transactionService";
 import { ShopService } from "@/services/shopService";
+import { StockService } from "@/services/stockService";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { SettingsService } from "@/services/settingsService";
 import { TopNavBar } from "@/components/ui/TopNavBar";
@@ -35,11 +36,18 @@ interface ReportData {
   totalRevenueMMK: number;
   totalRevenueTHB: number;
   totalProfit: number;
+  totalNetTHB?: number;
+  totalNetMMK?: number;
   totalExpenseTHB: number;
   totalExpenseMMK: number;
   totalTransactions: number;
   totalCustomers: number;
   averageOrderValue: number;
+  // Inventory totals (top-level)
+  totalStockSellValueTHB?: number;
+  totalStockSellValueMMK?: number;
+  totalStockOriginalTHB?: number;
+  totalStockOriginalMMK?: number;
   topSellingItems: Array<{
     name: string;
     quantity: number;
@@ -54,6 +62,11 @@ interface ReportData {
     date: string;
     profitTHB: number;
     profitMMK: number;
+    // Inventory totals
+    totalStockSellValueTHB?: number;
+    totalStockSellValueMMK?: number;
+    totalStockOriginalTHB?: number;
+    totalStockOriginalMMK?: number;
     expenseTHB: number;
     expenseMMK: number;
     totalSalesTHB: number;
@@ -167,9 +180,10 @@ function ReportsPageContent() {
   const loadReportData = async () => {
     try {
       setLoading(true);
-      const [transactions, expensesRes] = await Promise.all([
+      const [transactions, expensesRes, stocks] = await Promise.all([
         transactionService.getTransactions(),
         fetch("/api/expenses"),
+        StockService.getAllStocks(),
       ]);
 
       const expensesJson = await expensesRes.json();
@@ -251,8 +265,12 @@ function ReportsPageContent() {
         );
       }
 
-      // Calculate report data
-      const data = calculateReportData(filteredTransactions, filteredExpenses);
+      // Calculate report data (include stocks for inventory totals)
+      const data = calculateReportData(
+        filteredTransactions,
+        filteredExpenses,
+        stocks as unknown as Stock[],
+      );
       setReportData(data);
     } catch (error) {
       console.error("Error loading report data:", error);
@@ -261,9 +279,20 @@ function ReportsPageContent() {
     }
   };
 
+  type StockSizeQuantity = { quantity?: number };
+  type StockVariant = { sizeQuantities?: StockSizeQuantity[] };
+  type Stock = {
+    colorVariants?: StockVariant[];
+    unitPrice?: number;
+    originalPrice?: number;
+    // allow other properties safely if present
+    [key: string]: unknown;
+  };
+
   const calculateReportData = (
     transactions: Transaction[],
     expenses: Expense[] = [],
+    stocks: Stock[] = [],
   ): ReportData => {
     // Filter for revenue-generating transactions (completed, partially refunded, and refunded)
     const revenueTransactions = transactions.filter(
@@ -347,6 +376,31 @@ function ReportsPageContent() {
 
       return sum + Math.max(0, transactionProfit - refundedProfit);
     }, 0);
+
+    // Calculate total profit split by currency (THB / MMK), considering refunds
+    let totalProfitTHB = 0;
+    let totalProfitMMK = 0;
+    revenueTransactions.forEach((t) => {
+      const refundedQuantities: { [itemIndex: number]: number } = {};
+      if (t.refunds) {
+        t.refunds.forEach((refund) => {
+          refund.items.forEach((ri) => {
+            refundedQuantities[ri.itemIndex] =
+              (refundedQuantities[ri.itemIndex] || 0) + ri.quantity;
+          });
+        });
+      }
+
+      const transactionProfit = t.items.reduce((itemTotal, item, idx) => {
+        const refundedQty = refundedQuantities[idx] || 0;
+        const netQty = Math.max(0, item.quantity - refundedQty);
+        return itemTotal + (item.unitPrice - item.originalPrice) * netQty;
+      }, 0);
+
+      const sellingCurrency = (t.sellingCurrency || "THB").toUpperCase();
+      if (sellingCurrency === "THB") totalProfitTHB += transactionProfit;
+      else totalProfitMMK += transactionProfit;
+    });
 
     const totalTransactions = transactions.length;
     const uniqueCustomers = new Set(
@@ -454,6 +508,53 @@ function ReportsPageContent() {
       date,
       ...data,
     }));
+
+    // Inventory totals (sell value and original cost)
+    const totalStockSellValueTHB = (stocks || []).reduce((acc, stock) => {
+      const variants = stock.colorVariants || [];
+      const qty = variants.reduce((vAcc: number, v: StockVariant) => {
+        const sizes = v.sizeQuantities || [];
+        const sizeTotal = sizes.reduce(
+          (sAcc: number, s: StockSizeQuantity) => sAcc + (s.quantity || 0),
+          0,
+        );
+        return vAcc + sizeTotal;
+      }, 0);
+      return acc + (stock.unitPrice || 0) * qty;
+    }, 0);
+
+    const totalStockOriginalTHB = (stocks || []).reduce((acc, stock) => {
+      const variants = stock.colorVariants || [];
+      const qty = variants.reduce((vAcc: number, v: StockVariant) => {
+        const sizes = v.sizeQuantities || [];
+        const sizeTotal = sizes.reduce(
+          (sAcc: number, s: StockSizeQuantity) => sAcc + (s.quantity || 0),
+          0,
+        );
+        return vAcc + sizeTotal;
+      }, 0);
+      return acc + (stock.originalPrice || 0) * qty;
+    }, 0);
+
+    const currencyRate = businessSettings?.currencyRate || 0;
+    const defaultCurrency =
+      (businessSettings?.defaultCurrency as "THB" | "MMK") || "THB";
+
+    const totalStockSellValueMMK = SettingsService.convertPrice(
+      totalStockSellValueTHB,
+      "THB",
+      "MMK",
+      currencyRate,
+      defaultCurrency,
+    );
+
+    const totalStockOriginalMMK = SettingsService.convertPrice(
+      totalStockOriginalTHB,
+      "THB",
+      "MMK",
+      currencyRate,
+      defaultCurrency,
+    );
 
     // Daily status: profit, expense, net (THB and MMK) for a wider range
     const maxDailyDays = 90;
@@ -588,11 +689,25 @@ function ReportsPageContent() {
       { THB: 0, MMK: 0 },
     );
 
+    // Total net profit per currency = profit per currency - expenses per currency
+    const totalNetTHB =
+      (typeof totalProfitTHB !== "undefined" ? totalProfitTHB : 0) -
+      totalsByCurrency.THB;
+    const totalNetMMK =
+      (typeof totalProfitMMK !== "undefined" ? totalProfitMMK : 0) -
+      totalsByCurrency.MMK;
+
     return {
       totalRevenue,
       totalRevenueMMK,
       totalRevenueTHB,
       totalProfit,
+      totalNetTHB,
+      totalNetMMK,
+      totalStockSellValueTHB,
+      totalStockSellValueMMK,
+      totalStockOriginalTHB,
+      totalStockOriginalMMK,
       totalExpenseTHB: totalsByCurrency.THB,
       totalExpenseMMK: totalsByCurrency.MMK,
       totalTransactions,
@@ -942,6 +1057,10 @@ function ReportsPageContent() {
               </div>
             </div>
 
+            <div>
+              <hr className="text-gray-300 p-3"></hr>
+            </div>
+
             {/* Key Metrics - row 2 */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -997,6 +1116,73 @@ function ReportsPageContent() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div>
+              <hr className="text-gray-300 p-3"></hr>
+            </div>
+
+            {/* Inventory Totals */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Total Stock (Unit Price)
+                    </p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {formatPrice(reportData?.totalStockSellValueTHB || 0)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {SettingsService.formatPrice(
+                        reportData?.totalStockSellValueMMK || 0,
+                        "MMK",
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Total Stock (Original Price)
+                    </p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {formatPrice(reportData?.totalStockOriginalTHB || 0)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {SettingsService.formatPrice(
+                        reportData?.totalStockOriginalMMK || 0,
+                        "MMK",
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Total Net Profit
+                    </p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {formatPrice(reportData?.totalNetTHB || 0)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {SettingsService.formatPrice(
+                        reportData?.totalNetMMK || 0,
+                        "MMK",
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <hr className="text-gray-300 p-3"></hr>
             </div>
 
             {/* Charts and Tables */}
