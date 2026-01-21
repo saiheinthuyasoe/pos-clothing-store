@@ -1257,6 +1257,24 @@ function ReportsPageContent() {
                   </h3>
                   <div className="flex items-center space-x-2">
                     <select
+                      aria-label="Daily status branch"
+                      value={filterBranch || "all"}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setFilterBranch(v);
+                        setDailyCurrentPage(1);
+                        setCurrentPage(1);
+                      }}
+                      className="px-3 py-2 border border-gray-300 bg-white text-sm text-gray-900"
+                    >
+                      <option value="all">All Branches</option>
+                      {shops.map((shop) => (
+                        <option key={shop.id} value={shop.name}>
+                          {shop.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
                       aria-label="Daily status range"
                       value={dailyRange}
                       onChange={(e) => {
@@ -1290,24 +1308,6 @@ function ReportsPageContent() {
                       <option value="90d">Last 90 Days</option>
                       <option value="all">All</option>
                       <option value="custom">Custom</option>
-                    </select>
-                    <select
-                      aria-label="Daily status branch"
-                      value={filterBranch || "all"}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setFilterBranch(v);
-                        setDailyCurrentPage(1);
-                        setCurrentPage(1);
-                      }}
-                      className="px-3 py-2 border border-gray-300 bg-white text-sm text-gray-900"
-                    >
-                      <option value="all">All Branches</option>
-                      {shops.map((shop) => (
-                        <option key={shop.id} value={shop.name}>
-                          {shop.name}
-                        </option>
-                      ))}
                     </select>
                     {dailyRange === "custom" && (
                       <>
