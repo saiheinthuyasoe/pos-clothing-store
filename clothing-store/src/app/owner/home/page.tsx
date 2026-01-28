@@ -1332,48 +1332,61 @@ function OwnerHomeContent() {
                               <label className="text-xs font-medium text-gray-700 mb-1 block">
                                 Color:
                               </label>
-                              <div className="flex items-center space-x-1">
-                                {item.colorVariants &&
-                                item.colorVariants.length > 0 ? (
-                                  item.colorVariants.map((variant, index) => {
-                                    const variantId =
-                                      variant.id || `variant-${index}`;
-                                    const isSelected =
-                                      selectedColors[item.id] === variantId;
-                                    return (
-                                      <button
-                                        key={`${item.id}-${variantId}`}
-                                        onClick={() =>
-                                          handleColorSelect(item.id, variantId)
-                                        }
-                                        className={`relative w-6 h-6 rounded-full border-2 transition-all ${
-                                          isSelected
-                                            ? "border-blue-500 ring-2 ring-blue-200"
-                                            : "border-gray-300 hover:border-gray-400"
-                                        }`}
-                                        style={{
-                                          backgroundColor: variant.colorCode,
-                                        }}
-                                        title={
-                                          isSelected
-                                            ? `${variant.color} (click to unselect)`
-                                            : variant.color
-                                        }
-                                      >
-                                        {/* {isSelected && (
-                                          <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow-sm">
-                                            ×
-                                          </span>
-                                        )} */}
-                                      </button>
-                                    );
-                                  })
-                                ) : (
-                                  <span className="text-xs text-gray-500">
-                                    No color variants available
-                                  </span>
-                                )}
-                              </div>
+                              {(() => {
+                                const variants = item.colorVariants || [];
+                                if (variants.length === 0) {
+                                  return (
+                                    <span className="text-xs text-gray-500">
+                                      No color variants available
+                                    </span>
+                                  );
+                                }
+
+                                const cols = Math.max(
+                                  1,
+                                  Math.ceil(variants.length / 2),
+                                );
+
+                                return (
+                                  <div
+                                    className="grid gap-1"
+                                    style={{
+                                      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                                    }}
+                                  >
+                                    {variants.map((variant, index) => {
+                                      const variantId =
+                                        variant.id || `variant-${index}`;
+                                      const isSelected =
+                                        selectedColors[item.id] === variantId;
+                                      return (
+                                        <button
+                                          key={`${item.id}-${variantId}`}
+                                          onClick={() =>
+                                            handleColorSelect(
+                                              item.id,
+                                              variantId,
+                                            )
+                                          }
+                                          className={`relative w-6 h-6 rounded-full border-2 transition-all ${
+                                            isSelected
+                                              ? "border-blue-500 ring-2 ring-blue-200"
+                                              : "border-gray-300 hover:border-gray-400"
+                                          }`}
+                                          style={{
+                                            backgroundColor: variant.colorCode,
+                                          }}
+                                          title={
+                                            isSelected
+                                              ? `${variant.color} (click to unselect)`
+                                              : variant.color
+                                          }
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             {/* Size Selection */}
