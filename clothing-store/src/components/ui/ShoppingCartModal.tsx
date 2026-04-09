@@ -92,6 +92,11 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   // Payment clearance state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
 
+  // Local editing state for quantity inputs so users can type/clear before commit
+  const [editingQuantities, setEditingQuantities] = React.useState<
+    Record<string, string>
+  >({});
+
   // Refs for detecting clicks outside dropdowns
   const groupDropdownRef = React.useRef<HTMLDivElement>(null);
   const variantDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -458,9 +463,11 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   // Calculate group discount savings
   const groupDiscountSavings = cart.items.reduce((total, item) => {
     if (item.groupDiscount && item.groupDiscount > 0) {
-      const basePrice = item.isWholesalePricing ? (item.wholesalePrice ?? item.unitPrice) : item.unitPrice;
+      const basePrice = item.isWholesalePricing
+        ? (item.wholesalePrice ?? item.unitPrice)
+        : item.unitPrice;
       const groupDiscountAmount =
-        (basePrice * item.quantity) * (item.groupDiscount / 100);
+        basePrice * item.quantity * (item.groupDiscount / 100);
       return total + groupDiscountAmount;
     }
     return total;
@@ -469,9 +476,11 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
   // Calculate variant discount savings
   const variantDiscountSavings = cart.items.reduce((total, item) => {
     if (item.variantDiscount && item.variantDiscount > 0) {
-      const basePrice = item.isWholesalePricing ? (item.wholesalePrice ?? item.unitPrice) : item.unitPrice;
+      const basePrice = item.isWholesalePricing
+        ? (item.wholesalePrice ?? item.unitPrice)
+        : item.unitPrice;
       const variantDiscountAmount =
-        (basePrice * item.quantity) * (item.variantDiscount / 100);
+        basePrice * item.quantity * (item.variantDiscount / 100);
       return total + variantDiscountAmount;
     }
     return total;
@@ -1114,9 +1123,56 @@ export function ShoppingCartModal({ isOpen, onClose }: ShoppingCartModalProps) {
                                   >
                                     <Minus className="h-3 w-3 text-gray-600" />
                                   </button>
-                                  <span className="text-sm font-bold text-gray-900 min-w-[30px] text-center">
-                                    {item.quantity}
-                                  </span>
+
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    value={
+                                      editingQuantities[item.id] ??
+                                      String(item.quantity)
+                                    }
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      setEditingQuantities((prev) => ({
+                                        ...prev,
+                                        [item.id]: raw,
+                                      }));
+                                    }}
+                                    onBlur={() => {
+                                      const raw = editingQuantities[item.id];
+                                      // If user didn't edit, nothing to do
+                                      if (raw === undefined) return;
+                                      const v = parseInt(raw, 10);
+                                      if (Number.isNaN(v)) {
+                                        // Revert to actual quantity
+                                        setEditingQuantities((prev) => {
+                                          const copy = { ...prev };
+                                          delete copy[item.id];
+                                          return copy;
+                                        });
+                                        return;
+                                      }
+                                      if (v <= 0) {
+                                        removeFromCart(item.id);
+                                      } else {
+                                        updateQuantity(item.id, v);
+                                      }
+                                      setEditingQuantities((prev) => {
+                                        const copy = { ...prev };
+                                        delete copy[item.id];
+                                        return copy;
+                                      });
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    className="w-20 text-sm font-bold text-gray-900 text-center bg-transparent outline-none"
+                                    aria-label={`Quantity for ${item.groupName}`}
+                                  />
+
                                   <button
                                     onClick={() =>
                                       updateQuantity(item.id, item.quantity + 1)

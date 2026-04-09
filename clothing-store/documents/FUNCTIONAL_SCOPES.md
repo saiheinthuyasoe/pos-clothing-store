@@ -1,6 +1,7 @@
 Functional Scopes
 
 Owner
+
 - Manage products: create, read, update, delete product records and images.
 - Manage inventory: add stock, adjust quantities, set reorder thresholds, and view low-stock alerts.
 - Manage shops/branches: create and configure branches, set branch-specific prices/stock.
@@ -13,6 +14,7 @@ Owner
 - System settings: change tax, currency, payment methods, integrations (R2, Firebase), and global settings.
 
 Manager
+
 - Manage products and inventory: create and edit products, adjust stock, and view inventory reports.
 - Customer management: view and edit customer data and order history.
 - Sales & transactions: view transactions, generate reports, and assist with refunds (subject to policies).
@@ -22,6 +24,7 @@ Manager
 - Restrictions: cannot create/modify/delete staff accounts or change owner-level settings.
 
 Staff (Cashier)
+
 - POS operations: process sales, accept payments, and print/issue receipts.
 - Refunds: process refunds according to allowed workflows and permissions.
 - Customer lookup: search and update customer details during checkout.
@@ -30,11 +33,13 @@ Staff (Cashier)
 - Restrictions: no access to staff management, global system settings, or owner-only reports.
 
 Customer
+
 - Browse products: view product listings, descriptions, images, and availability by branch.
 - Cart & checkout: add/remove items in cart, checkout, and view order history.
 - Shop info: view shop locations, opening hours, and terms & conditions.
 - Account: manage personal profile and view past orders.
 
 Notes
+
 - Roles in code: `owner`, `manager`, `staff`, `customer` (see `src/types/auth.ts`).
 - Access control is enforced across the app (ProtectedRoute, Sidebar role filters, server APIs).
