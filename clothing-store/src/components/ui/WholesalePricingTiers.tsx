@@ -27,10 +27,14 @@ export function WholesalePricingTiers({
   };
 
   // Sort tiers by minimum quantity for better display
-  const sortedTiers = [...wholesaleTiers].sort((a, b) => a.minQuantity - b.minQuantity);
+  const sortedTiers = [...wholesaleTiers].sort(
+    (a, b) => a.minQuantity - b.minQuantity,
+  );
 
   return (
-    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
+    <div
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}
+    >
       {/* Header with toggle button */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
@@ -39,7 +43,8 @@ export function WholesalePricingTiers({
             <h3 className="text-lg font-medium text-gray-900">{title}</h3>
             {wholesaleTiers.length > 0 && (
               <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                {wholesaleTiers.length} tier{wholesaleTiers.length !== 1 ? 's' : ''}
+                {wholesaleTiers.length} tier
+                {wholesaleTiers.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
@@ -77,7 +82,9 @@ export function WholesalePricingTiers({
             <div className="space-y-4">
               {sortedTiers.map((tier, index) => (
                 <div
-                  key={tier.id || `tier-${index}-${tier.minQuantity}-${tier.price}`}
+                  key={
+                    tier.id || `tier-${index}-${tier.minQuantity}-${tier.price}`
+                  }
                   className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center space-x-4">
@@ -102,13 +109,15 @@ export function WholesalePricingTiers({
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-semibold text-green-600">
-                      {formatPrice(tier.price)}
+                      {tier.minQuantity > 0
+                        ? formatPrice(tier.price / tier.minQuantity)
+                        : formatPrice(tier.price)}
                     </div>
                     <div className="text-sm text-gray-500">per item</div>
                   </div>
                 </div>
               ))}
-              
+
               {/* Summary information */}
               {sortedTiers.length > 1 && (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
@@ -122,12 +131,42 @@ export function WholesalePricingTiers({
                       </h4>
                       <div className="mt-2 text-sm text-blue-700">
                         <p>
-                          Best price: <span className="font-semibold">{formatPrice(Math.min(...sortedTiers.map(t => t.price)))}</span> 
-                          {" "}(min. {sortedTiers.find(t => t.price === Math.min(...sortedTiers.map(tier => tier.price)))?.minQuantity} items)
+                          Best price:{" "}
+                          <span className="font-semibold">
+                            {formatPrice(
+                              Math.min(...sortedTiers.map((t) => t.price)),
+                            )}
+                          </span>{" "}
+                          (min.{" "}
+                          {
+                            sortedTiers.find(
+                              (t) =>
+                                t.price ===
+                                Math.min(
+                                  ...sortedTiers.map((tier) => tier.price),
+                                ),
+                            )?.minQuantity
+                          }{" "}
+                          items)
                         </p>
                         <p>
-                          Regular price: <span className="font-semibold">{formatPrice(Math.max(...sortedTiers.map(t => t.price)))}</span>
-                          {" "}(min. {sortedTiers.find(t => t.price === Math.max(...sortedTiers.map(tier => tier.price)))?.minQuantity} items)
+                          Regular price:{" "}
+                          <span className="font-semibold">
+                            {formatPrice(
+                              Math.max(...sortedTiers.map((t) => t.price)),
+                            )}
+                          </span>{" "}
+                          (min.{" "}
+                          {
+                            sortedTiers.find(
+                              (t) =>
+                                t.price ===
+                                Math.max(
+                                  ...sortedTiers.map((tier) => tier.price),
+                                ),
+                            )?.minQuantity
+                          }{" "}
+                          items)
                         </p>
                       </div>
                     </div>

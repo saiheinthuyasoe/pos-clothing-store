@@ -68,6 +68,9 @@ function NewStockContent() {
 
   const [isColorless, setIsColorless] = useState(false);
   const [wholesaleTiers, setWholesaleTiers] = useState<WholesaleTier[]>([]);
+  const [perItemInputs, setPerItemInputs] = useState<Record<string, string>>(
+    {},
+  );
   const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
 
@@ -179,6 +182,11 @@ function NewStockContent() {
 
   const removeWholesaleTier = (id: string) => {
     setWholesaleTiers((tiers) => tiers.filter((tier) => tier.id !== id));
+    setPerItemInputs((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
   };
 
   const addColorVariant = () => {
@@ -994,35 +1002,100 @@ function NewStockContent() {
                             value={
                               tier.minQuantity === 0 ? "" : tier.minQuantity
                             }
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const minQty =
+                                e.target.value === ""
+                                  ? 0
+                                  : parseInt(e.target.value, 10);
                               updateWholesaleTier(
                                 tier.id,
                                 "minQuantity",
-                                e.target.value === ""
-                                  ? 0
-                                  : parseInt(e.target.value, 10),
-                              )
-                            }
+                                minQty,
+                              );
+
+                              const rawPerItem = perItemInputs[tier.id];
+                              const perItem =
+                                rawPerItem === undefined || rawPerItem === ""
+                                  ? NaN
+                                  : parseFloat(rawPerItem);
+                              if (!Number.isNaN(perItem) && minQty > 0) {
+                                updateWholesaleTier(
+                                  tier.id,
+                                  "price",
+                                  perItem * minQty,
+                                );
+                              }
+                            }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                           />
                         </div>
                         <div className="flex-1">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Price ({currencySymbol})
+                            Price per item ({currencySymbol})
                           </label>
                           <input
-                            aria-label="Enter price"
+                            aria-label="Enter price per item"
                             type="number"
+                            min={0}
+                            step="0.01"
+                            value={
+                              perItemInputs[tier.id] ??
+                              (tier.minQuantity > 0
+                                ? (tier.price / tier.minQuantity).toFixed(2)
+                                : "")
+                            }
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setPerItemInputs((prev) => ({
+                                ...prev,
+                                [tier.id]: raw,
+                              }));
+
+                              const perItemRaw =
+                                raw === "" ? NaN : parseFloat(raw);
+                              if (
+                                !Number.isNaN(perItemRaw) &&
+                                tier.minQuantity > 0
+                              ) {
+                                updateWholesaleTier(
+                                  tier.id,
+                                  "price",
+                                  perItemRaw * tier.minQuantity,
+                                );
+                              }
+                            }}
+                            onBlur={() => {
+                              // Let computed value take over after editing
+                              setPerItemInputs((prev) => {
+                                const copy = { ...prev };
+                                delete copy[tier.id];
+                                return copy;
+                              });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Total Price ({currencySymbol})
+                          </label>
+                          <input
+                            aria-label="Enter total price"
+                            type="number"
+                            min={0}
+                            step="0.01"
                             value={tier.price === 0 ? "" : tier.price}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const v =
+                                e.target.value === ""
+                                  ? 0
+                                  : parseFloat(e.target.value);
                               updateWholesaleTier(
                                 tier.id,
                                 "price",
-                                e.target.value === ""
-                                  ? 0
-                                  : parseFloat(e.target.value),
-                              )
-                            }
+                                isNaN(v) ? 0 : v,
+                              );
+                            }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                           />
                         </div>
