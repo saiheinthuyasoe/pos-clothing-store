@@ -865,18 +865,6 @@ function NewStockContent() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Unit Price ({currencySymbol})
-                    </label>
-                    <input
-                      type="number"
-                      value={unitPrice}
-                      onChange={(e) => setUnitPrice(e.target.value)}
-                      placeholder="Enter unit price"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Original Price ({currencySymbol})
                     </label>
                     <input
@@ -884,6 +872,18 @@ function NewStockContent() {
                       value={originalPrice}
                       onChange={(e) => setOriginalPrice(e.target.value)}
                       placeholder="Enter original price"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Unit Price ({currencySymbol})
+                    </label>
+                    <input
+                      type="number"
+                      value={unitPrice}
+                      onChange={(e) => setUnitPrice(e.target.value)}
+                      placeholder="Enter unit price"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                     />
                   </div>
