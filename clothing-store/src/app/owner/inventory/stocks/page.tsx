@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from 'react-hot-toast';
+import { toast } from "react-hot-toast";
 import { useState, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -31,6 +31,7 @@ import { Shop } from "@/types/shop";
 import { StockDisplayService } from "@/services/stockDisplayService";
 import { SettingsService } from "@/services/settingsService";
 import { CategoryService } from "@/services/categoryService";
+import { InventoryRealtimeService } from "@/services/inventoryRealtimeService";
 import { WholesalePricingTiers } from "@/components/ui/WholesalePricingTiers";
 
 function InventoryStocksContent() {
@@ -42,6 +43,7 @@ function InventoryStocksContent() {
 
   // API state
   const [stockGroups, setStockGroups] = useState<StockGroupDisplay[]>([]);
+  const [rawStocks, setRawStocks] = useState<StockItem[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [shopLookup, setShopLookup] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -126,36 +128,22 @@ function InventoryStocksContent() {
     };
   }, []);
 
-  // Fetch stocks from API
+  // Fetch shops and currency settings
   useEffect(() => {
-    const fetchStocks = async () => {
+    const fetchShopsAndSettings = async () => {
       try {
-        setIsLoading(true);
         setError(null);
 
-        // Fetch stocks, shops, and currency settings
-        const [stocksResponse, shopsResponse, settings] = await Promise.all([
-          fetch("/api/stocks"),
+        const [shopsResponse, settings] = await Promise.all([
           fetch("/api/shops"),
           SettingsService.getBusinessSettings(),
         ]);
-
-        if (!stocksResponse.ok) {
-          throw new Error("Failed to fetch stocks");
-        }
 
         if (!shopsResponse.ok) {
           throw new Error("Failed to fetch shops");
         }
 
-        const [stocksData, shopsData] = await Promise.all([
-          stocksResponse.json(),
-          shopsResponse.json(),
-        ]);
-
-        if (!stocksData.success || !stocksData.data) {
-          throw new Error(stocksData.error || "Invalid response format");
-        }
+        const shopsData = await shopsResponse.json();
 
         if (!shopsData.success || !shopsData.data) {
           throw new Error(shopsData.error || "Failed to fetch shops");
@@ -172,23 +160,69 @@ function InventoryStocksContent() {
         // Set currency from settings
         const currency = (settings?.defaultCurrency as "THB" | "MMK") || "THB";
         setDefaultCurrency(currency);
-
-        // Transform API data using the display service with currency
-        const transformedGroups = StockDisplayService.transformStocksForDisplay(
-          stocksData.data,
-          currency,
-        );
-        setStockGroups(transformedGroups);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch stocks");
-        console.error("Error fetching stocks:", err);
-      } finally {
-        setIsLoading(false);
+        setError(err instanceof Error ? err.message : "Failed to fetch shops");
+        console.error("Error fetching shops/settings:", err);
       }
     };
 
-    fetchStocks();
+    fetchShopsAndSettings();
   }, []);
+
+  // Subscribe to real-time stock updates
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+
+    const unsubscribe = InventoryRealtimeService.subscribeToAllStocks(
+      (stocks) => {
+        setRawStocks(stocks);
+        setIsLoading(false);
+      },
+    );
+
+    if (!unsubscribe) {
+      const fetchStocks = async () => {
+        try {
+          const stocksResponse = await fetch("/api/stocks");
+          if (!stocksResponse.ok) {
+            throw new Error("Failed to fetch stocks");
+          }
+
+          const stocksData = await stocksResponse.json();
+          if (!stocksData.success || !stocksData.data) {
+            throw new Error(stocksData.error || "Invalid response format");
+          }
+
+          setRawStocks(stocksData.data);
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch stocks",
+          );
+          console.error("Error fetching stocks:", err);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchStocks();
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  // Transform stocks for display when data or currency changes
+  useEffect(() => {
+    const transformedGroups = StockDisplayService.transformStocksForDisplay(
+      rawStocks,
+      defaultCurrency,
+    );
+    setStockGroups(transformedGroups);
+  }, [rawStocks, defaultCurrency]);
 
   // Filter groups based on search term and filters
   const filteredGroups = stockGroups.filter((group) => {
@@ -196,8 +230,8 @@ function InventoryStocksContent() {
     const normalizedSearch = searchTerm.toLowerCase();
     const matchesSearch =
       group.groupName.toLowerCase().includes(normalizedSearch) ||
-      group.variants.some(
-        (variant) => variant.barcode?.toLowerCase().includes(normalizedSearch),
+      group.variants.some((variant) =>
+        variant.barcode?.toLowerCase().includes(normalizedSearch),
       );
 
     // Shop filter
@@ -329,7 +363,9 @@ function InventoryStocksContent() {
     const csvContent = [
       headers.join(","),
       ...rows.map((row) =>
-        row.map((cell, columnIndex) => formatCsvCell(cell, columnIndex)).join(","),
+        row
+          .map((cell, columnIndex) => formatCsvCell(cell, columnIndex))
+          .join(","),
       ),
     ].join("\n");
 
@@ -1269,4 +1305,3 @@ export default function InventoryStocksPage() {
     </ProtectedRoute>
   );
 }
-

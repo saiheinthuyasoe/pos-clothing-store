@@ -6,6 +6,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import {
   Cart,
@@ -41,6 +42,8 @@ export function CartProvider({ children }: CartProviderProps) {
     selectedCustomer: null,
   });
   const [isLoadingCart, setIsLoadingCart] = useState(false);
+  const isSyncingRef = useRef(false);
+  const cartUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const [inventoryCallbacks, setInventoryCallbacks] = useState<{
     reduceStock: (
@@ -127,9 +130,58 @@ export function CartProvider({ children }: CartProviderProps) {
     loadCart();
   }, [user?.uid]);
 
+  // Subscribe to cart updates when authenticated
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = CartService.subscribeToCart(user.uid, (remoteCart) => {
+      if (!remoteCart) return;
+      isSyncingRef.current = true;
+      setCart(remoteCart);
+      // Allow next save tick
+      setTimeout(() => {
+        isSyncingRef.current = false;
+      }, 0);
+    });
+
+    cartUnsubscribeRef.current = unsubscribe || null;
+
+    return () => {
+      if (cartUnsubscribeRef.current) {
+        cartUnsubscribeRef.current();
+        cartUnsubscribeRef.current = null;
+      }
+    };
+  }, [user?.uid]);
+
+  // Sync cart across tabs for unauthenticated users
+  useEffect(() => {
+    if (user?.uid) return;
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== "shopping-cart" || !event.newValue) return;
+      try {
+        const parsed = JSON.parse(event.newValue) as Cart;
+        isSyncingRef.current = true;
+        setCart(parsed);
+        setTimeout(() => {
+          isSyncingRef.current = false;
+        }, 0);
+      } catch (error) {
+        console.error("Error syncing cart from storage:", error);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [user?.uid]);
+
   // Save cart to database and localStorage whenever it changes
   useEffect(() => {
     const saveCart = async () => {
+      if (isSyncingRef.current) return;
       if (user?.uid && !isLoadingCart) {
         // User is authenticated, save to database
         try {
@@ -282,7 +334,10 @@ export function CartProvider({ children }: CartProviderProps) {
         0,
       );
       const totalAmount = updatedItems.reduce((sum, item) => {
-        const price = item.discountedPrice !== undefined ? item.discountedPrice : item.unitPrice;
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
         return sum + price * item.quantity;
       }, 0);
 
@@ -325,7 +380,10 @@ export function CartProvider({ children }: CartProviderProps) {
         0,
       );
       const totalAmount = updatedItems.reduce((sum, item) => {
-        const price = item.discountedPrice !== undefined ? item.discountedPrice : item.unitPrice;
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
         return sum + price * item.quantity;
       }, 0);
 
@@ -411,7 +469,10 @@ export function CartProvider({ children }: CartProviderProps) {
         0,
       );
       const totalAmount = updatedItems.reduce((sum, item) => {
-        const price = item.discountedPrice !== undefined ? item.discountedPrice : item.unitPrice;
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
         return sum + price * item.quantity;
       }, 0);
 
@@ -485,7 +546,10 @@ export function CartProvider({ children }: CartProviderProps) {
       const updatedItems = prevCart.items.map((item) => {
         if (item.groupName === groupName) {
           const newGroupDiscount = discountPercent;
-          const basePrice = item.isWholesalePricing && item.wholesalePrice !== undefined ? item.wholesalePrice : item.unitPrice;
+          const basePrice =
+            item.isWholesalePricing && item.wholesalePrice !== undefined
+              ? item.wholesalePrice
+              : item.unitPrice;
           const discountedPrice = calculateDiscountedPrice(
             basePrice,
             newGroupDiscount,
@@ -524,7 +588,10 @@ export function CartProvider({ children }: CartProviderProps) {
       const updatedItems = prevCart.items.map((item) => {
         if (item.id === itemId) {
           const newVariantDiscount = discountPercent;
-          const basePrice = item.isWholesalePricing && item.wholesalePrice !== undefined ? item.wholesalePrice : item.unitPrice;
+          const basePrice =
+            item.isWholesalePricing && item.wholesalePrice !== undefined
+              ? item.wholesalePrice
+              : item.unitPrice;
           const discountedPrice = calculateDiscountedPrice(
             basePrice,
             item.groupDiscount,
@@ -542,7 +609,10 @@ export function CartProvider({ children }: CartProviderProps) {
       });
 
       const totalAmount = updatedItems.reduce((sum, item) => {
-        const price = item.discountedPrice !== undefined ? item.discountedPrice : item.unitPrice;
+        const price =
+          item.discountedPrice !== undefined
+            ? item.discountedPrice
+            : item.unitPrice;
         return sum + price * item.quantity;
       }, 0);
 
@@ -559,8 +629,11 @@ export function CartProvider({ children }: CartProviderProps) {
     setCart((prevCart) => {
       const updatedItems = prevCart.items.map((item) => {
         if (item.groupName === groupName) {
-          const basePrice = item.isWholesalePricing && item.wholesalePrice !== undefined ? item.wholesalePrice : item.unitPrice;
-          
+          const basePrice =
+            item.isWholesalePricing && item.wholesalePrice !== undefined
+              ? item.wholesalePrice
+              : item.unitPrice;
+
           // If there's a variant discount, recalculate with just that
           // Otherwise, set discountedPrice to undefined (use unitPrice) or wholesale price if applicable
           const discountedPrice =
@@ -570,7 +643,9 @@ export function CartProvider({ children }: CartProviderProps) {
                   0, // Remove group discount
                   item.variantDiscount,
                 )
-              : (item.isWholesalePricing ? item.wholesalePrice : undefined);
+              : item.isWholesalePricing
+                ? item.wholesalePrice
+                : undefined;
 
           return {
             ...item,
@@ -603,8 +678,11 @@ export function CartProvider({ children }: CartProviderProps) {
     setCart((prevCart) => {
       const updatedItems = prevCart.items.map((item) => {
         if (item.id === itemId) {
-          const basePrice = item.isWholesalePricing && item.wholesalePrice !== undefined ? item.wholesalePrice : item.unitPrice;
-          
+          const basePrice =
+            item.isWholesalePricing && item.wholesalePrice !== undefined
+              ? item.wholesalePrice
+              : item.unitPrice;
+
           // If there's a group discount, recalculate with just that
           // Otherwise, set discountedPrice to undefined (use unitPrice) or wholesale price if applicable
           const discountedPrice =
@@ -614,7 +692,9 @@ export function CartProvider({ children }: CartProviderProps) {
                   item.groupDiscount,
                   0, // Remove variant discount
                 )
-              : (item.isWholesalePricing ? item.wholesalePrice : undefined);
+              : item.isWholesalePricing
+                ? item.wholesalePrice
+                : undefined;
 
           return {
             ...item,

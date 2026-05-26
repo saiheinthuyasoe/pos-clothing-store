@@ -11,11 +11,13 @@ import {
   Timestamp,
   getDoc,
   setDoc,
-} from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '@/lib/firebase';
-import { Cart, CartItem } from '@/types/cart';
+  onSnapshot,
+  Unsubscribe,
+} from "firebase/firestore";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { Cart, CartItem } from "@/types/cart";
 
-const COLLECTION_NAME = 'carts';
+const COLLECTION_NAME = "carts";
 
 export interface DatabaseCart extends Cart {
   id?: string;
@@ -26,16 +28,56 @@ export interface DatabaseCart extends Cart {
 
 export class CartService {
   /**
+   * Subscribe to real-time cart updates for a user
+   */
+  static subscribeToCart(
+    userId: string,
+    callback: (cart: Cart | null) => void,
+  ): Unsubscribe | null {
+    if (!db || !isFirebaseConfigured) {
+      console.warn("Firebase not configured, real-time cart updates disabled");
+      return null;
+    }
+
+    try {
+      const cartRef = doc(db, COLLECTION_NAME, userId);
+      return onSnapshot(
+        cartRef,
+        (cartDoc) => {
+          if (!cartDoc.exists()) {
+            callback(null);
+            return;
+          }
+          const data = cartDoc.data();
+          const cart: Cart = {
+            items: data.items || [],
+            totalItems: data.totalItems || 0,
+            totalAmount: data.totalAmount || 0,
+            currency: data.currency || "THB",
+            selectedCustomer: data.selectedCustomer || null,
+          };
+          callback(cart);
+        },
+        (error) => {
+          console.error("Error in real-time cart updates:", error);
+        },
+      );
+    } catch (error) {
+      console.error("Error setting up cart listener:", error);
+      return null;
+    }
+  }
+  /**
    * Save cart to database
    */
   static async saveCart(userId: string, cart: Cart): Promise<void> {
     if (!db || !isFirebaseConfigured) {
-      console.warn('Firebase not configured, cart will only be saved locally');
+      console.warn("Firebase not configured, cart will only be saved locally");
       return;
     }
 
     try {
-      const cartData: Omit<DatabaseCart, 'id'> = {
+      const cartData: Omit<DatabaseCart, "id"> = {
         ...cart,
         userId,
         createdAt: new Date().toISOString(),
@@ -50,9 +92,9 @@ export class CartService {
         updatedAt: serverTimestamp(),
       });
 
-      console.log('Cart saved to database successfully');
+      console.log("Cart saved to database successfully");
     } catch (error) {
-      console.error('Error saving cart to database:', error);
+      console.error("Error saving cart to database:", error);
       // Don't throw error - allow app to continue with localStorage
     }
   }
@@ -62,7 +104,9 @@ export class CartService {
    */
   static async loadCart(userId: string): Promise<Cart | null> {
     if (!db || !isFirebaseConfigured) {
-      console.warn('Firebase not configured, loading cart from localStorage only');
+      console.warn(
+        "Firebase not configured, loading cart from localStorage only",
+      );
       return null;
     }
 
@@ -76,17 +120,17 @@ export class CartService {
           items: data.items || [],
           totalItems: data.totalItems || 0,
           totalAmount: data.totalAmount || 0,
-          currency: data.currency || 'THB',
+          currency: data.currency || "THB",
         };
 
-        console.log('Cart loaded from database successfully');
+        console.log("Cart loaded from database successfully");
         return cart;
       } else {
-        console.log('No cart found in database for user');
+        console.log("No cart found in database for user");
         return null;
       }
     } catch (error) {
-      console.error('Error loading cart from database:', error);
+      console.error("Error loading cart from database:", error);
       return null;
     }
   }
@@ -96,16 +140,18 @@ export class CartService {
    */
   static async clearCart(userId: string): Promise<void> {
     if (!db || !isFirebaseConfigured) {
-      console.warn('Firebase not configured, cart will only be cleared locally');
+      console.warn(
+        "Firebase not configured, cart will only be cleared locally",
+      );
       return;
     }
 
     try {
       const cartRef = doc(db, COLLECTION_NAME, userId);
       await deleteDoc(cartRef);
-      console.log('Cart cleared from database successfully');
+      console.log("Cart cleared from database successfully");
     } catch (error) {
-      console.error('Error clearing cart from database:', error);
+      console.error("Error clearing cart from database:", error);
       // Don't throw error - allow app to continue
     }
   }
@@ -124,7 +170,7 @@ export class CartService {
    */
   static async getAllCarts(): Promise<DatabaseCart[]> {
     if (!db || !isFirebaseConfigured) {
-      throw new Error('Firebase is not configured');
+      throw new Error("Firebase is not configured");
     }
 
     try {
@@ -149,8 +195,8 @@ export class CartService {
 
       return carts;
     } catch (error) {
-      console.error('Error fetching carts:', error);
-      throw new Error('Failed to fetch carts');
+      console.error("Error fetching carts:", error);
+      throw new Error("Failed to fetch carts");
     }
   }
 }
