@@ -266,7 +266,10 @@ export default function TransactionsPage() {
         .includes(searchTerm.toLowerCase()) ||
       transaction.customer?.displayName
         ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
+        .includes(searchTerm.toLowerCase()) ||
+      transaction.items?.some((item) =>
+        item.groupName?.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
 
     const matchesStatus =
       filterStatus === "all" || transaction.status === filterStatus;
@@ -1147,11 +1150,7 @@ export default function TransactionsPage() {
                   onChange={(e) => {
                     setFilterPaymentMethod(
                       e.target.value as
-                        | "all"
-                        | "cash"
-                        | "scan"
-                        | "wallet"
-                        | "cod",
+                        "all" | "cash" | "scan" | "wallet" | "cod",
                     );
                     setCurrentPage(1);
                   }}
@@ -1170,9 +1169,7 @@ export default function TransactionsPage() {
                   onChange={(e) => {
                     setFilterWholesale(
                       e.target.value as
-                        | "all"
-                        | "with_wholesale"
-                        | "without_wholesale",
+                        "all" | "with_wholesale" | "without_wholesale",
                     );
                     setCurrentPage(1);
                   }}
@@ -1209,12 +1206,7 @@ export default function TransactionsPage() {
                   value={dateRange}
                   onChange={(e) => {
                     const range = e.target.value as
-                      | "today"
-                      | "7d"
-                      | "30d"
-                      | "90d"
-                      | "all"
-                      | "custom";
+                      "today" | "7d" | "30d" | "90d" | "all" | "custom";
                     setDateRange(range);
                     setCurrentPage(1);
 
