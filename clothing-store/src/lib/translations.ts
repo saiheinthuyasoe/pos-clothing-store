@@ -18,6 +18,8 @@ export interface Translations {
   stocks: string;
   customers: string;
   expenses: string;
+  newExpenses: string;
+  promotions: string;
   barcode: string;
   labelPrint: string;
   printSettings: string;
@@ -514,6 +516,8 @@ export const translations: Record<Language, Translations> = {
     stocks: "Stocks",
     customers: "Customers",
     expenses: "Expenses",
+    newExpenses: "New Expenses",
+    promotions: "Promotions",
     barcode: "Barcode",
     labelPrint: "Label Print",
     printSettings: "Print Settings",
@@ -1008,6 +1012,8 @@ export const translations: Record<Language, Translations> = {
     stocks: "စတော့ခ်များ",
     customers: "ဖောက်သည်များ",
     expenses: "ကုန်ကျစရိတ်များ",
+    newExpenses: "ကုန်ကျစရိတ်များ (အသစ်)",
+    promotions: "ပရိုမိုးရှင်းများ",
     barcode: "ဘားကုဒ်",
     labelPrint: "တံဆိပ်ပုံနှိပ်ခြင်း",
     printSettings: "ပုံနှိပ်ဆက်တင်များ",

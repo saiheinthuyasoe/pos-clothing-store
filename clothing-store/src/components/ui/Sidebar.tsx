@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   Store,
   Building2,
+  Percent,
 } from "lucide-react";
 import { MenuItem, NavigationProps } from "@/types/schemas";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -53,6 +54,7 @@ const iconMap = {
   UserCheck,
   Building2,
   Store,
+  Percent,
 };
 
 interface SidebarProps extends NavigationProps {
@@ -165,6 +167,20 @@ export function Sidebar({
       label: t.expenses,
       icon: "Receipt",
       href: "/owner/expenses",
+      roles: ["owner", "manager"], // Only owner and manager
+    },
+    {
+      id: "new-expenses",
+      label: t.newExpenses,
+      icon: "Receipt",
+      href: "/owner/new-expenses",
+      roles: ["owner", "manager"], // Only owner and manager
+    },
+    {
+      id: "promotions",
+      label: t.promotions,
+      icon: "Percent",
+      href: "/owner/promotions",
       roles: ["owner", "manager"], // Only owner and manager
     },
     {
